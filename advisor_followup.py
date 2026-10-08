@@ -24,7 +24,7 @@ def advisor_reply(text, state=None, tamil=False, handoff=False):
         return state, None
     if stage == "offer_help":
         if callback:
-        return reply("I can save a request for the support team; it won’t confirm a call. Would you prefer phone or email?", "ஆதரவு குழுவுக்கான கோரிக்கையைச் சேமிக்கலாம்; அழைப்பை உறுதிப்படுத்தாது. தொலைபேசியா மின்னஞ்சலா?", "method")
+            return reply("I can save a request for the support team; it won’t confirm a call. Would you prefer phone or email?", "ஆதரவு குழுவுக்கான கோரிக்கையைச் சேமிக்கலாம்; அழைப்பை உறுதிப்படுத்தாது. தொலைபேசியா மின்னஞ்சலா?", "method")
         if re.fullmatch(r"(?:yes|sure|okay|ok|help me|ஆம்|சரி)[.! ]*", query):
             return reply("What would you like help with?", "எதில் உதவி வேண்டும்?")
         return {}, None  # A substantive question continues the ordinary chat.
@@ -48,6 +48,6 @@ def advisor_reply(text, state=None, tamil=False, handoff=False):
     if stage == "confirm":
         if re.fullmatch(r"(?:yes|yes please|confirm|save|save it|okay|ok|ஆம்|சரி)[.! ]*", query):
             state["stage"] = "confirmed"
-        return reply("Your callback request is saved for the support team. Your preferred time isn’t a confirmed appointment, and a response isn’t guaranteed.", "ஆதரவு குழுவுக்கான தொடர்பு கோரிக்கை சேமிக்கப்பட்டது. விருப்ப நேரம் உறுதியான சந்திப்பு அல்ல; பதிலும் உறுதியில்லை.")
+            return reply("Your callback request is saved for the support team. Your preferred time isn’t a confirmed appointment, and a response isn’t guaranteed.", "ஆதரவு குழுவுக்கான தொடர்பு கோரிக்கை சேமிக்கப்பட்டது. விருப்ப நேரம் உறுதியான சந்திப்பு அல்ல; பதிலும் உறுதியில்லை.")
         return reply("Should I save this request, or cancel it?", "கோரிக்கையைச் சேமிக்கவா ரத்து செய்யவா?")
     return state, None
