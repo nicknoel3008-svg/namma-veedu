@@ -930,7 +930,14 @@ section[data-testid="stMain"] .st-key-info-panel-content [data-testid="stForm"] 
   display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:.4rem!important
 }
 .st-key-chat-starter-options [data-testid="stHorizontalBlock"]>[data-testid="stColumn"]{
-  width:auto!important;min-width:0!important;max-width:none!important
+  width:auto!important;min-width:0!important;max-width:none!important;display:flex!important;align-items:stretch!important
+}
+.st-key-chat-starter-options [data-testid="stButton"]{
+  width:100%!important;margin:0!important;display:flex!important;align-items:stretch!important
+}
+.st-key-chat-starter-options button{
+  width:100%!important;height:100%!important;min-height:38px!important;margin:0!important;
+  display:flex!important;align-items:center!important;justify-content:center!important
 }
 .st-key-explore-controls{margin-top:.35rem!important;margin-bottom:.65rem!important}
 .st-key-eight-toggle-grid [data-testid="stHorizontalBlock"]{
