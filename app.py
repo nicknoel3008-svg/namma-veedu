@@ -233,7 +233,7 @@ TAMIL_UI = {
     "Set a bedroom count": "படுக்கையறை எண்ணிக்கையை அமைக்கவும்", "Bedrooms (BHK)": "படுக்கையறைகள் (BHK)",
     "Choose locations": "பகுதிகளைத் தேர்ந்தெடுக்கவும்", "Choose property types": "சொத்து வகைகளைத் தேர்ந்தெடுக்கவும்", "Choose listing kinds": "பட்டியல் வகைகளைத் தேர்ந்தெடுக்கவும்",
     "Search locations": "பகுதிகளைத் தேடுங்கள்", "All": "அனைத்தும்", "Include ended auctions in this search": "இந்தத் தேடலில் முடிந்த ஏலங்களையும் சேர்க்கவும்", "No locations match": "பொருந்தும் பகுதிகள் இல்லை", "Showing the first 40 locations; type more to narrow the list.": "முதல் 40 பகுதிகள் காட்டப்படுகின்றன; பட்டியலைச் சுருக்க மேலும் தட்டச்சு செய்யுங்கள்.",
-    "Owner dashboard": "உரிமையாளர் டாஷ்போர்டு", "Owner dashboard sign-in": "உரிமையாளர் டாஷ்போர்டு உள்நுழைவு", "Close sign-in": "உள்நுழைவை மூடு", "Include all districts": "அனைத்து மாவட்டங்களையும் சேர்க்கவும்",
+    "Mira Studio": "மீரா ஸ்டூடியோ", "Mira Studio sign-in": "மீரா ஸ்டூடியோ உள்நுழைவு", "Close sign-in": "உள்நுழைவை மூடு", "Include all districts": "அனைத்து மாவட்டங்களையும் சேர்க்கவும்",
     "A careful note": "கவனிக்க வேண்டியது", "Language preference": "மொழி விருப்பம்",
     "Chat": "உரையாடல்", "Property search": "சொத்து தேடல்", "Auction properties": "ஏலச் சொத்துகள்",
     "Home loans": "வீட்டுக் கடன்", "Area & price": "அளவும் விலையும்", "Sources": "ஆதாரங்கள்", "Follow-ups": "தொடர் நினைவூட்டல்கள்",
@@ -1106,22 +1106,22 @@ if pending_mira_sync:
 def render_owner_dashboard_access() -> None:
     """Keep the owner entry above public filters and gate the dashboard by sign-in."""
     if st.session_state.owner_dashboard_authenticated:
-        st.success("Owner dashboard access enabled")
-        if st.button("Sign out of owner dashboard", use_container_width=True):
+        st.success("Mira Studio access enabled")
+        if st.button("Sign out of Mira Studio", use_container_width=True):
             st.session_state.owner_dashboard_authenticated = False
             st.session_state.owner_dashboard_login_open = False
             st.rerun()
         return
 
-    login_button_label = tr("Close sign-in") if st.session_state.owner_dashboard_login_open else "Owner sign-in"
+    login_button_label = tr("Close sign-in") if st.session_state.owner_dashboard_login_open else "Mira Studio sign-in"
     st.button(login_button_label, key="owner_dashboard_login_toggle", use_container_width=True,
               on_click=lambda: setattr(st.session_state, "owner_dashboard_login_open", not st.session_state.owner_dashboard_login_open))
     if not st.session_state.owner_dashboard_login_open:
         return
     if configured_dashboard_password:
         with st.form("owner_dashboard_sign_in"):
-            st.markdown(f"**{tr('Owner dashboard sign-in')}**")
-            dashboard_password_attempt = st.text_input(tr("Owner dashboard sign-in"), type="password", label_visibility="collapsed")
+            st.markdown(f"**{tr('Mira Studio sign-in')}**")
+            dashboard_password_attempt = st.text_input(tr("Mira Studio sign-in"), type="password", label_visibility="collapsed")
             submitted = st.form_submit_button("Sign in", use_container_width=True)
         if submitted:
             if hmac.compare_digest(dashboard_password_attempt, configured_dashboard_password):
@@ -1130,7 +1130,7 @@ def render_owner_dashboard_access() -> None:
                 st.rerun()
             st.error("That sign-in did not match.")
     else:
-        st.info("Owner dashboard access is not configured yet. Set OWNER_DASHBOARD_PASSWORD in Streamlit secrets before signing in.")
+        st.info("Mira Studio access is not configured yet. Set OWNER_DASHBOARD_PASSWORD in Streamlit secrets before signing in.")
 
 
 with st.sidebar:
@@ -1241,13 +1241,13 @@ with st.sidebar:
 if owner_request_is_local and st.session_state.owner_dashboard_authenticated:
     # A successful sign-in now opens a dedicated main-page dashboard. Keeping
     # this out of dynamically inserted tabs makes the export easy to find.
-    st.title("Owner dashboard")
+    st.title("Mira Studio")
     st.caption("A clear view of saved records, customer conversations, and owner-tracked outcomes. Property counts describe saved records, not live availability.")
     st.markdown("""
     <div class="owner-dashboard-hero" style="background:linear-gradient(115deg,#075e5a 0%,#0b8d83 58%,#ef704e 100%);border-radius:18px;padding:24px 28px;margin:8px 0 20px;color:#fff;box-shadow:0 16px 34px rgba(3,48,48,.30)">
-      <div style="font-size:12px;font-weight:750;letter-spacing:.14em;opacity:.9">NAMMA ILLAM · OWNER WORKSPACE</div>
+      <div style="font-size:12px;font-weight:750;letter-spacing:.14em;opacity:.9">NAMMA ILLAM · MIRA STUDIO</div>
       <div style="font-size:27px;font-weight:750;margin-top:5px">A clearer view of every inquiry</div>
-      <div style="font-size:14px;margin-top:5px;opacity:.94">Track customer needs, follow-ups, and confirmed listing outcomes in one place.</div>
+      <div style="font-size:14px;margin-top:5px;opacity:.94">Review conversations, improve Mira, and track the website blueprint in one private workspace.</div>
       <div class="owner-hero-pills"><span>● Live signals</span><span>✦ Private workspace</span><span>↗ Action-ready insights</span></div>
     </div>
     """, unsafe_allow_html=True)
@@ -1313,6 +1313,15 @@ if owner_request_is_local and st.session_state.owner_dashboard_authenticated:
     </style>
     """, unsafe_allow_html=True)
     chart_palette = ["#42D5C6", "#FF8976", "#FFC65A", "#78A2FF", "#B48BFF", "#72D6A5", "#F291C2"]
+    blueprint_path = ROOT / "WEBSITE_BLUEPRINT.md"
+    with st.expander("Website Blueprint", expanded=False):
+        st.caption("Private product and engineering map. It contains no passwords, API keys, or customer conversation text.")
+        if blueprint_path.exists():
+            blueprint_text = blueprint_path.read_text(encoding="utf-8")
+            st.markdown(blueprint_text)
+            st.download_button("Download blueprint", data=blueprint_text, file_name="namma_illam_website_blueprint.md", mime="text/markdown", key="download_website_blueprint")
+        else:
+            st.info("The blueprint file is not available in this deployment yet.")
 
     def dashboard_bar_chart(data, category, value, *, height=250):
         st.vega_lite_chart(data, {
