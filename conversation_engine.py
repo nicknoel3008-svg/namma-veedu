@@ -125,7 +125,7 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
     # match in the same sentence cannot re-add a preference the customer just
     # removed.
     removal_clause = r"(?:remove|ignore|forget|drop|no longer want|don't want|do not want)[^.?!\n]{0,55}"
-    if re.search(rf"{removal_clause}(?:flat|house|plot|property type)\b", query):
+    if re.search(r"\b(?:remove|ignore|forget|drop|no longer want|don't want|do not want)\b[^.?!\n]{0,80}\b(?:flat|house|plot|property type)\b", query):
         context.pop("property_type", None)
     if re.search(rf"{removal_clause}(?:\d+\s*bhk|bedroom(?:s)?|bhk)\b", query) and not re.search(r"\bkeep\b[^.?!\n]{0,25}(?:\d+\s*bhk|bedroom(?:s)?|bhk)", query):
         context.pop("bedrooms", None)
