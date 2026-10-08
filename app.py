@@ -1188,14 +1188,21 @@ with st.sidebar:
         st.markdown("---")
     locations = sorted({str(v).strip() for c in ("city", "district", "locality") for v in properties[c] if str(v).strip()})
     if st.session_state.pop("clear_filter_widgets_on_next_run", False):
+        # Set widget values before their widgets are instantiated. Removing
+        # only the keys can leave the browser-side control displaying its
+        # previous value after a conversational correction.
+        st.session_state["filter_location_query"] = ""
         for index in range(len(locations)):
-            st.session_state.pop(f"filter_location_option_{index}", None)
+            st.session_state[f"filter_location_option_{index}"] = False
         for key in (
             "filter_property_type_plot", "filter_property_type_house", "filter_property_type_flat",
             "filter_listing_kind_existing_sale", "filter_listing_kind_project_reference", "filter_listing_kind_auction",
-            "filter_preferred_budget", "filter_preferred_size", "filter_preferred_bedrooms", "filter_include_ended",
+            "filter_include_ended",
         ):
-            st.session_state.pop(key, None)
+            st.session_state[key] = False
+        st.session_state["filter_preferred_budget"] = 0.0
+        st.session_state["filter_preferred_size"] = 0.0
+        st.session_state["filter_preferred_bedrooms"] = 0
     with st.container(border=True, key="filter-panel-scroll"):
         with st.container(border=True):
             st.markdown(
