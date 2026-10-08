@@ -113,7 +113,16 @@ def parse_request(text: str, data: pd.DataFrame) -> SearchIntent:
             query,
         )
         if colloquial_area:
-            candidate = colloquial_area.group(1).strip()
+            candidate_words = colloquial_area.group(1).strip().split()
+            # The broad phrase match can include a preceding conversational
+            # word ("venum Taramani" / "near Taramani"). Keep the locality
+            # itself while still allowing genuine two-word names.
+            while candidate_words and candidate_words[0] in {
+                "venum", "vendum", "want", "need", "oru", "one", "near",
+                "around", "in", "at", "the", "my", "home",
+            }:
+                candidate_words.pop(0)
+            candidate = " ".join(candidate_words)
             if candidate not in {"budget", "office", "home", "work", "area", "city"}:
                 intent.location = candidate.title()
     return intent
