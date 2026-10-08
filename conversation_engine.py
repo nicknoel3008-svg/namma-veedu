@@ -152,7 +152,10 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
     amount = re.search(r"(?:budget|around|under|within|maximum|up to).*?(\d+(?:\.\d+)?)\s*(lakhs?|lacs?|crores?|cr)\b", query)
     if amount:
         context["max_budget"] = float(amount.group(1)) * (10000000 if amount.group(2).startswith("cr") else 100000)
-    if re.search(r"flat|apartment|குடியிருப்பு", query):
+    if re.search(r"flat|apartment|குடியிருப்பு", query) and not re.search(
+        r"(?:remove|ignore|forget|drop|no longer want|don't want|do not want)[^.?!\n]{0,80}(?:flat|house|plot|property type)",
+        query,
+    ):
         context["property_type"] = "Flat"
     bhk = re.search(r"([1-9])\s*bhk", query)
     if bhk:
