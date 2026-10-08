@@ -216,11 +216,18 @@ def save_learning_rules(rules: list[dict[str, Any]], local_saver) -> list[dict[s
 
 
 def revision(local_revision: int = 0) -> int:
-    """Return a changing cache key for dashboard reads."""
+    """Return a changing cache key for dashboard reads.
+
+    Include row count and microsecond precision so multiple chat turns written
+    in one second still invalidate Streamlit's cached dashboard read.
+    """
     def action(connection):
         with connection.cursor() as cursor:
             cursor.execute(
-                "SELECT COALESCE(EXTRACT(EPOCH FROM MAX(updated_at)), 0)::bigint FROM mira_inquiry_turns"
+                "SELECT "
+                "(COALESCE(EXTRACT(EPOCH FROM MAX(updated_at)), 0) * 1000000)::bigint "
+                "+ COUNT(*) "
+                "FROM mira_inquiry_turns"
             )
             return int(cursor.fetchone()[0] or 0)
 
