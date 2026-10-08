@@ -5,6 +5,7 @@ from __future__ import annotations
 from html import escape
 from pathlib import Path
 from datetime import datetime, timedelta
+import base64
 import hmac
 import json
 import logging
@@ -66,9 +67,20 @@ from property_search import format_price_for_card, load_properties, rank_matches
 
 ROOT = Path(__file__).parent
 SOURCE_FILE = ROOT / "data" / "sources.csv"
-# Streamlit serves the repository's static directory relative to the app page.
-# Relative URLs also work when Community Cloud mounts the app under /~/+/.
-HERO_IMAGE_URL = "static/property-hero.png"
+
+
+def _asset_data_uri(path: Path, mime_type: str) -> str:
+    """Embed brand assets so hosted CSS is independent of static URL mounting."""
+    try:
+        encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    except OSError:
+        return ""
+    return f"data:{mime_type};base64,{encoded}"
+
+
+HERO_IMAGE_URL = _asset_data_uri(ROOT / "static" / "property-hero.png", "image/png")
+WATERMARK_IMAGE_URL = _asset_data_uri(ROOT / "static" / "namma-illam-watermark.svg", "image/svg+xml")
+LOGO_IMAGE_URL = _asset_data_uri(ROOT / "static" / "namma-illam-logo.svg", "image/svg+xml")
 ASSISTANT_AVATAR = ROOT / "assets" / "assistant-guide.png"
 PROPERTIES_FILE = ROOT / "data" / "properties.csv"
 PRICE_NORMALIZER_VERSION = 3
@@ -316,15 +328,15 @@ def select_all_auction_types() -> None:
 def select_specific_auction_type() -> None:
     st.session_state.auction_type_all = False
 
-st.markdown("""
+_base_styles = """
 <style>
 :root{--navy:#102D35;--teal:#007B78;--teal-bright:#009C98;--coral:#F05D43;--cream:#FFF8EB;--paper:#FFFFFF;--ink:#17313A;--muted:#435A60;--line:#C7DCD6;color-scheme:light}
-.stApp{background-color:#102631;background-image:url('static/namma-illam-watermark.svg'),url('static/property-hero.png');background-position:center 48vh,center center;background-size:min(72vw,900px),cover;background-repeat:no-repeat;background-attachment:fixed;color:#F4F7F4}
+.stApp{background-color:#102631;background-image:url('__WATERMARK_IMAGE__'),url('__HERO_IMAGE__');background-position:center 48vh,center center;background-size:min(72vw,900px),cover;background-repeat:no-repeat;background-attachment:fixed;color:#F4F7F4}
 div[data-testid="stAppViewContainer"],section[data-testid="stMain"],section[data-testid="stMain"]>div{background:transparent!important}
 html,body,[class*="css"]{font-family:'Aptos','Segoe UI',Arial,sans-serif;color:var(--ink)}
 .block-container{max-width:1320px;padding:1.15rem 1.45rem 2rem;background:transparent!important;border:0;border-radius:24px;box-shadow:none;backdrop-filter:none}
 header[data-testid="stHeader"]{background:transparent!important}
-.hero{min-height:286px;padding:22px 26px;border-radius:22px;background-image:linear-gradient(90deg,rgba(9,28,37,.78) 0%,rgba(9,28,37,.48) 48%,rgba(9,28,37,.08) 100%),linear-gradient(0deg,rgba(9,28,37,.42),transparent 48%),url('static/property-hero.png');background-size:cover;background-position:center 58%;border:1px solid #FFFFFFA8;position:relative;overflow:hidden;margin-bottom:14px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 16px 36px #16343B20}
+.hero{min-height:286px;padding:22px 26px;border-radius:22px;background-image:linear-gradient(90deg,rgba(9,28,37,.78) 0%,rgba(9,28,37,.48) 48%,rgba(9,28,37,.08) 100%),linear-gradient(0deg,rgba(9,28,37,.42),transparent 48%),url('__HERO_IMAGE__');background-size:cover;background-position:center 58%;border:1px solid #FFFFFFA8;position:relative;overflow:hidden;margin-bottom:14px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 16px 36px #16343B20}
 .hero-topline{display:flex;align-items:center;justify-content:space-between;color:#fff;font-size:13px;font-weight:700;letter-spacing:.03em}
 .hero-brand{display:flex;align-items:center;gap:9px;padding:3px 0;border:0;border-radius:13px;background:transparent;box-shadow:none}.hero-brand img{display:block;width:min(310px,48vw);height:auto;filter:drop-shadow(0 3px 9px #091C25A0)}.hero-mark{display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:var(--coral);font-size:19px}.hero-pill{border:1px solid #FFFFFF80;border-radius:20px;padding:7px 12px;background:transparent;font-size:11px;text-shadow:0 1px 5px #091C25}
 .hero-main{max-width:570px;margin:32px 0 22px}.eyebrow{letter-spacing:.16em;text-transform:uppercase;font-size:10px;font-weight:800;color:#FFB19F}
@@ -987,12 +999,13 @@ section[data-testid="stMain"] div[data-testid="stColumn"]:has(.st-key-mira-conte
   .st-key-mira-composer-row [data-testid="stHorizontalBlock"]{grid-template-columns:minmax(0,1fr)!important}
 }
 </style>
-""", unsafe_allow_html=True)
+""".replace("__HERO_IMAGE__", HERO_IMAGE_URL).replace("__WATERMARK_IMAGE__", WATERMARK_IMAGE_URL)
+st.markdown(_base_styles, unsafe_allow_html=True)
 
 st.markdown(f'''
 <section class="hero" style="background-image:linear-gradient(90deg,rgba(9,28,37,.84) 0%,rgba(9,28,37,.57) 46%,rgba(9,28,37,.08) 100%),linear-gradient(0deg,rgba(9,28,37,.52),transparent 48%),url('{HERO_IMAGE_URL}');">
   <div class="hero-topline">
-    <div class="hero-brand"><img src="static/namma-illam-logo.svg" alt="Namma Illam — homes, with heart and honesty"></div>
+    <div class="hero-brand"><img src="{LOGO_IMAGE_URL}" alt="Namma Illam — homes, with heart and honesty"></div>
     <span class="hero-pill">{"தமிழ்நாடு · ஆதாரத் தகவல் · உங்கள் வேகத்தில்" if language == "தமிழ்" else "Tamil Nadu · Source-aware · At your pace"}</span>
   </div>
   <div class="hero-main">
