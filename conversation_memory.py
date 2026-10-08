@@ -31,11 +31,11 @@ def update_preferences(text, data, previous=None):
     prior_location = str(remembered.get("location") or previous_context.get("location") or "").strip()
     if prior_location and re.search(rf"{removal}[^.?!\n]{{0,80}}{re.escape(prior_location)}|{re.escape(prior_location)}[^.?!\n]{{0,35}}{removal}", normalized):
         remembered.pop("location", None)
-    if re.search(rf"{removal}[^.?!\n]{{0,80}}(?:\d+\s*bhk|bedroom(?:s)?|bhk)", normalized):
+    if re.search(rf"{removal}[^.?!\n]{{0,45}}(?:\d+\s*bhk|bedroom(?:s)?|bhk)", normalized) and not re.search(r"\bkeep\b[^.?!\n]{0,25}(?:\d+\s*bhk|bedroom(?:s)?|bhk)", normalized):
         remembered.pop("bedrooms", None)
-    if re.search(rf"{removal}[^.?!\n]{{0,80}}(?:budget|lakh|crore|price)", normalized):
+    if re.search(rf"{removal}[^.?!\n]{{0,45}}(?:budget|lakh|crore|price)", normalized) and not re.search(r"\bkeep\b[^.?!\n]{0,25}(?:budget|lakh|crore|price|\d+\s*(?:lakh|crore))", normalized):
         remembered.pop("max_budget", None)
-    if re.search(rf"{removal}[^.?!\n]{{0,80}}(?:flat|house|plot|property type)", normalized):
+    if re.search(rf"{removal}[^.?!\n]{{0,45}}(?:flat|house|plot|property type)", normalized):
         remembered.pop("property_type", None)
     # If a message names a replacement area, prefer that replacement over the
     # first locality found by the generic parser (which may be the area being
@@ -50,6 +50,18 @@ def update_preferences(text, data, previous=None):
                             and re.search(rf"(?:add|instead|replace|switch to|use)\s+(?:the\s+)?{re.escape(value.casefold())}\b", normalized)), None)
         if replacement:
             remembered["location"] = replacement
+        else:
+            # Keep an area the customer explicitly supplied even when it is
+            # absent from the saved catalogue; it can still guide the next
+            # clarification or search-widening question.
+            raw_replacement = re.search(
+                r"\b(?:add|instead|replace|switch to)\s+(?:the\s+)?([a-z][a-z-]*)\b",
+                normalized,
+            )
+            if raw_replacement:
+                candidate = raw_replacement.group(1).strip()
+                if candidate not in {"instead", "the", "area", "location"}:
+                    remembered["location"] = candidate.upper()
     return remembered
 
 
