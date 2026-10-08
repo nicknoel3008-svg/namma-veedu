@@ -1319,6 +1319,29 @@ if owner_request_is_local and st.session_state.owner_dashboard_authenticated:
         blueprint_visual = ROOT / "static" / "mira-blueprint-map.png"
         if blueprint_visual.exists():
             st.image(blueprint_visual, caption="Mira's end-to-end customer, property, review, and learning flow", use_container_width=True)
+        st.markdown("""
+        <div class="blueprint-stage-grid">
+          <div class="blueprint-stage stage-teal"><b>👤 Customer message</b><span>Receives the customer's request, language, and context.</span></div>
+          <div class="blueprint-stage stage-blue"><b>🧠 Understand intent</b><span>Detects language, need, emotion, and preferences.</span></div>
+          <div class="blueprint-stage stage-coral"><b>🏠 Search property data</b><span>Finds relevant homes, auctions, sources, and filters.</span></div>
+          <div class="blueprint-stage stage-amber"><b>🔎 Verify listing details</b><span>Explains saved facts and highlights what must be verified.</span></div>
+          <div class="blueprint-stage stage-violet"><b>💬 Mira response</b><span>Creates a clear, safe, human-friendly answer.</span></div>
+          <div class="blueprint-stage stage-mint"><b>🗂️ Save chat record</b><span>Stores structured signals, ratings, and follow-up state.</span></div>
+          <div class="blueprint-stage stage-sky"><b>🔍 Quality Review</b><span>Finds missed intent, frustration, or correction opportunities.</span></div>
+          <div class="blueprint-stage stage-pink"><b>✅ Approve learning rule</b><span>Turns reviewed improvements into approved Mira guidance.</span></div>
+        </div>
+        <style>
+        .blueprint-stage-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:10px 0 18px}
+        .blueprint-stage{border-radius:14px;padding:13px 14px;min-height:86px;border:1px solid rgba(255,255,255,.3);box-shadow:0 8px 18px rgba(3,35,45,.18);color:#fff}
+        .blueprint-stage b{display:block;font-size:14px;margin-bottom:7px}.blueprint-stage span{display:block;font-size:12px;line-height:1.45;opacity:.96}
+        .stage-teal{background:linear-gradient(135deg,#087d78,#10b7ab)} .stage-blue{background:linear-gradient(135deg,#1264d8,#398ef6)}
+        .stage-coral{background:linear-gradient(135deg,#e6574c,#f58969)} .stage-amber{background:linear-gradient(135deg,#df9911,#f6bd3f)}
+        .stage-violet{background:linear-gradient(135deg,#6540db,#9269f4)} .stage-mint{background:linear-gradient(135deg,#159d76,#45d2a3)}
+        .stage-sky{background:linear-gradient(135deg,#087fc1,#42b8f2)} .stage-pink{background:linear-gradient(135deg,#c93c86,#f267ad)}
+        @media(max-width:800px){.blueprint-stage-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        @media(max-width:480px){.blueprint-stage-grid{grid-template-columns:1fr}}
+        </style>
+        """, unsafe_allow_html=True)
         if blueprint_path.exists():
             blueprint_text = blueprint_path.read_text(encoding="utf-8")
             st.markdown(blueprint_text)
