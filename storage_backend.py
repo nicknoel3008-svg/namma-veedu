@@ -182,7 +182,20 @@ def load_learning_rules(local_loader) -> list[dict[str, Any]] | None:
     def action(connection):
         with connection.cursor() as cursor:
             cursor.execute("SELECT payload FROM mira_learning_rules ORDER BY rule_id")
-            return [dict(row[0]) for row in cursor.fetchall() if isinstance(row[0], dict)]
+            rules = [dict(row[0]) for row in cursor.fetchall() if isinstance(row[0], dict)]
+        if rules:
+            return rules
+        # Seed a newly configured database from the owner's existing private
+        # library. This makes the first hosted run preserve approved guidance.
+        seeded = local_loader()
+        with connection.cursor() as cursor:
+            for rule in seeded:
+                cursor.execute(
+                    "INSERT INTO mira_learning_rules (rule_id, payload, updated_at) VALUES (%s, %s::jsonb, NOW()) ON CONFLICT DO NOTHING",
+                    (str(rule.get("Rule ID") or ""), json.dumps(rule, ensure_ascii=False, default=str)),
+                )
+        connection.commit()
+        return seeded
 
     return _db_call(action, local_loader)
 
