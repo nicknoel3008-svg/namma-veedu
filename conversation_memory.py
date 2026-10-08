@@ -81,6 +81,19 @@ def update_preferences(text, data, previous=None):
                 candidate = raw_replacement.group(1).strip()
                 if candidate not in {"instead", "the", "area", "location"}:
                     remembered["location"] = candidate.upper()
+    # A type word such as "Flat" is never a location. If a generic parser
+    # promoted it, recover an actual locality named in the same message.
+    if str(remembered.get("location") or "").casefold() in {"flat", "apartment", "house", "plot"}:
+        remembered.pop("location", None)
+        place_values = sorted({
+            str(value).strip() for column in ("locality", "city", "district")
+            for value in data.get(column, []) if str(value).strip()
+        }, key=len, reverse=True)
+        actual_place = next((value for value in place_values
+            if value.casefold() not in {"flat", "apartment", "house", "plot"}
+            and re.search(rf"(?<!\w){re.escape(value.casefold())}(?!\w)", normalized)), None)
+        if actual_place:
+            remembered["location"] = actual_place
     return remembered
 
 
