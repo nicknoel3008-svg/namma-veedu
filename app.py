@@ -2990,7 +2990,8 @@ def _respond_without_logging(text: str):
     # soon as a conversational preference update is accepted. The old flow
     # only queued this for a later interaction, which could leave stale type
     # checkboxes (for example House) visible while Mira said Flat.
-    if conversation.get("intent") == "preference_update":
+    preference_filter_sync_needed = conversation.get("intent") == "preference_update"
+    if preference_filter_sync_needed:
         sync_intent = parse_request("", properties)
         for key, value in conversation.get("context", {}).items():
             if hasattr(sync_intent, key):
@@ -3024,6 +3025,10 @@ def _respond_without_logging(text: str):
             # The sidebar rendered before the chat turn was handled. Rerun once
             # so clear_filter_widgets_on_next_run is applied immediately.
             clear_active_preferences()
+            st.rerun()
+        if preference_filter_sync_needed:
+            # Apply the queued widget state immediately; otherwise Streamlit
+            # leaves the old checkbox values visible until another interaction.
             st.rerun()
         return
     understood = understand_request(text, properties, st.session_state.chat,
