@@ -227,9 +227,10 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
         # Collect all changes from one message, then invite the next change
         # instead of forcing the customer through a one-field-at-a-time loop.
         additions = []
+        property_type_removed = bool(re.search(r"(?:remove|ignore|forget|drop)[^.?!\n]{0,60}(?:flat|house|plot)", query))
         if context.get("location"):
             additions.append(str(context["location"]))
-        if context.get("property_type") not in (None, "Any"):
+        if context.get("property_type") not in (None, "Any") and not property_type_removed:
             additions.append(str(context["property_type"]))
         if context.get("bedrooms"):
             additions.append(f"{context['bedrooms']} BHK")
