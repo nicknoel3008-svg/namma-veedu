@@ -212,11 +212,18 @@ def is_local_owner_request() -> bool:
 
 configured_dashboard_password = owner_dashboard_password()
 owner_request_is_local = is_local_owner_request()
+try:
+    # Keep the owner console hidden from normal public visits while allowing
+    # the owner to review hosted PostgreSQL conversations through an explicit,
+    # password-protected studio URL.
+    owner_console_requested = owner_request_is_local or str(st.query_params.get("studio", "")) == "1"
+except Exception:
+    owner_console_requested = owner_request_is_local
 if "owner_dashboard_authenticated" not in st.session_state:
     st.session_state.owner_dashboard_authenticated = False
 if "owner_dashboard_login_open" not in st.session_state:
     st.session_state.owner_dashboard_login_open = False
-if not owner_request_is_local:
+if not owner_console_requested:
     # A public tunnel can serve the customer experience, but never the owner
     # sign-in or the private inquiry dashboard.
     st.session_state.owner_dashboard_authenticated = False
@@ -1194,7 +1201,7 @@ def render_owner_dashboard_access() -> None:
 
 
 with st.sidebar:
-    if owner_request_is_local:
+    if owner_console_requested:
         render_owner_dashboard_access()
         st.markdown("---")
     locations = sorted({str(v).strip() for c in ("city", "district", "locality") for v in properties[c] if str(v).strip()})
@@ -1309,7 +1316,7 @@ with st.sidebar:
     st.markdown(f"**{tr('A careful note')}**")
     st.caption("ஏலம் மற்றும் விற்பனை விவரங்கள் சேமிக்கப்பட்ட ஆதாரங்களில் இருந்து எடுக்கப்பட்டவை. தற்போதைய நிலை, உரிமை, உடைமை, காலக்கெடு மற்றும் கடன் தகுதியை அதிகாரப்பூர்வ ஆதாரத்தில் உறுதிப்படுத்தவும்." if language == "தமிழ்" else "Auction and sale details are copied from saved source files. Confirm live status, title, possession, deadlines and loan eligibility with the official source before acting.")
 
-if owner_request_is_local and st.session_state.owner_dashboard_authenticated:
+if owner_console_requested and st.session_state.owner_dashboard_authenticated:
     # A successful sign-in now opens a dedicated main-page dashboard. Keeping
     # this out of dynamically inserted tabs makes the export easy to find.
     st.title("Mira Studio")
