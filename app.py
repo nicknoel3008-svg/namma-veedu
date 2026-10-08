@@ -31,10 +31,37 @@ from agent_policy import (
 from agent_runtime import INDIA_TZ, run_openai_agent
 from area_utils import convert_area, price_per_sqm
 from followup_service import cancel_email_followup, cancel_followup_from_link, cancel_user_followups, email_config_ready, list_email_followups, schedule_email_followup
-from inquiry_log import INQUIRY_ARCHIVE_DIR, INQUIRY_LOG_PATH, append_inquiry, archive_inquiry_export, build_conversation_transcript_export, build_inquiry_export, customer_summary_rows, structured_archive_export, read_inquiries, update_conversation_fields, update_inquiry_fields
+from inquiry_log import INQUIRY_ARCHIVE_DIR, INQUIRY_LOG_PATH, append_inquiry as local_append_inquiry, archive_inquiry_export, build_conversation_transcript_export, build_inquiry_export, customer_summary_rows, structured_archive_export, read_inquiries as local_read_inquiries, update_conversation_fields as local_update_conversation_fields, update_inquiry_fields as local_update_inquiry_fields
+import storage_backend
 from mira_dialogue_libraries import local_dialogue_reply, local_land_conversation_reply
 from mira_quality import quality_flags
-from mira_learning_library import active_learning_guidance, load_learning_rules, merge_suggested_drafts, save_learning_rules, suggested_draft_rules
+from mira_learning_library import active_learning_guidance, load_learning_rules as local_load_learning_rules, merge_suggested_drafts, save_learning_rules as local_save_learning_rules, suggested_draft_rules
+
+
+def read_inquiries() -> list[dict]:
+    return storage_backend.read_inquiries(local_read_inquiries)
+
+
+def append_inquiry(record: dict) -> None:
+    # Keep a local mirror when a database is configured so owner exports remain
+    # available during local development; the database is the hosted source of truth.
+    storage_backend.append_inquiry(record, local_append_inquiry)
+
+
+def update_inquiry_fields(inquiry_id: str, fields: dict) -> bool:
+    return storage_backend.update_inquiry_fields(inquiry_id, fields, local_update_inquiry_fields)
+
+
+def update_conversation_fields(conversation_id: str, fields: dict) -> int:
+    return storage_backend.update_conversation_fields(conversation_id, fields, local_update_conversation_fields)
+
+
+def load_learning_rules() -> list[dict]:
+    return storage_backend.load_learning_rules(local_load_learning_rules)
+
+
+def save_learning_rules(rules: list[dict]) -> list[dict]:
+    return storage_backend.save_learning_rules(rules, local_save_learning_rules)
 from property_search import format_price_for_card, load_properties, rank_matches, search_properties
 
 ROOT = Path(__file__).parent
@@ -97,9 +124,8 @@ def cached_sources(file_version: int) -> pd.DataFrame:
     return pd.read_csv(SOURCE_FILE, keep_default_na=False)
 
 
-@st.cache_data(show_spinner=False)
 def cached_inquiries(file_version: int, file_size: int) -> list[dict]:
-    """Avoid reopening the private Excel workbook on unchanged dashboard reruns."""
+    """Read current inquiry data from the configured persistent backend."""
     return read_inquiries()
 
 
@@ -1356,9 +1382,13 @@ if owner_request_is_local and st.session_state.owner_dashboard_authenticated:
     st.markdown("---")
     st.subheader("Private inquiry history")
     st.caption("Each row is one chat turn. The export includes conversation signals and owner-maintained follow-up and outcome fields.")
+    st.caption(f"Storage: {storage_backend.mode()}. Configure DATABASE_URL in Streamlit Secrets to keep hosted chats and approved rules across restarts.")
     try:
         inquiry_stat = INQUIRY_LOG_PATH.stat() if INQUIRY_LOG_PATH.exists() else None
-        inquiry_rows = cached_inquiries(inquiry_stat.st_mtime_ns, inquiry_stat.st_size) if inquiry_stat else []
+        inquiry_rows = cached_inquiries(
+            storage_backend.revision(inquiry_stat.st_mtime_ns if inquiry_stat else 0),
+            inquiry_stat.st_size if inquiry_stat else 0,
+        )
         today = datetime.now(INDIA_TZ).date()
 
         def inquiry_date(row):
@@ -1490,7 +1520,7 @@ if owner_request_is_local and st.session_state.owner_dashboard_authenticated:
                 with st.container(key="dashboard_activity_card"):
                     st.markdown("#### Inquiry activity over the selected period")
                     dashboard_activity_chart(timeline, x_axis)
-        if INQUIRY_LOG_PATH.exists():
+        if filtered_rows:
             manual_export = build_inquiry_export(filtered_rows, period_label, start_label, end_label)
             st.download_button(
                 f"Download {period_label} inquiry data (.xlsx)",
