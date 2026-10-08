@@ -127,6 +127,8 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
     removal_clause = r"(?:remove|ignore|forget|drop|no longer want|don't want|do not want)[^.?!\n]{0,55}"
     if re.search(r"\b(?:remove|ignore|forget|drop|no longer want|don't want|do not want)\b[^.?!\n]{0,80}\b(?:flat|house|plot|property type)\b", query):
         context.pop("property_type", None)
+    if re.search(r"(?:remove|ignore|forget|drop)[^.?!\n]{0,40}(?:flat|house|plot)", query) and not re.search(r"keep[^.?!\n]{0,20}(?:flat|house|plot)", query):
+        context.pop("property_type", None)
     if re.search(rf"{removal_clause}(?:\d+\s*bhk|bedroom(?:s)?|bhk)\b", query) and not re.search(r"\bkeep\b[^.?!\n]{0,25}(?:\d+\s*bhk|bedroom(?:s)?|bhk)", query):
         context.pop("bedrooms", None)
     if re.search(rf"{removal_clause}(?:budget|lakh|crore|price)\b", query) and not re.search(r"\bkeep\b[^.?!\n]{0,25}(?:budget|lakh|crore|price|\d+\s*(?:lakh|crore))", query):
