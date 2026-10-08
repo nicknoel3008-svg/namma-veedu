@@ -151,6 +151,16 @@ def understand_request(text, data, chat, context=None, memory=None, tamil=False)
             parking = feature_evidence(row, "parking")
             lines.append(f"**{row['title']}** — {details or ('வசதிகள் குறிப்பிடப்படவில்லை' if tamil else 'amenities not stated in the saved record')}; parking: {parking}.")
         return {"reply": "\n\n".join(lines), "context": context, "memory": memory}
+    if re.search(r"(?:verify|check|validate|confirm).*(?:property|listing)|how should i verify", query):
+        reply = (
+            "பட்டியலைச் சரிபார்க்க: (1) அதிகாரப்பூர்வ source link-ல் தற்போதைய விலை மற்றும் கிடைப்பை உறுதிப்படுத்துங்கள், "
+            "(2) title, approval/RERA விவரங்கள் மற்றும் உரிமையாளர் அடையாளத்தைச் சரிபாருங்கள், (3) இடத்தை நேரில் பார்த்து "
+            "ஆவணங்கள், நிலுவைகள், possession மற்றும் maintenance கட்டணங்களை கேளுங்கள், (4) எழுத்துப்பூர்வ terms இல்லாமல் "
+            "advance அனுப்பாதீர்கள். சேமித்த பதிவு ஒரு தொடக்கக் குறிப்பு மட்டுமே."
+            if tamil else
+            "To verify a listing: (1) open the saved source link and confirm current price and availability, (2) check title, approval/RERA details and the owner’s identity, (3) visit the property and ask for documents, possession terms, encumbrances and maintenance charges, and (4) don’t send an advance without written terms. The saved record is only a starting point."
+        )
+        return {"reply": reply, "context": context, "memory": memory}
     if re.search(r"what can (?:you|mira) do|how (?:do i|to) use (?:this|the) (?:website|portal)|what features", query):
         return {"reply": "சேமித்த விற்பனை மற்றும் ஏலப் பதிவுகளை உங்கள் பகுதி, பட்ஜெட், அளவு மற்றும் BHK-க்கு ஏற்ப தேடலாம்; பட்டியலின் விவரங்கள், ஆதாரங்கள், பரப்பளவு மாற்றம், EMI மற்றும் follow-up வசதிகளிலும் உதவலாம். இவை நேரடி கிடைப்பு அல்லது கடன் ஒப்புதலை உறுதிப்படுத்தாது." if tamil else "I can search saved sale listings and auctions by area, budget, property type, size and BHK, explain recorded property details and source links, and help with area conversion, illustrative EMI and follow-ups. Saved records don’t confirm live availability or loan approval. What would you like help with?", "context": context, "memory": memory}
     if re.search(r"(?:no|not|missing|why).*price|price.*(?:missing|not listed|not provided)", query):
