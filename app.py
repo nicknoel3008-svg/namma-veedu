@@ -4274,7 +4274,7 @@ def close_conversation_from_button() -> None:
             })
         except Exception:
             logging.exception("Could not save the end-of-chat status for %s", conversation_id)
-        st.session_state.inquiry_log_error = "The chat ended, but its completion status could not be saved. Please try again before relying on the saved history."
+            st.session_state.inquiry_log_error = "The chat ended, but its completion status could not be saved. Please try again before relying on the saved history."
 
 
     st.session_state.chat = []
