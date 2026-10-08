@@ -5140,7 +5140,7 @@ with st.container(key="info-panel-content"):
                             masked_email = (name_part[:1] + "***@" + domain_part) if name_part else "***@" + domain_part
                         st.markdown(f"**{escape(item['preference_summary'])}**")
                         st.caption(f"{masked_email} · {state_label} · {item['sent_count']}/{item['max_messages']} sent · Next: {next_time}" if language != "தமிழ்" else f"{masked_email} · {state_label} · {item['sent_count']}/{item['max_messages']} அனுப்பப்பட்டது · அடுத்து: {next_time}")
-                        if item["status"] == "scheduled" and st.button("மின்னஞ்சல்களை நிறுத்து" if language == "தமிழ்" else "Stop email follow-ups", key=f"stop_email_followup_{item['id']}"):
+                        if item["status"] in {"scheduled", "saved_pending_activation"} and st.button("சேமித்த follow-up-ஐ நீக்கு" if language == "தமிழ்" and item["status"] == "saved_pending_activation" else "மின்னஞ்சல்களை நிறுத்து" if language == "தமிழ்" else "Remove saved follow-up" if item["status"] == "saved_pending_activation" else "Stop email follow-ups", key=f"stop_email_followup_{item['id']}"):
                             cancel_email_followup(item["id"], str(st.session_state.user_id))
                             st.session_state.followup_schedule = {**st.session_state.get("followup_schedule", {}), "status": "Stopped by user", "next_at": ""}
                             st.rerun()

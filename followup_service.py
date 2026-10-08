@@ -109,7 +109,7 @@ def cancel_email_followup(schedule_id: str, user_id: str, db_path: Path = FOLLOW
     with _connect(db_path) as connection:
         row = connection.execute("SELECT conversation_id FROM email_followups WHERE id=? AND user_id=?", (schedule_id, user_id)).fetchone()
         cursor = connection.execute(
-            "UPDATE email_followups SET status='cancelled', updated_at=? WHERE id=? AND user_id=? AND status IN ('scheduled','sending')",
+            "UPDATE email_followups SET status='cancelled', updated_at=? WHERE id=? AND user_id=? AND status IN ('scheduled','sending','saved_pending_activation')",
             (now, schedule_id, user_id),
         )
         cancelled = cursor.rowcount > 0
@@ -122,9 +122,9 @@ def cancel_email_followup(schedule_id: str, user_id: str, db_path: Path = FOLLOW
 def cancel_user_followups(user_id: str, db_path: Path = FOLLOWUP_DB) -> int:
     now = datetime.now(INDIA_TZ).isoformat(timespec="seconds")
     with _connect(db_path) as connection:
-        rows = connection.execute("SELECT DISTINCT conversation_id FROM email_followups WHERE user_id=? AND status IN ('scheduled','sending')", (user_id,)).fetchall()
+        rows = connection.execute("SELECT DISTINCT conversation_id FROM email_followups WHERE user_id=? AND status IN ('scheduled','sending','saved_pending_activation')", (user_id,)).fetchall()
         cursor = connection.execute(
-            "UPDATE email_followups SET status='cancelled', updated_at=? WHERE user_id=? AND status IN ('scheduled','sending')",
+            "UPDATE email_followups SET status='cancelled', updated_at=? WHERE user_id=? AND status IN ('scheduled','sending','saved_pending_activation')",
             (now, user_id),
         )
         cancelled = cursor.rowcount
@@ -143,7 +143,7 @@ def cancel_followup_from_link(token: str, db_path: Path = FOLLOWUP_DB) -> bool:
     with _connect(db_path) as connection:
         row = connection.execute("SELECT conversation_id FROM email_followups WHERE id=?", (token,)).fetchone()
         cursor = connection.execute(
-            "UPDATE email_followups SET status='cancelled', updated_at=? WHERE id=? AND status IN ('scheduled','sending')",
+            "UPDATE email_followups SET status='cancelled', updated_at=? WHERE id=? AND status IN ('scheduled','sending','saved_pending_activation')",
             (now, token),
         )
         cancelled = cursor.rowcount > 0
