@@ -3677,6 +3677,14 @@ def _respond_without_logging(text: str):
                     )
                     st.session_state.pending_area_source_check = True
                     st.session_state.area_source_prompted = True
+                if re.search(r"frustrat|not helpful|going in circles|fed up|upset|ஏமாற்றம்|உதவவில்லை", normalized):
+                    empathy = (
+                        "இந்தத் தேடல் உங்களுக்கு ஏமாற்றமாக இருந்ததற்கு மன்னிக்கவும். "
+                        if language == "தமிழ்" else
+                        "I’m sorry this has been frustrating. "
+                    )
+                    if not str(turn.text or "").startswith(("I’m sorry", "இந்தத் தேடல்")):
+                        turn.text = empathy + str(turn.text or "")
             # Groq can occasionally answer a clear listing request without
             # emitting a search tool call. Recover the visible results locally
             # from the same saved inventory instead of leaving Mira's answer
