@@ -136,7 +136,7 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
     replacement_area = re.search(r"\b(?:add|instead|replace|switch to)\s+(?:the\s+)?([a-z][a-z-]*)\b", query)
     if replacement_area and re.search(rf"{removal_clause}[^.?!\n]{{0,40}}(?:area|location|[a-z][a-z-]*)", query):
         candidate = replacement_area.group(1).strip()
-        if candidate not in {"instead", "the", "area", "location"}:
+        if candidate not in {"instead", "the", "area", "location", "flat", "apartment", "house", "plot", "bhk", "budget"}:
             context["location"] = candidate.upper()
     memory = deepcopy(memory or {})
     for key, value in (("preferences", {}), ("rejected", []), ("corrections", []), ("selected", None)):
