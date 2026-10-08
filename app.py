@@ -1101,6 +1101,10 @@ def queue_mira_filter_sync(intent) -> None:
         exact = [value for value in location_options if value.casefold() == needle]
         matches = exact or [value for value in location_options if needle in value.casefold()]
         current["location"] = matches or [intent.location]
+        # Keep an area that Mira understood even when the saved catalogue has
+        # no matching locality. The filter renderer uses this marker to show
+        # an honest empty state rather than silently falling back to all rows.
+        st.session_state["mira_location_without_catalogue"] = intent.location if not matches else ""
     if intent.property_type != "Any":
         current["property_type"] = [intent.property_type]
     if intent.status != "Any":
@@ -1243,6 +1247,9 @@ with st.sidebar:
                 value for index, value in enumerate(locations)
                 if st.session_state.get(f"filter_location_option_{index}", False)
             ]
+            unknown_mira_location = str(st.session_state.get("mira_location_without_catalogue") or "").strip()
+            if unknown_mira_location and location_query.strip().casefold() == unknown_mira_location.casefold() and not matching_locations:
+                location_filter = [unknown_mira_location]
 
             type_column, status_column = st.columns(2, gap="small")
             with type_column:
