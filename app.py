@@ -4063,7 +4063,11 @@ def capture_customer_address(text: str) -> bool:
         if re.fullmatch(r"[^\W\d_]+(?:[ '-][^\W\d_]+){0,2}", candidate, re.UNICODE) and candidate.casefold() not in {
             "hi", "hello", "hey", "good morning", "good afternoon", "good evening", "yes", "no", "okay", "ok", "sure", "thanks", "thank you", "thanks so much", "thank you so much", "skip", "none", "sir", "madam", "ma'am", "bye", "goodbye", "that's all", "that is all", "that's it", "that is it", "i'm done", "we're done",
         }:
-            name = candidate
+        name = candidate
+    if name.casefold() in {
+        "hi mira", "hello mira", "hey mira", "vanakkam mira", "வணக்கம் mira", "ஹாய் mira",
+    }:
+        name = ""
     if name.casefold() in {
         "looking", "searching", "interested", "here", "not", "ready", "fine", "good", "okay", "well",
         "doing well", "doing great", "a buyer", "a seller", "sir", "ma'am", "madam", "madame",
