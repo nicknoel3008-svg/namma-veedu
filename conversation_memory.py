@@ -28,6 +28,13 @@ def update_preferences(text, data, previous=None):
             continue
         if value not in (None, "", "Any"):
             remembered[key] = value
+    explicit_property_type_addition = re.search(
+        r"\b(?:add|set|keep|want|prefer)\s+(?:a\s+)?(flat|apartment|house|plot)\b",
+        normalized,
+    )
+    if explicit_property_type_addition:
+        remembered["property_type"] = "Flat" if explicit_property_type_addition.group(1) in {"flat", "apartment"} else explicit_property_type_addition.group(1).title()
+        remembered.pop("_property_type_cleared", None)
     if explicit_property_type_removal:
         remembered["_property_type_cleared"] = True
     elif re.search(r"\b(?:flat|apartment|house|plot)\b", normalized):
