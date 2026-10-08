@@ -2986,6 +2986,18 @@ def _respond_without_logging(text: str):
     st.session_state.search_context = conversation["context"]
     st.session_state.buyer_memory = conversation["memory"]
     st.session_state.response_language = conversation["memory"]["response_language"]
+    # Keep the visible filters aligned with Mira's remembered preferences as
+    # soon as a conversational preference update is accepted. The old flow
+    # only queued this for a later interaction, which could leave stale type
+    # checkboxes (for example House) visible while Mira said Flat.
+    if conversation.get("intent") == "preference_update":
+        sync_intent = parse_request("", properties)
+        for key, value in conversation.get("context", {}).items():
+            if hasattr(sync_intent, key):
+                setattr(sync_intent, key, value)
+        if conversation.get("context", {}).get("_property_type_cleared"):
+            sync_intent.property_type = "Any"
+        queue_mira_filter_sync(sync_intent)
     if conversation.get("reply"):
         st.session_state.pending_area_source_check = False
         st.session_state.pending_contact_source = None
@@ -3043,6 +3055,7 @@ def _respond_without_logging(text: str):
             st.session_state.chat.extend([{"role": "user", "content": text},
                 {"role": "assistant", "content": reply, "mode": "results", "records": records,
                  "count": len(ranked), "intent": understood["context"]}])
+            st.rerun()
         else:
             st.session_state.chat.extend([{"role": "user", "content": text},
                 {"role": "assistant", "content": understood["reply"], "mode": "welcome" if understood.get("greeting") else "property_detail"}])
