@@ -13,6 +13,8 @@ def update_preferences(text, data, previous=None):
     if re.search(r"\b(?:start (?:over|again)|reset (?:my )?(?:search|preferences)|forget my preferences)\b", normalized):
         remembered = {}
     intent = parse_request(text, data)
+    if re.search(r"(?:remove|ignore|forget|drop|don't need|not needed).*lift|lift.*(?:don't need|not needed|venam|venaam|vendam|வேண்டாம்)", normalized):
+        remembered.pop("lift", None)
     # ``parse_request`` infers Flat from a bare BHK phrase. Respect an
     # explicit property-type removal in the same message so that a later
     # ``2BHK`` or budget update cannot silently restore the removed type.

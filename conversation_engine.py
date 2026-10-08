@@ -224,13 +224,14 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
         )
     # Capture non-catalogue constraints before returning the consolidated
     # preference acknowledgement, so later turns retain them as well.
-    if re.search(r"lift.*(?:need|required|must|venum|வேண்டும்)|(?:need|required|must).*lift", query) and not re.search(r"(?:remove|ignore|forget|drop|don't need|not needed).*lift", query):
+    lift_removal = bool(re.search(r"(?:remove|ignore|forget|drop|don't need|not needed).*lift|lift.*(?:don't need|not needed|venam|venaam|vendam|வேண்டாம்)", query))
+    if re.search(r"lift.*(?:need|required|must|venum|வேண்டும்)|(?:need|required|must).*lift", query) and not lift_removal:
         memory["preferences"]["lift"] = "required"
     if re.search(r"hospital|மருத்துவமனை", query):
         memory["preferences"]["hospital_access"] = "verify"
     if re.search(r"east[- ]?facing|கிழக்கு", query):
         memory["facing"] = "East"
-    if re.search(r"(?:remove|ignore|forget|drop|don't need|not needed).*lift", query):
+    if lift_removal:
         memory["preferences"].pop("lift", None)
     if re.search(r"(?:remove|ignore|forget|drop|don't need|not needed).{0,30}hospital", query):
         memory["preferences"].pop("hospital_access", None)
@@ -258,7 +259,7 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
             additions.append(f"{context['bedrooms']} BHK")
         if context.get("max_budget") is not None:
             additions.append(f"₹{context['max_budget'] / 100000:g} lakh budget")
-        if re.search(r"lift", query) and not re.search(r"(?:remove|ignore|forget|drop|don't need|not needed).{0,30}lift", query):
+        if re.search(r"lift", query) and not lift_removal:
             additions.append("a building with a lift")
         if re.search(r"hospital", query) and not re.search(r"(?:remove|ignore|forget|drop|don't need|not needed).{0,30}hospital", query):
             additions.append("hospital access")
