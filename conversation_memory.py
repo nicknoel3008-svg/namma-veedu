@@ -21,12 +21,19 @@ def update_preferences(text, data, previous=None):
         r"[^.?!\n]{0,80}\b(?:flat|house|plot|property type)\b",
         normalized,
     ))
+    property_type_was_cleared = bool(previous_context.get("_property_type_cleared"))
     for key in ("location", "property_type", "bedrooms", "status", "max_budget", "min_area_sqm"):
         value = getattr(intent, key)
-        if key == "property_type" and explicit_property_type_removal:
+        if key == "property_type" and (explicit_property_type_removal or property_type_was_cleared):
             continue
         if value not in (None, "", "Any"):
             remembered[key] = value
+    if explicit_property_type_removal:
+        remembered["_property_type_cleared"] = True
+    elif re.search(r"\b(?:flat|apartment|house|plot)\b", normalized):
+        # A later explicit type request is the deliberate way to restore the
+        # type after the customer cleared it.
+        remembered.pop("_property_type_cleared", None)
     for pattern, key in (
         (r"\b(?:any (?:area|location|city)|anywhere|(?:remove|ignore|forget) (?:the )?(?:location|area|city))\b", "location"),
         (r"\b(?:no budget (?:limit|cap)|(?:remove|ignore|forget) (?:the )?budget|any budget)\b", "max_budget"),
@@ -48,6 +55,7 @@ def update_preferences(text, data, previous=None):
         remembered.pop("max_budget", None)
     if re.search(rf"{removal}[^.?!\n]{{0,45}}(?:flat|house|plot|property type)", normalized):
         remembered.pop("property_type", None)
+        remembered["_property_type_cleared"] = True
     # If a message names a replacement area, prefer that replacement over the
     # first locality found by the generic parser (which may be the area being
     # removed).
