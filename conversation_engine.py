@@ -186,6 +186,16 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
             "Previous suggestions-ai remove pannitten; neenga ketkaama adha thirumba kaatta maatten. Different area, budget, illa property type-oda fresh search venuma?",
             removed_suggestions=removed,
         )
+    # Capture non-catalogue constraints before returning the consolidated
+    # preference acknowledgement, so later turns retain them as well.
+    if re.search(r"lift.*(?:need|required|must|venum|வேண்டும்)|(?:need|required|must).*lift", query) and not re.search(r"(?:remove|ignore|forget|drop|don't need|not needed).*lift", query):
+        memory["preferences"]["lift"] = "required"
+    if re.search(r"hospital|மருத்துவமனை", query):
+        memory["preferences"]["hospital_access"] = "verify"
+    if re.search(r"east[- ]?facing|கிழக்கு", query):
+        memory["facing"] = "East"
+    if re.search(r"(?:remove|ignore|forget|drop|don't need|not needed).*lift", query):
+        memory["preferences"].pop("lift", None)
     explicit_search = bool(re.search(r"\b(?:find|search|show|list|browse|filter|refine|narrow)\b|காட்டு|தேடு", query))
     preference_signal = bool(re.search(
         r"\b(?:prefer|preference|want|need|keep|add|remove|ignore|forget|drop|set|under|around|near|bhk|bedroom|flat|house|plot|lift|hospital|east[- ]?facing|budget|lakh|crore)\b|விருப்பம்|வேண்டும்|பட்ஜெட்|அருகில்",
@@ -213,6 +223,12 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
         if re.search(r"hospital", query):
             additions.append("hospital access")
         if re.search(r"east[- ]?facing|கிழக்கு", query):
+            additions.append("east-facing")
+        if memory.get("preferences", {}).get("lift") == "required" and "a building with a lift" not in additions:
+            additions.append("a building with a lift")
+        if memory.get("preferences", {}).get("hospital_access") == "verify" and "hospital access" not in additions:
+            additions.append("hospital access")
+        if memory.get("facing") == "East" and "east-facing" not in additions:
             additions.append("east-facing")
         removed = [label for key, label in (
             ("location", "the previous area"),
