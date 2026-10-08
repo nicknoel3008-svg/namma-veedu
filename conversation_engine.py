@@ -154,6 +154,10 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
         memory["requirements"] = dict(context)
         return {"reply": say(english, tamil, tanglish), "context": context, "memory": memory, "intent": intent, **actions}
     amount = re.search(r"(?:budget|around|under|within|maximum|up to).*?(\d+(?:\.\d+)?)\s*(lakhs?|lacs?|crores?|cr)\b", query)
+    if not amount:
+        # Tanglish customers often put the amount before the noun: “50 lakh
+        # budget”. Accept that natural order as the same budget preference.
+        amount = re.search(r"(\d+(?:\.\d+)?)\s*(lakhs?|lacs?|crores?|cr)\s*(?:budget|varamb[ue]|limit)?\b", query)
     if amount:
         context["max_budget"] = float(amount.group(1)) * (10000000 if amount.group(2).startswith("cr") else 100000)
     if re.search(r"flat|apartment|குடியிருப்பு", query) and not re.search(
