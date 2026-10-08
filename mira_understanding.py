@@ -97,6 +97,14 @@ def understand_request(text, data, chat, context=None, memory=None, tamil=False)
         query,
     ):
         search = True
+    # Direct requests such as "find a 2BHK" or "show homes near Velachery"
+    # must search immediately, even when a budget phrase is also present.
+    if re.search(
+        r"\b(?:find|search|show|list|browse|recommend|suggest)\b.{0,80}"
+        r"\b(?:property|properties|home|homes|house|houses|flat|flats|apartment|apartments|plot|plots|land|listing|listings|bhk)\b",
+        query,
+    ):
+        search = True
     if cheapest and not re.search(r"why|no price|not listed", query):
         search = True
     if search or amount or broad:
