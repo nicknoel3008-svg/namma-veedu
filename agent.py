@@ -125,6 +125,15 @@ def parse_request(text: str, data: pd.DataFrame) -> SearchIntent:
             candidate = " ".join(candidate_words)
             if candidate not in {"budget", "office", "home", "work", "area", "city"}:
                 intent.location = candidate.title()
+    if not intent.location:
+        replacement_area = re.search(
+            r"\b(?:near|around|to|towards)\s+([a-z][a-z-]{2,})\b",
+            query,
+        )
+        if replacement_area:
+            candidate = replacement_area.group(1).strip()
+            if candidate not in {"the", "same", "my", "this", "that", "home", "property", "area", "budget"}:
+                intent.location = candidate.title()
     return intent
 
 
