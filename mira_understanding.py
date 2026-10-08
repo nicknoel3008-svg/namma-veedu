@@ -101,7 +101,7 @@ def understand_request(text, data, chat, context=None, memory=None, tamil=False)
     # must search immediately, even when a budget phrase is also present.
     if re.search(
         r"\b(?:find|search|show|list|browse|recommend|suggest)\b.{0,80}"
-        r"\b(?:property|properties|home|homes|house|houses|flat|flats|apartment|apartments|plot|plots|land|listing|listings|bhk)\b",
+        r"(?:\b(?:property|properties|home|homes|house|houses|flat|flats|apartment|apartments|plot|plots|land|listing|listings)\b|\b[1-9]\s*bhk\b)",
         query,
     ):
         search = True
