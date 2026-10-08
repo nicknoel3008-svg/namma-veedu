@@ -2975,6 +2975,10 @@ def _respond_without_logging(text: str):
             st.session_state.filters_applied = False
         st.session_state.chat.extend([{"role": "user", "content": text},
             {"role": "assistant", "content": conversation["reply"], "mode": conversation["intent"]}])
+        if conversation.get("removed_suggestions") is not None:
+            # The sidebar rendered before the chat turn was handled. Rerun once
+            # so clear_filter_widgets_on_next_run is applied immediately.
+            st.rerun()
         return
     understood = understand_request(text, properties, st.session_state.chat,
         st.session_state.get("search_context"), st.session_state.get("buyer_memory"), language == "தமிழ்")
