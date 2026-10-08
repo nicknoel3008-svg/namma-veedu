@@ -1086,6 +1086,15 @@ with st.sidebar:
         render_owner_dashboard_access()
         st.markdown("---")
     locations = sorted({str(v).strip() for c in ("city", "district", "locality") for v in properties[c] if str(v).strip()})
+    if st.session_state.pop("clear_filter_widgets_on_next_run", False):
+        for index in range(len(locations)):
+            st.session_state.pop(f"filter_location_option_{index}", None)
+        for key in (
+            "filter_property_type_plot", "filter_property_type_house", "filter_property_type_flat",
+            "filter_listing_kind_existing_sale", "filter_listing_kind_project_reference", "filter_listing_kind_auction",
+            "filter_preferred_budget", "filter_preferred_size", "filter_preferred_bedrooms", "filter_include_ended",
+        ):
+            st.session_state.pop(key, None)
     with st.container(border=True, key="filter-panel-scroll"):
         with st.container(border=True):
             st.markdown(
@@ -4086,6 +4095,9 @@ def clear_active_preferences() -> None:
     st.session_state.filters_applied = False
     st.session_state.property_inquiry_active = False
     st.session_state.awaiting_search_preferences = False
+    st.session_state.pop("pending_prompt", None)
+    st.session_state.mira_pending_filter_sync = None
+    st.session_state.clear_filter_widgets_on_next_run = True
     st.session_state.preference_clear_notice = (
         "உங்கள் தேடல் விருப்பங்களும் பரிந்துரைகளும் நீக்கப்பட்டன. புதிய விருப்பங்களைச் சொல்லலாம்."
         if language == "தமிழ்" else
