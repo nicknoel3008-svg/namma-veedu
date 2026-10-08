@@ -1316,6 +1316,9 @@ if owner_request_is_local and st.session_state.owner_dashboard_authenticated:
     blueprint_path = ROOT / "WEBSITE_BLUEPRINT.md"
     with st.expander("Website Blueprint", expanded=False):
         st.caption("Private product and engineering map. It contains no passwords, API keys, or customer conversation text.")
+        blueprint_visual = ROOT / "static" / "mira-blueprint-map.png"
+        if blueprint_visual.exists():
+            st.image(blueprint_visual, caption="Mira's end-to-end customer, property, review, and learning flow", use_container_width=True)
         if blueprint_path.exists():
             blueprint_text = blueprint_path.read_text(encoding="utf-8")
             st.markdown(blueprint_text)
