@@ -3106,6 +3106,13 @@ def _respond_without_logging(text: str):
             queue_mira_filter_sync(intent)
             records = ranked.head(3).to_dict("records")
             reply = grounded_search_reply({"records": records}, understood["memory"], language == "தமிழ்")
+            if re.search(r"frustrat|not helpful|going in circles|fed up|upset|ஏமாற்றம்|உதவவில்லை", normalized):
+                empathy = (
+                    "இந்தத் தேடல் உங்களுக்கு ஏமாற்றமாக இருந்ததற்கு மன்னிக்கவும். "
+                    if language == "தமிழ்" else
+                    "I’m sorry this has been frustrating. "
+                )
+                reply = empathy + reply
             st.session_state.chat.extend([{"role": "user", "content": text},
                 {"role": "assistant", "content": reply, "mode": "results", "records": records,
                  "count": len(ranked), "intent": understood["context"]}])
