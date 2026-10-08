@@ -90,8 +90,13 @@ def update_preferences(text, data, previous=None):
                     remembered["location"] = candidate.upper()
     # A type word such as "Flat" is never a location. If a generic parser
     # promoted it, recover an actual locality named in the same message.
-    if str(remembered.get("location") or "").casefold() in {"flat", "apartment", "house", "plot"}:
+    location_value = str(remembered.get("location") or "").strip()
+    invalid_location = location_value.casefold() in {"flat", "apartment", "house", "plot", "east", "west", "north", "south", "east-facing", "west-facing", "north-facing", "south-facing"}
+    if invalid_location:
         remembered.pop("location", None)
+        prior = str(previous_context.get("location") or "").strip()
+        if prior and prior.casefold() not in {"flat", "apartment", "house", "plot", "east", "west", "north", "south", "east-facing", "west-facing", "north-facing", "south-facing"}:
+            remembered["location"] = prior
         place_values = sorted({
             str(value).strip() for column in ("locality", "city", "district")
             for value in data.get(column, []) if str(value).strip()
