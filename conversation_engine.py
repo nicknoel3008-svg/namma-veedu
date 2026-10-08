@@ -157,7 +157,8 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
     bhk = re.search(r"([1-9])\s*bhk", query)
     if bhk:
         context["bedrooms"] = int(bhk.group(1))
-        context.setdefault("property_type", "Flat")
+        if not context.get("_property_type_cleared"):
+            context.setdefault("property_type", "Flat")
     workplace = re.search(r"(?:office|workplace)\s+([a-z][a-z ]{2,30}?)(?:\s+la|\s+is|[.,]|$)", query)
     if workplace:
         memory["workplace"] = workplace.group(1).strip().title()
