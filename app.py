@@ -4444,6 +4444,9 @@ def clear_active_preferences() -> None:
     st.session_state.main_results_total_count = 0
     st.session_state.main_results_mode = "none"
     st.session_state.filters_applied = False
+    # Prevent the filter panel's change detector from immediately rebuilding
+    # the full catalogue after the customer explicitly cleared everything.
+    st.session_state.applied_property_filters = None
     st.session_state.property_inquiry_active = False
     st.session_state.awaiting_search_preferences = False
     st.session_state.pop("pending_prompt", None)
