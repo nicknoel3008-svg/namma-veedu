@@ -29,7 +29,8 @@ def update_preferences(text, data, previous=None):
     # “keep 2BHK under 60 lakh but remove Velachery” or “drop the flat type”.
     removal = r"(?:remove|ignore|forget|drop|no longer want|don't want|do not want)"
     prior_location = str(remembered.get("location") or previous_context.get("location") or "").strip()
-    if prior_location and re.search(rf"{removal}[^.?!\n]{{0,80}}{re.escape(prior_location)}|{re.escape(prior_location)}[^.?!\n]{{0,35}}{removal}", normalized):
+    prior_location_query = prior_location.casefold()
+    if prior_location and re.search(rf"{removal}[^.?!\n]{{0,80}}{re.escape(prior_location_query)}|{re.escape(prior_location_query)}[^.?!\n]{{0,35}}{removal}", normalized):
         remembered.pop("location", None)
     if re.search(rf"{removal}[^.?!\n]{{0,45}}(?:\d+\s*bhk|bedroom(?:s)?|bhk)", normalized) and not re.search(r"\bkeep\b[^.?!\n]{0,25}(?:\d+\s*bhk|bedroom(?:s)?|bhk)", normalized):
         remembered.pop("bedrooms", None)
@@ -40,13 +41,13 @@ def update_preferences(text, data, previous=None):
     # If a message names a replacement area, prefer that replacement over the
     # first locality found by the generic parser (which may be the area being
     # removed).
-    if prior_location and re.search(rf"{removal}[^.?!\n]{{0,80}}{re.escape(prior_location)}", normalized):
+    if prior_location and re.search(rf"{removal}[^.?!\n]{{0,80}}{re.escape(prior_location_query)}", normalized):
         candidates = sorted({
             str(value).strip() for column in ("locality", "city", "district")
             for value in data.get(column, []) if str(value).strip()
         }, key=len, reverse=True)
         replacement = next((value for value in candidates
-                            if value.casefold() != prior_location.casefold()
+            if value.casefold() != prior_location_query
                             and re.search(rf"(?:add|instead|replace|switch to|use)\s+(?:the\s+)?{re.escape(value.casefold())}\b", normalized)), None)
         if replacement:
             remembered["location"] = replacement

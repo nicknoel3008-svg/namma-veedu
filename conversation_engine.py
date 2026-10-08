@@ -121,6 +121,21 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
     query = " ".join(text.casefold().replace("’", "'").split())
     previous_context = dict(context or {})
     context = update_preferences(text, data, previous_context)
+    # Apply explicit removals once more at the intent boundary so a parser
+    # match in the same sentence cannot re-add a preference the customer just
+    # removed.
+    removal_clause = r"(?:remove|ignore|forget|drop|no longer want|don't want|do not want)[^.?!\n]{0,55}"
+    if re.search(rf"{removal_clause}(?:flat|house|plot|property type)\b", query):
+        context.pop("property_type", None)
+    if re.search(rf"{removal_clause}(?:\d+\s*bhk|bedroom(?:s)?|bhk)\b", query) and not re.search(r"\bkeep\b[^.?!\n]{0,25}(?:\d+\s*bhk|bedroom(?:s)?|bhk)", query):
+        context.pop("bedrooms", None)
+    if re.search(rf"{removal_clause}(?:budget|lakh|crore|price)\b", query) and not re.search(r"\bkeep\b[^.?!\n]{0,25}(?:budget|lakh|crore|price|\d+\s*(?:lakh|crore))", query):
+        context.pop("max_budget", None)
+    replacement_area = re.search(r"\b(?:add|instead|replace|switch to)\s+(?:the\s+)?([a-z][a-z-]*)\b", query)
+    if replacement_area and re.search(rf"{removal_clause}[^.?!\n]{{0,40}}(?:area|location|[a-z][a-z-]*)", query):
+        candidate = replacement_area.group(1).strip()
+        if candidate not in {"instead", "the", "area", "location"}:
+            context["location"] = candidate.upper()
     memory = deepcopy(memory or {})
     for key, value in (("preferences", {}), ("rejected", []), ("corrections", []), ("selected", None)):
         memory.setdefault(key, value)
