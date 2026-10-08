@@ -923,7 +923,7 @@ section[data-testid="stMain"] div[data-testid="stColumn"]:has(.st-key-mira-conte
   .st-key-utility-toggle-bar [data-testid="stHorizontalBlock"]>[data-testid="stColumn"]:nth-child(5){grid-column:span 3!important;margin-inline:0!important}
   .st-key-info_panel_auction button,.st-key-info_panel_loan button,.st-key-info_panel_area button,
   .st-key-info_panel_sources button,.st-key-info_panel_followups button{height:52px!important;min-height:52px!important;font-size:11px!important;white-space:normal!important}
-  .st-key-mira-content-wash{max-height:360px!important}
+  .st-key-mira-content-wash{max-height:min(330px,calc(100vh - 270px))!important}
   .st-key-main-start-options .start-option-help{height:108px!important;min-height:108px!important;padding:7px!important;font-size:10.5px!important;line-height:1.3!important;overflow:visible!important}
   .st-key-main-start-options .st-key-results_start_0 button,
   .st-key-main-start-options .st-key-results_start_1 button,
@@ -4071,6 +4071,27 @@ def start_new_conversation() -> None:
     st.session_state.show_full_chat_history = False
     st.session_state.followup_schedule = {}
 
+
+def clear_active_preferences() -> None:
+    """Remove the active search context without deleting the conversation transcript."""
+    st.session_state.search_context = {}
+    st.session_state.buyer_memory = {}
+    st.session_state.soft_search_preferences = []
+    st.session_state.applied_property_filters = {}
+    st.session_state.active_listing_view = "all"
+    st.session_state.last_results = pd.DataFrame()
+    st.session_state.main_results = pd.DataFrame()
+    st.session_state.main_results_total_count = 0
+    st.session_state.main_results_mode = "none"
+    st.session_state.filters_applied = False
+    st.session_state.property_inquiry_active = False
+    st.session_state.awaiting_search_preferences = False
+    st.session_state.preference_clear_notice = (
+        "உங்கள் தேடல் விருப்பங்களும் பரிந்துரைகளும் நீக்கப்பட்டன. புதிய விருப்பங்களைச் சொல்லலாம்."
+        if language == "தமிழ்" else
+        "Your active search preferences and suggestions were cleared. You can start with new requirements."
+    )
+
 if "chat" not in st.session_state:
     st.session_state.chat = [{"role": "assistant", "content": "வணக்கம்! Namma Illam-க்கு வரவேற்கிறேன். நான் Mira, உங்கள் AI வழிகாட்டி. உங்களை என்ன சொல்லி அழைக்கலாம்? உங்கள் பெயரா, Sir/Ma’am என்றா, அல்லது நடுநிலையாகப் பேசவா—உங்கள் விருப்பம். இதைத் தவிர்க்கலாம்; தயாரானபோது எதைப் பற்றி பேச விரும்புகிறீர்களோ அதிலிருந்து தொடங்குங்கள்." if language == "தமிழ்" else "Hi, welcome to Namma Illam! I’m Mira, your AI guide. What should I call you? Your name, Sir or Ma’am, or I can keep it neutral—whichever you prefer. You can skip this and tell me what’s on your mind whenever you’re ready.", "mode": "welcome"}]
     st.session_state.last_results = pd.DataFrame()
@@ -4291,7 +4312,24 @@ with chat_slot.container(key="mira-content-wash"):
     else:
         st.caption(f"Mira AI · {AI_PROVIDER.title()}")
     with st.expander("தனியுரிமை" if language == "தமிழ்" else "Privacy and data", expanded=False):
-        st.caption(f"உரையாடல் தனிப்பட்ட கோப்பில் சேமிக்கப்படும். AI இயக்கப்பட்டால் {AI_PROVIDER.title()} சேவைக்கு சமீபத்திய உரையாடல், விருப்பங்கள் மற்றும் பொருந்தும் பதிவுகள் அனுப்பப்படும்." if language == "தமிழ்" else f"Your conversation is saved in a private workbook for owner review. When AI is enabled, recent conversation, remembered preferences and matching record snippets are sent to {AI_PROVIDER.title()}; the full property file is not uploaded.")
+        st.caption(
+            f"உரையாடல் உரிமையாளர் பார்வைக்கான தனிப்பட்ட கோப்பில் சேமிக்கப்படும். AI இயக்கப்பட்டால், சமீபத்திய உரையாடல், விருப்பங்கள் மற்றும் பொருந்தும் பதிவுகளின் பகுதிகள் {AI_PROVIDER.title()} சேவைக்கு அனுப்பப்படும்; முழு சொத்து கோப்பு பதிவேற்றப்படாது. Aadhaar, PAN, வங்கி கணக்கு அல்லது அடையாள ஆவணங்களை பகிர வேண்டாம். தேவையில்லாத பதிவுகளை உரிமையாளர் நீக்க வேண்டும்."
+            if language == "தமிழ்" else
+            f"Your conversation is saved in a private workbook for owner review. When AI is enabled, recent conversation, remembered preferences and matching record snippets are sent to {AI_PROVIDER.title()}; the full property file is not uploaded. Do not share Aadhaar, PAN, bank-account details, or identity documents. The owner should delete records when they are no longer needed."
+        )
+    active_memory = st.session_state.get("buyer_memory", {})
+    has_active_preferences = bool(
+        st.session_state.get("search_context") or active_memory.get("requirements") or
+        active_memory.get("preferences") or st.session_state.get("soft_search_preferences") or
+        st.session_state.get("main_results_total_count")
+    )
+    if has_active_preferences and not st.session_state.get("conversation_closed"):
+        clear_label = "விருப்பங்களை அழி" if language == "தமிழ்" else "Clear active preferences"
+        if st.button(clear_label, key="clear_active_mira_preferences", help="Remove current filters and suggestions while keeping this chat transcript."):
+            clear_active_preferences()
+            st.rerun()
+    if st.session_state.get("preference_clear_notice"):
+        st.info(st.session_state.pop("preference_clear_notice"))
     if st.session_state.get("agent_error"):
         st.caption(st.session_state.pop("agent_error"))
     if st.session_state.get("offer_delay_callback") and not st.session_state.get("conversation_closed"):
@@ -4342,13 +4380,13 @@ with chat_slot.container(key="mira-content-wash"):
     if not st.session_state.get("conversation_closed") and not any(message.get("role") == "user" for message in st.session_state.chat):
         st.caption("தொடங்குவதற்கு ஒரு வழியைத் தேர்ந்தெடுக்கலாம்—அல்லது உங்கள் சொற்களில் சொல்லுங்கள்." if language == "தமிழ்" else "If a starting point helps, choose one—or just write in your own words.")
         quick_prompts = (
-            ("சுற்றிப் பார்", "இப்போதைக்கு தேடவில்லை; பட்டியல்கள் வேண்டாம்."),
-            ("வழிகாட்டு", "எங்கிருந்து தொடங்குவது என்று தெரியவில்லை."),
-            ("தேடு", "சொத்து தேடத் தயாராக இருக்கிறேன்."),
+            ("2BHK தேடல்", "சென்னை அருகே ₹60 லட்சத்திற்குள் 2BHK தேடுங்கள்."),
+            ("ஏலப் பட்டியல்கள்", "சேமிக்கப்பட்ட ஏலச் சொத்துகளை காட்டுங்கள்."),
+            ("பட்டியல் விளக்கம்", "ஒரு சொத்து பட்டியலை எப்படி சரிபார்ப்பது?"),
         ) if language == "தமிழ்" else (
-            ("Explore", "I’m not looking at listings yet; just exploring."),
-            ("Guide me", "I’m not sure where to start."),
-            ("Search", "I’d like to find a property."),
+            ("Find a 2BHK", "Find a 2BHK near Velachery under ₹60 lakh."),
+            ("Show auctions", "Show me saved auction properties."),
+            ("Explain a listing", "How should I verify a property listing?"),
         )
         with st.container(key="chat-starter-options"):
             quick_cols = st.columns(3)
