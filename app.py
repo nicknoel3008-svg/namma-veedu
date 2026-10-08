@@ -3039,12 +3039,19 @@ def _respond_without_logging(text: str):
             # leaves the old checkbox values visible until another interaction.
             st.rerun()
         return
+    prior_search_context = dict(st.session_state.get("search_context") or {})
     understood = understand_request(text, properties, st.session_state.chat,
         st.session_state.get("search_context"), st.session_state.get("buyer_memory"), language == "தமிழ்")
     if understood:
         if understood.get("greeting"):
             st.session_state.property_inquiry_active = False
             st.session_state.awaiting_search_preferences = False
+        # A generic search command such as “find homes now” must keep the
+        # latest conversational type (Plot/House/Flat). The lightweight
+        # search parser can otherwise infer House from the word “home”.
+        if (prior_search_context.get("property_type") not in (None, "Any")
+                and not re.search(r"\b(?:flat|apartment|house|plot|land)\b", text.casefold())):
+            understood["context"]["property_type"] = prior_search_context["property_type"]
         st.session_state.search_context = understood["context"]
         st.session_state.buyer_memory = understood["memory"]
         st.session_state.pending_area_source_check = False
