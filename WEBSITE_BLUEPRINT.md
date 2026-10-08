@@ -47,3 +47,9 @@ This private blueprint explains how the property assistant is assembled. It is a
 ## Keeping this blueprint current
 
 When a product or architecture change is made, update the relevant section and the current version date in this file in the same commit. The private Mira Studio section reads this file directly and provides a download for the latest approved copy.
+
+## Activation checklist
+
+- **Hosted Mira reasoning:** add `GROQ_API_KEY` and (optionally) `GROQ_MODEL` in Streamlit Secrets. Mira retries rate limits briefly and falls back to the local assistant when the provider is unavailable.
+- **Hosted persistence:** add `DATABASE_URL` in Streamlit Secrets, then run the read-only storage health check after migration. The app falls back safely to local files until configured.
+- **Email follow-ups:** intentionally excluded from this current workstream.

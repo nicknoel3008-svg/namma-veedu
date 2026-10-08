@@ -1313,6 +1313,16 @@ if owner_request_is_local and st.session_state.owner_dashboard_authenticated:
     </style>
     """, unsafe_allow_html=True)
     chart_palette = ["#42D5C6", "#FF8976", "#FFC65A", "#78A2FF", "#B48BFF", "#72D6A5", "#F291C2"]
+    with st.expander("Mira Studio health and readiness", expanded=False):
+        health_cols = st.columns(3)
+        health_cols[0].metric("AI provider", AI_PROVIDER.title())
+        health_cols[1].metric("Hosted AI", "Configured" if bool(AI_API_KEY) else "Local fallback")
+        health_cols[2].metric("Persistent storage", "Connected" if storage_backend.is_configured() else "Fallback files")
+        if not AI_API_KEY:
+            st.info("Add GROQ_API_KEY in Streamlit Secrets when you want hosted Mira reasoning. Local property search and safety flows remain available without it.")
+        if not storage_backend.is_configured():
+            st.info("Add DATABASE_URL in Streamlit Secrets to keep hosted chat records and approved Learning Library rules across restarts.")
+        st.caption("Email follow-ups are intentionally excluded from this readiness view.")
     blueprint_path = ROOT / "WEBSITE_BLUEPRINT.md"
     with st.expander("Website Blueprint", expanded=False):
         st.caption("Private product and engineering map. It contains no passwords, API keys, or customer conversation text.")
