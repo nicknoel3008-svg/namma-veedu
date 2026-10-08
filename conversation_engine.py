@@ -278,14 +278,18 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
         ) if previous_context.get(key) and not context.get(key)]
         added_text = ", ".join(additions)
         removed_text = ", ".join(removed)
+        mixed_frustration = bool(re.search(r"frustrat|not helpful|going in circles|slow|seekiram|கோப|புரியவில்லை", query))
         if language == "Tamil":
-            reply = (f"சரி, ஒரே செய்தியில் மாற்றிய விருப்பங்களைப் புதுப்பித்துவிட்டேன்: {added_text or 'புதிய விருப்பங்கள் இல்லை'}. "
+            reply = (("உங்களுக்கு இது சிரமமாக இருந்தது புரிகிறது. " if mixed_frustration else "")
+                     + f"சரி, ஒரே செய்தியில் மாற்றிய விருப்பங்களைப் புதுப்பித்துவிட்டேன்: {added_text or 'புதிய விருப்பங்கள் இல்லை'}. "
                      f"{removed_text + ' நீக்கப்பட்டது. ' if removed_text else ''}அடுத்து வேறு விருப்பம் சேர்க்கவா அல்லது இந்த விருப்பங்களுடன் தேடவா?")
         elif language == "Tanglish":
-            reply = (f"Seri, ore message-la preferences update pannitten: {added_text or 'new preference illa'}. "
+            reply = (("Idhu frustrating-aa irundhadhu puriyudhu. " if mixed_frustration else "")
+                     + f"Seri, ore message-la preferences update pannitten: {added_text or 'new preference illa'}. "
                      f"{removed_text + ' remove pannitten. ' if removed_text else ''}Next vera preference add pannalama, illa indha preferences-oda search pannalama?")
         else:
-            reply = (f"Got it—I updated these preferences together: {added_text or 'no new preference'}. "
+            reply = (("I hear you—this has been frustrating. " if mixed_frustration else "")
+                     + f"Got it—I updated these preferences together: {added_text or 'no new preference'}. "
                      f"{removed_text + ' was removed. ' if removed_text else ''}Would you like to add another preference, or should I search with these now?")
         return answer("preference_update", reply, reply, reply)
     guidance = document_guidance_turn(query, language, answer, context, memory)
