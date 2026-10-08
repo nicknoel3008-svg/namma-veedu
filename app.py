@@ -1330,6 +1330,18 @@ if owner_request_is_local and st.session_state.owner_dashboard_authenticated:
           <div class="blueprint-stage stage-sky"><b>🔍 Quality Review</b><span>Finds missed intent, frustration, or correction opportunities.</span></div>
           <div class="blueprint-stage stage-pink"><b>✅ Approve learning rule</b><span>Turns reviewed improvements into approved Mira guidance.</span></div>
         </div>
+        <div class="blueprint-branch-title">Conversation decision paths from the original map</div>
+        <div class="blueprint-branch-grid">
+          <div class="blueprint-branch"><b>🧭 What does the customer need?</b><span>Routes the message to the most useful response path.</span></div>
+          <div class="blueprint-branch"><b>🏘️ Find property</b><span>Searches saved properties using location, budget, BHK, and listing preferences.</span></div>
+          <div class="blueprint-branch"><b>📄 Ask about listing</b><span>Explains verified price, source, availability, and property details.</span></div>
+          <div class="blueprint-branch"><b>🛠️ Correction or frustration</b><span>Acknowledges the concern, removes unwanted suggestions, and corrects course.</span></div>
+          <div class="blueprint-branch"><b>📅 Follow-up request</b><span>Collects consent and contact preference without promising a call.</span></div>
+          <div class="blueprint-branch"><b>🙏 Thanks or compliment</b><span>Thanks the customer and offers the next relevant help.</span></div>
+          <div class="blueprint-branch"><b>📚 Apply approved Mira rules</b><span>Uses only owner-approved guidance for similar situations.</span></div>
+          <div class="blueprint-branch"><b>✍️ Generate human-friendly reply</b><span>Combines the current request, verified data, and approved guidance.</span></div>
+          <div class="blueprint-branch"><b>📝 Draft Learning Library rule</b><span>Turns repeated quality cues into an editable draft, never an automatic behavior change.</span></div>
+        </div>
         <style>
         .blueprint-stage-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:10px 0 18px}
         .blueprint-stage{border-radius:14px;padding:13px 14px;min-height:86px;border:1px solid rgba(255,255,255,.3);box-shadow:0 8px 18px rgba(3,35,45,.18);color:#fff}
@@ -1340,6 +1352,12 @@ if owner_request_is_local and st.session_state.owner_dashboard_authenticated:
         .stage-sky{background:linear-gradient(135deg,#087fc1,#42b8f2)} .stage-pink{background:linear-gradient(135deg,#c93c86,#f267ad)}
         @media(max-width:800px){.blueprint-stage-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
         @media(max-width:480px){.blueprint-stage-grid{grid-template-columns:1fr}}
+        .blueprint-branch-title{font-size:15px;font-weight:750;color:#E8FFFA;margin:8px 0 10px}
+        .blueprint-branch-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 18px}
+        .blueprint-branch{background:rgba(255,255,255,.12);border:1px solid rgba(196,244,235,.28);border-radius:12px;padding:11px 13px;color:#F5FFFD;min-height:78px}
+        .blueprint-branch b{display:block;font-size:13px;margin-bottom:5px}.blueprint-branch span{display:block;font-size:11px;line-height:1.45;opacity:.93}
+        @media(max-width:800px){.blueprint-branch-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        @media(max-width:480px){.blueprint-branch-grid{grid-template-columns:1fr}}
         </style>
         """, unsafe_allow_html=True)
         if blueprint_path.exists():
