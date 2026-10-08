@@ -13,8 +13,18 @@ def update_preferences(text, data, previous=None):
     if re.search(r"\b(?:start (?:over|again)|reset (?:my )?(?:search|preferences)|forget my preferences)\b", normalized):
         remembered = {}
     intent = parse_request(text, data)
+    # ``parse_request`` infers Flat from a bare BHK phrase. Respect an
+    # explicit property-type removal in the same message so that a later
+    # ``2BHK`` or budget update cannot silently restore the removed type.
+    explicit_property_type_removal = bool(re.search(
+        r"\b(?:remove|ignore|forget|drop|no longer want|don't want|do not want)\b"
+        r"[^.?!\n]{0,80}\b(?:flat|house|plot|property type)\b",
+        normalized,
+    ))
     for key in ("location", "property_type", "bedrooms", "status", "max_budget", "min_area_sqm"):
         value = getattr(intent, key)
+        if key == "property_type" and explicit_property_type_removal:
+            continue
         if value not in (None, "", "Any"):
             remembered[key] = value
     for pattern, key in (
