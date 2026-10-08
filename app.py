@@ -5008,7 +5008,7 @@ with st.container(key="info-panel-content"):
         st.caption("உங்களுக்கு ஏற்ற முறையைத் தேர்வு செய்யுங்கள். In-app நினைவூட்டல்கள் இந்த உலாவி அமர்வில், இந்தப் பகுதியில் மட்டும் தெரியும்; Email தேர்வுக்கு உங்கள் முகவரி மற்றும் வெளிப்படையான ஒப்புதல் தேவை." if language == "தமிழ்" else "Choose how you’d like Mira to follow up. In-app reminders stay in this browser session and appear in this panel; email follow-ups require your address and explicit opt-in.")
         followup_method = st.radio("Follow-up method" if language != "தமிழ்" else "தொடர்பு முறை", ["In-app reminder", "Email follow-up"], horizontal=True, key="followup_delivery_method", format_func=lambda option: {"In-app reminder": "இந்த உலாவியில்", "Email follow-up": "மின்னஞ்சல்"}.get(option, option) if language == "தமிழ்" else option)
         if followup_method == "Email follow-up" and not FOLLOWUP_EMAIL_READY:
-            st.warning("Email அனுப்புதல் இன்னும் அமைக்கப்படவில்லை. உரிமையாளர் SMTP விவரங்களையும் பகிரப்பட்ட website முகவரியையும் secrets-ல் அமைத்து, follow-up worker-ஐ திட்டமிட வேண்டும். இப்போது email அட்டவணை சேமிக்கப்படாது." if language == "தமிழ்" else "Email sending isn’t configured yet. The owner needs to add SMTP settings and the shared website URL to Streamlit secrets, then schedule the follow-up worker. Email schedules can’t be saved yet.")
+            st.info("மின்னஞ்சல் அனுப்புதல் இப்போது இயக்கப்படவில்லை. உங்கள் follow-up கோரிக்கை மற்றும் ஒப்புதல் மட்டும் சேமிக்கப்படும்; எந்த மின்னஞ்சலும் அனுப்பப்படாது." if language == "தமிழ்" else "Email delivery is currently off. Mira will save your follow-up request and consent for review, but no email will be sent.")
         elif followup_method == "Email follow-up":
             st.caption("ஒப்புதல் அளித்தபின் மின்னஞ்சல் அட்டவணை சேமிக்கப்படும்; அமைத்துள்ள daily worker இயக்கப்படும்போது மட்டுமே அனுப்பப்படும்." if language == "தமிழ்" else "After you opt in, the email schedule is saved and sends only when the configured daily worker runs.")
         with st.form("manual_followup_form", clear_on_submit=False):
@@ -5023,12 +5023,11 @@ with st.container(key="info-panel-content"):
                 recipient_email = st.text_input("உங்கள் மின்னஞ்சல் முகவரி" if language == "தமிழ்" else "Your email address", placeholder="name@example.com")
                 st.caption("முகவரி follow-up அனுப்புவதற்காக மட்டும் தனிப்பட்ட உள்ளூர் பதிவில் வைக்கப்படும். ஆதார், PAN அல்லது வங்கி விவரங்களை follow-up குறிப்பில் எழுத வேண்டாம்." if language == "தமிழ்" else "Your address is kept in a private local follow-up queue for these messages only. Don’t include Aadhaar, PAN, or bank details in your note.")
                 email_cadence = st.selectbox("எத்தனை முறை?" if language == "தமிழ்" else "How often should Mira check in?", ["Every 3 days (up to 3 emails)", "One email after 3 days"], key="followup_email_cadence", format_func=lambda option: {"Every 3 days (up to 3 emails)": "3 நாட்களுக்கு ஒருமுறை (அதிகபட்சம் 3 மின்னஞ்சல்கள்)", "One email after 3 days": "3 நாட்களுக்குப் பிறகு ஒரு மின்னஞ்சல்"}.get(option, option) if language == "தமிழ்" else option)
-                email_opt_in = st.checkbox("என் மின்னஞ்சலுக்கு இந்த follow-up-ஐ அனுப்ப ஒப்புக்கொள்கிறேன். எந்த நேரத்திலும் நிறுத்தலாம்." if language == "தமிழ்" else "I agree to receive these follow-up emails. I can stop them at any time.")
-            save_manual_reminder = st.form_submit_button("நினைவூட்டலைச் சேமிக்கவும்" if language == "தமிழ்" else "Save follow-up", use_container_width=True, disabled=(followup_method == "Email follow-up" and not FOLLOWUP_EMAIL_READY))
+                email_opt_in_label = ("இந்த email follow-up கோரிக்கையை சேமிக்க ஒப்புக்கொள்கிறேன். எந்த நேரத்திலும் நிறுத்தலாம்." if language == "தமிழ்" else "I agree to save this email follow-up request. I can remove it at any time.") if not FOLLOWUP_EMAIL_READY else ("என் மின்னஞ்சலுக்கு இந்த follow-up-ஐ அனுப்ப ஒப்புக்கொள்கிறேன். எந்த நேரத்திலும் நிறுத்தலாம்." if language == "தமிழ்" else "I agree to receive these follow-up emails. I can stop them at any time.")
+                email_opt_in = st.checkbox(email_opt_in_label)
+            save_manual_reminder = st.form_submit_button("நினைவூட்டலைச் சேமிக்கவும்" if language == "தமிழ்" else "Save follow-up", use_container_width=True)
         if save_manual_reminder:
-            if followup_method == "Email follow-up" and not FOLLOWUP_EMAIL_READY:
-                st.error("Email sending isn’t configured yet. Please use an in-app reminder until the owner completes email setup.")
-            elif not preference_summary.strip():
+            if not preference_summary.strip():
                 st.error("மீண்டும் எதைப் பார்க்க வேண்டும் என்பதை முதலில் எழுதுங்கள்." if language == "தமிழ்" else "Add a short note about what Mira should follow up on.")
             elif followup_method == "Email follow-up" and not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", recipient_email.strip()):
                 st.error("சரியான மின்னஞ்சல் முகவரியை உள்ளிடுங்கள்." if language == "தமிழ்" else "Enter a valid email address.")
@@ -5081,28 +5080,31 @@ with st.container(key="info-panel-content"):
                             preference_summary=preference_summary.strip(),
                             started_at=started_at,
                             max_messages=max_messages,
+                            initial_status="scheduled" if FOLLOWUP_EMAIL_READY else "saved_pending_activation",
                         )
                         scheduled = next((item for item in list_email_followups(str(st.session_state.user_id)) if item["id"] == schedule_id), None)
                         next_time = datetime.fromisoformat(scheduled["next_send_at"]).astimezone(INDIA_TZ).strftime("%d %b %Y, %I:%M %p IST") if scheduled else ""
-                        next_at = scheduled["next_send_at"] if scheduled else ""
+                        next_at = scheduled["next_send_at"] if scheduled and FOLLOWUP_EMAIL_READY else ""
                         consent_at = datetime.now(INDIA_TZ).isoformat(timespec="seconds")
                         cadence_label = "Every 3 days · up to 3 emails" if max_messages == 3 else "One email after 3 days"
+                        delivery_status = "Scheduled" if FOLLOWUP_EMAIL_READY else "Saved (email delivery off)"
                         st.session_state.followup_schedule = {
                             "method": "Email",
-                            "status": "Scheduled",
+                            "status": delivery_status,
                             "cadence": cadence_label,
                             "consent_at": consent_at,
                             "next_at": next_at,
                         }
                         update_conversation_fields(conversation_id, {
                             "Follow-up method": "Email",
-                            "Follow-up schedule status": "Scheduled",
+                            "Follow-up schedule status": delivery_status,
                             "Follow-up cadence": cadence_label,
                             "Follow-up consent timestamp (Asia/Kolkata)": consent_at,
                             "Next follow-up time (Asia/Kolkata)": next_at,
                         })
-                        add_followup_confirmation_to_chat("email", preference_summary.strip()[:500], f"first message {next_time}")
-                        st.success((f"Email follow-up saved. First message: {next_time}. You can stop it below or from the stop link in each email." if language != "தமிழ்" else f"மின்னஞ்சல் தொடர் சேமிக்கப்பட்டது. முதல் செய்தி: {next_time}. கீழே அல்லது ஒவ்வொரு மின்னஞ்சலிலும் உள்ள நிறுத்த இணைப்பில் இதை நிறுத்தலாம்."))
+                        confirmation_time = f"first message {next_time}" if FOLLOWUP_EMAIL_READY else "saved for review; no email will be sent"
+                        add_followup_confirmation_to_chat("email", preference_summary.strip()[:500], confirmation_time)
+                        st.success((f"Email follow-up saved. {('First message: ' + next_time + '.') if FOLLOWUP_EMAIL_READY else 'Email delivery is off, so nothing will be sent.'}" if language != "தமிழ்" else f"மின்னஞ்சல் தொடர் சேமிக்கப்பட்டது. {'முதல் செய்தி: ' + next_time + '.' if FOLLOWUP_EMAIL_READY else 'மின்னஞ்சல் அனுப்புதல் நிறுத்தப்பட்டுள்ளது; எதுவும் அனுப்பப்படாது.'}"))
                     except Exception:
                         logging.exception("Could not schedule an opted-in email follow-up")
                         st.error("மின்னஞ்சல் நினைவூட்டலைச் சேமிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்." if language == "தமிழ்" else "Couldn’t save the email follow-up. Please try again.")
@@ -5130,7 +5132,7 @@ with st.container(key="info-panel-content"):
                 st.markdown("##### திட்டமிட்ட மின்னஞ்சல்கள்" if language == "தமிழ்" else "##### Scheduled email follow-ups")
                 for item in scheduled_email:
                     with st.container(border=True):
-                        state_label = ("திட்டமிடப்பட்டுள்ளது" if item["status"] == "scheduled" else "நிறுத்தப்பட்டது" if item["status"] == "cancelled" else "முடிந்தது") if language == "தமிழ்" else item["status"].title()
+                        state_label = ("திட்டமிடப்பட்டுள்ளது" if item["status"] == "scheduled" else "சேமிக்கப்பட்டது; அனுப்புதல் நிறுத்தம்" if item["status"] == "saved_pending_activation" else "நிறுத்தப்பட்டது" if item["status"] == "cancelled" else "முடிந்தது") if language == "தமிழ்" else ("Saved; delivery off" if item["status"] == "saved_pending_activation" else item["status"].title())
                         next_time = datetime.fromisoformat(item["next_send_at"]).astimezone(INDIA_TZ).strftime("%d %b %Y, %I:%M %p IST")
                         masked_email = item["recipient_email"]
                         if "@" in masked_email:

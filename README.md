@@ -106,13 +106,15 @@ values only to `.streamlit/secrets.toml`. In CMD, validate without sending:
 .venv\Scripts\python.exe run_followup_worker.py --check
 ```
 
-The check does not authenticate SMTP or send mail. After configuration and
-verification, Windows Task Scheduler must run `run_followup_worker.py` regularly
-while the computer is on and connected. Starting Streamlit alone does not run
-the email worker. Consented sequences begin at the next three-day boundary;
-they do not send immediately. Saving an advisor callback request with an email
-contact only records that request for owner review; it does not create an
-automated email sequence.
+The check does not authenticate SMTP or send mail. Users can save an email
+follow-up request and consent for owner review while delivery is off; those
+records are marked `Saved (email delivery off)` and are never picked up by the
+worker. If delivery is enabled later, Windows Task Scheduler must run
+`run_followup_worker.py` regularly while the computer is on and connected.
+Starting Streamlit alone does not run the email worker. Consented delivery
+sequences begin at the next three-day boundary; they do not send immediately.
+Saving an advisor callback request with an email contact only records that
+request for owner review; it does not create an automated email sequence.
 
 This provider requires explicitly setting `AI_PROVIDER = "openai"` and is not
 the recommended setup for the zero-budget project.
@@ -214,7 +216,7 @@ Use **Browse listings** for exact filters. Use **Area & price tool** to calculat
 - **Approx. price / m²** — derived as saved asking/reserve price divided by saved land/advertised area converted to square metres; it is not a sale valuation.
 - **Grounds** — conversion uses the common Tamil Nadu convention of 2,400 square feet per ground. Check the relevant deed/local convention.
 
-Without an API key, the app uses a small local phrase parser. With a key, the OpenAI model can choose among the app's allowlisted functions; the application validates and executes those functions. The model cannot directly access files or run arbitrary code. Email and calendar actions are not enabled. Reminder entries last only while the current browser session remains active; this stage does not send background notifications.
+Without an API key, the app uses a small local phrase parser. With a key, the OpenAI model can choose among the app's allowlisted functions; the application validates and executes those functions. The model cannot directly access files or run arbitrary code. Email delivery remains off unless SMTP and a worker are explicitly configured; email follow-up requests can still be saved for review. Reminder entries last only while the current browser session remains active; this stage does not send background notifications.
 
 ## Share with peers
 

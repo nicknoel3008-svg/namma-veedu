@@ -52,4 +52,4 @@ When a product or architecture change is made, update the relevant section and t
 
 - **Hosted Mira reasoning:** add `GROQ_API_KEY` and (optionally) `GROQ_MODEL` in Streamlit Secrets. Mira retries rate limits briefly and falls back to the local assistant when the provider is unavailable.
 - **Hosted persistence:** add `DATABASE_URL` in Streamlit Secrets, then run the read-only storage health check after migration. The app falls back safely to local files until configured.
-- **Email follow-ups:** intentionally excluded from this current workstream.
+- **Email follow-ups:** customers can save an email follow-up request and consent for review without sending anything. Delivery remains disabled until the owner explicitly configures SMTP and a worker.

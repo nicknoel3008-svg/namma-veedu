@@ -66,8 +66,11 @@ def schedule_email_followup(
     *, user_id: str, conversation_id: str, recipient_email: str,
     customer_name: str, preference_summary: str, started_at: datetime,
     max_messages: int = 3, db_path: Path = FOLLOWUP_DB,
+    initial_status: str = "scheduled",
 ) -> str:
-    """Create a user-opted-in sequence, beginning at the next 3-day boundary."""
+    """Save a user-opted-in sequence, optionally as a non-delivery draft."""
+    if initial_status not in {"scheduled", "saved_pending_activation"}:
+        raise ValueError("Unsupported follow-up status")
     now = datetime.now(INDIA_TZ)
     schedule_id = uuid4().hex
     next_send = next_three_day_boundary(started_at, now)
@@ -84,6 +87,11 @@ def schedule_email_followup(
             next_send.isoformat(timespec="seconds"), 3, max_messages,
             now.isoformat(timespec="seconds"), now.isoformat(timespec="seconds"),
         ))
+        if initial_status != "scheduled":
+            connection.execute(
+                "UPDATE email_followups SET status=?, updated_at=? WHERE id=?",
+                (initial_status, now.isoformat(timespec="seconds"), schedule_id),
+            )
     return schedule_id
 
 
