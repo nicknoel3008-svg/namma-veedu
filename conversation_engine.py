@@ -188,15 +188,24 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
     guidance = document_guidance_turn(query, language, answer, context, memory)
     if guidance:
         return guidance
-    if re.search(r"frustrat|not helpful|going in circles|slow|seekiram|கோப|புரியவில்லை", query):
+    frustration_signal = bool(re.search(r"frustrat|not helpful|going in circles|slow|seekiram|கோப|புரியவில்லை", query))
+    search_request_signal = bool(re.search(
+        r"\b(?:show|find|search|list|browse|recommend|suggest)\b.{0,70}"
+        r"(?:property|properties|home|house|flat|apartment|plot|land|listing|bhk|option|வீடு|சொத்து|மனை)"
+        r"|(?:property|properties|home|house|flat|apartment|plot|land|listing|bhk|வீடு|சொத்து|மனை).{0,70}"
+        r"\b(?:show|find|search|list|browse|recommend|suggest)\b",
+        query,
+    ))
+    if frustration_signal:
         memory["emotion"] = "frustration signal"
-        return answer(
-            "feedback_offer",
-            "I’m sorry this has not been helpful. Tell me what Mira missed—such as the area, budget, language, or type of answer—and I’ll use that to improve this chat and adjust the next step.",
-            "இது உதவியாக இல்லாததற்கு மன்னிக்கவும். பகுதி, பட்ஜெட், மொழி அல்லது பதிலின் வகை—Mira எதைத் தவறவிட்டது என்று சொல்லுங்கள்; இந்த உரையாடலை மேம்படுத்தி அடுத்த படியைச் சரிசெய்கிறேன்.",
-            "Helpful-aa illa-nu ketka varuthama irukku. Area, budget, language, illa answer type-la Mira enna miss pannuchu-nu sollunga; indha chat-ai improve panni next step-ai adjust panren.",
-            offer_feedback=True,
-        )
+        if not search_request_signal:
+            return answer(
+                "feedback_offer",
+                "I’m sorry this has not been helpful. Tell me what Mira missed—such as the area, budget, language, or type of answer—and I’ll use that to improve this chat and adjust the next step.",
+                "இது உதவியாக இல்லாததற்கு மன்னிக்கவும். பகுதி, பட்ஜெட், மொழி அல்லது பதிலின் வகை—Mira எதைத் தவறவிட்டது என்று சொல்லுங்கள்; இந்த உரையாடலை மேம்படுத்தி அடுத்த படியைச் சரிசெய்கிறேன்.",
+                "Helpful-aa illa-nu ketka varuthama irukku. Area, budget, language, illa answer type-la Mira enna miss pannuchu-nu sollunga; indha chat-ai improve panni next step-ai adjust panren.",
+                offer_feedback=True,
+            )
     elif re.search(r"urgent|worried|கவலை|பயம்", query):
         memory["emotion"] = "concern signal"
 

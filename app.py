@@ -3534,6 +3534,50 @@ def _respond_without_logging(text: str):
                     )
                     st.session_state.pending_area_source_check = True
                     st.session_state.area_source_prompted = True
+            # Groq can occasionally answer a clear listing request without
+            # emitting a search tool call. Recover the visible results locally
+            # from the same saved inventory instead of leaving Mira's answer
+            # disconnected from the page.
+            property_search_request = bool(re.search(
+                r"\b(?:property|properties|home|house|flat|apartment|plot|land|listing|bhk)\b|சொத்து|வீடு|மனை|நிலம்",
+                normalized,
+            )) and explicit_search
+            if property_search_request and not property_tool:
+                fallback_intent = parse_request(text, properties)
+                previous = st.session_state.get("search_context", {})
+                for key in ("location", "max_budget", "min_area_sqm"):
+                    if not getattr(fallback_intent, key) and previous.get(key):
+                        setattr(fallback_intent, key, previous[key])
+                if fallback_intent.bedrooms is None and previous.get("bedrooms"):
+                    fallback_intent.bedrooms = previous["bedrooms"]
+                if fallback_intent.property_type == "Any" and previous.get("property_type", "Any") != "Any":
+                    fallback_intent.property_type = previous["property_type"]
+                fallback_records = search_properties(
+                    properties,
+                    location=fallback_intent.location,
+                    property_type=fallback_intent.property_type,
+                    bedrooms=fallback_intent.bedrooms,
+                    status=fallback_intent.status,
+                    max_budget=fallback_intent.max_budget,
+                    min_area_sqm=fallback_intent.min_area_sqm,
+                )
+                if not fallback_records.empty:
+                    fallback_ranked = rank_matches(
+                        prepare_inventory(fallback_records, st.session_state.get("buyer_memory", {})),
+                        location=fallback_intent.location,
+                        max_budget=fallback_intent.max_budget,
+                    ).head(30)
+                    st.session_state.last_results = fallback_ranked.copy()
+                    st.session_state.main_results = fallback_ranked.head(3).copy()
+                    st.session_state.main_results_total_count = len(fallback_ranked)
+                    st.session_state.main_results_mode = "chat"
+                    st.session_state.active_listing_view = "all"
+                    st.session_state.filters_applied = True
+                    turn.text = grounded_search_reply(
+                        {"records": fallback_ranked.head(3).to_dict("records"), "count": len(fallback_ranked)},
+                        st.session_state.get("buyer_memory", {}),
+                        language == "தமிழ்",
+                    )
             st.session_state.chat.append({"role": "user", "content": text})
             st.session_state.chat.append({
                 "role": "assistant",
