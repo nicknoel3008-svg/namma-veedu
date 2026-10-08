@@ -2978,6 +2978,7 @@ def _respond_without_logging(text: str):
         if conversation.get("removed_suggestions") is not None:
             # The sidebar rendered before the chat turn was handled. Rerun once
             # so clear_filter_widgets_on_next_run is applied immediately.
+            clear_active_preferences()
             st.rerun()
         return
     understood = understand_request(text, properties, st.session_state.chat,
