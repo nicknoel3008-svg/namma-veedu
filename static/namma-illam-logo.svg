@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 112" role="img" aria-labelledby="title desc">
+  <title id="title">Namma Illam</title>
+  <desc id="desc">A welcoming home mark with a teal roof and coral doorway.</desc>
+  <defs>
+    <linearGradient id="roof" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#13A39A"/>
+      <stop offset="1" stop-color="#086B70"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(5 4)">
+    <path d="M8 50 49 12l42 38v48H8z" fill="#FFF8EB" stroke="#0A6D70" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M1 49 49 4l49 45-8 9-41-38L9 58z" fill="url(#roof)"/>
+    <path d="M39 98V65a10 10 0 0 1 20 0v33" fill="#F16A4B"/>
+    <path d="M13 59h72" stroke="#0A6D70" stroke-width="4" stroke-linecap="round" opacity=".26"/>
+    <circle cx="55" cy="65" r="1.8" fill="#FFF8EB"/>
+  </g>
+  <text x="118" y="58" fill="#FFF8EB" font-family="Aptos, Segoe UI, sans-serif" font-size="35" font-weight="750" letter-spacing="-.8">Namma Illam</text>
+  <text x="120" y="84" fill="#E8F4EE" font-family="Aptos, Segoe UI, sans-serif" font-size="12" font-weight="700" letter-spacing="2.1">HOMES, WITH HEART &amp; HONESTY</text>
+</svg>

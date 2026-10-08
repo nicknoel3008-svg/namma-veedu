@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 620">
+  <g fill="none" stroke="#075E5D" stroke-linecap="round" stroke-linejoin="round" opacity=".17">
+    <path d="M226 294 460 92l234 202v226H226z" stroke-width="12"/>
+    <path d="m176 292 284-246 284 246" stroke-width="20"/>
+    <path d="M391 520V369a69 69 0 0 1 138 0v151" stroke-width="12"/>
+    <path d="M280 337h94v93h-94zM546 337h94v93h-94z" stroke-width="10"/>
+    <path d="M161 548h598M286 577h348" stroke-width="8" opacity=".65"/>
+  </g>
+  <text x="460" y="606" text-anchor="middle" fill="#075E5D" fill-opacity=".16" font-family="Aptos, Segoe UI, sans-serif" font-size="30" font-weight="700" letter-spacing="8">NAMMA ILLAM</text>
+</svg>
