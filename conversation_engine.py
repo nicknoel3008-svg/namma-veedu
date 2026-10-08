@@ -303,9 +303,9 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
         r"send|pay|transfer|anupp|urgent|செலுத்த|அனுப்ப", query
     ))
     search_request_signal = bool(re.search(
-        r"\b(?:show|find|search|list|browse|recommend|suggest)\b.{0,70}"
-        r"(?:property|properties|home|house|flat|apartment|plot|land|listing|bhk|option|வீடு|சொத்து|மனை)"
-        r"|(?:property|properties|home|house|flat|apartment|plot|land|listing|bhk|வீடு|சொத்து|மனை).{0,70}"
+        # Once preferences are already in memory, customers often say only
+        # “search now” or “show the best matches”. Keep that action request
+        # ahead of the generic frustration feedback branch.
         r"\b(?:show|find|search|list|browse|recommend|suggest)\b",
         query,
     ))
