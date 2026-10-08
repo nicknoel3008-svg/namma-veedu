@@ -4104,6 +4104,24 @@ def conversation_transcript(chat: list[dict]) -> str:
     )
 
 
+def add_followup_confirmation_to_chat(method: str, summary: str, schedule_text: str) -> None:
+    """Keep an explicitly saved follow-up visible in Mira's conversation."""
+    if language == "தமிழ்":
+        content = f"சரி. {method} follow-up சேமிக்கப்பட்டது: **{summary}** · {schedule_text}. இதை Follow-ups பகுதியில் பார்க்கலாம்."
+    else:
+        content = f"Okay. I saved your **{method} follow-up** for: **{summary}** · {schedule_text}. You can review it in Follow-ups."
+    st.session_state.chat.append({"role": "assistant", "content": content, "mode": "followup_saved"})
+    conversation_id = str(st.session_state.get("inquiry_conversation_id") or "")
+    if conversation_id:
+        try:
+            update_conversation_fields(conversation_id, {
+                "Recent conversation context": conversation_transcript(st.session_state.chat),
+                "Final conversation transcript": conversation_transcript(st.session_state.chat) if st.session_state.get("conversation_closed") else "",
+            })
+        except Exception:
+            logging.exception("Could not save follow-up confirmation to conversation %s", conversation_id)
+
+
 def respond(text: str):
     """Answer a user turn, then save a private owner-only inquiry record."""
     # A returning customer is already back in contact; stop any pending
@@ -4914,6 +4932,11 @@ with st.container(key="info-panel-content"):
                             "method": "In-app reminder",
                             "status": "saved",
                         })
+                        add_followup_confirmation_to_chat(
+                            "in-app reminder",
+                            preference_summary.strip()[:500],
+                            f"{due.strftime('%d %b %Y, %I:%M %p')} IST",
+                        )
                         st.success("இந்த உலாவிக்கான நினைவூட்டல் சேமிக்கப்பட்டது." if language == "தமிழ்" else "In-app reminder saved for this browser session.")
                 else:
                     conversation_id = st.session_state.setdefault("inquiry_conversation_id", str(uuid4()))
@@ -4948,6 +4971,7 @@ with st.container(key="info-panel-content"):
                             "Follow-up consent timestamp (Asia/Kolkata)": consent_at,
                             "Next follow-up time (Asia/Kolkata)": next_at,
                         })
+                        add_followup_confirmation_to_chat("email", preference_summary.strip()[:500], f"first message {next_time}")
                         st.success((f"Email follow-up saved. First message: {next_time}. You can stop it below or from the stop link in each email." if language != "தமிழ்" else f"மின்னஞ்சல் தொடர் சேமிக்கப்பட்டது. முதல் செய்தி: {next_time}. கீழே அல்லது ஒவ்வொரு மின்னஞ்சலிலும் உள்ள நிறுத்த இணைப்பில் இதை நிறுத்தலாம்."))
                     except Exception:
                         logging.exception("Could not schedule an opted-in email follow-up")
