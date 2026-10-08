@@ -908,7 +908,24 @@ section[data-testid="stMain"] div[data-testid="stColumn"]:has(.st-key-mira-conte
 }
 .st-key-toggle_mira_chat_size button{min-width:32px!important;width:32px!important;height:32px!important;min-height:32px!important;border-radius:9px!important;font-size:16px!important}
 .st-key-end_mira_chat button{height:30px!important;min-height:30px!important;padding:3px 7px!important;border-radius:8px!important;font-size:11px!important}
+@media(max-width:900px){
+  section[data-testid="stMain"] [data-testid="stHorizontalBlock"]:has(.st-key-mira-content-wash){
+    display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:1rem!important
+  }
+  section[data-testid="stMain"] div[data-testid="stColumn"]:has(.st-key-mira-content-wash){
+    position:relative!important;top:auto!important;align-self:stretch!important;min-width:0!important
+  }
+}
 @media(max-width:760px){
+  /* Streamlit's two-column workspace can overlap before the browser finishes
+     measuring a narrow viewport. Stack the result and chat columns and remove
+     desktop sticky positioning on phones. */
+  section[data-testid="stMain"] [data-testid="stHorizontalBlock"]:has(.st-key-mira-content-wash){
+    display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:1rem!important
+  }
+  section[data-testid="stMain"] div[data-testid="stColumn"]:has(.st-key-mira-content-wash){
+    position:relative!important;top:auto!important;align-self:stretch!important;min-width:0!important
+  }
   .st-key-eight-toggle-grid [data-testid="stHorizontalBlock"]{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:.32rem!important}
   .st-key-eight-toggle-grid button{height:54px!important;min-height:54px!important;padding:4px 3px!important}
   .st-key-eight-toggle-grid button p{font-size:9px!important;line-height:1.15!important}
@@ -931,6 +948,15 @@ section[data-testid="stMain"] div[data-testid="stColumn"]:has(.st-key-mira-conte
   .st-key-main-start-options .st-key-results_start_0 button p,
   .st-key-main-start-options .st-key-results_start_1 button p,
   .st-key-main-start-options .st-key-results_start_2 button p{font-size:10px!important;line-height:1.2!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important}
+}
+@media(max-width:560px){
+  .st-key-eight-toggle-grid [data-testid="stHorizontalBlock"]{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:.45rem!important}
+  .st-key-eight-toggle-grid button{height:46px!important;min-height:46px!important;padding:5px 6px!important}
+  .st-key-eight-toggle-grid button p{font-size:11px!important;line-height:1.2!important}
+  .st-key-chat-starter-options [data-testid="stHorizontalBlock"]{grid-template-columns:1fr!important}
+  .st-key-main-start-options [data-testid="stHorizontalBlock"]{grid-template-columns:1fr!important}
+  .st-key-main-start-options .start-option-help{height:auto!important;min-height:0!important;margin-top:4px!important}
+  .st-key-mira-composer-row [data-testid="stHorizontalBlock"]{grid-template-columns:minmax(0,1fr)!important}
 }
 </style>
 """, unsafe_allow_html=True)
