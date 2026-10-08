@@ -3052,6 +3052,17 @@ def _respond_without_logging(text: str):
         if (prior_search_context.get("property_type") not in (None, "Any")
                 and not re.search(r"\b(?:flat|apartment|house|plot|land)\b", text.casefold())):
             understood["context"]["property_type"] = prior_search_context["property_type"]
+        if not re.search(r"\b(?:flat|apartment|house|plot|land)\b", text.casefold()):
+            # The visible preference acknowledgement is the most recent
+            # customer-facing source of truth if an older parser context was
+            # persisted by a previous search turn.
+            for item in reversed(st.session_state.chat):
+                if item.get("role") != "assistant" or item.get("mode") != "preference_update":
+                    continue
+                type_match = re.search(r"\b(Plot|House|Flat)\b", str(item.get("content") or ""), re.I)
+                if type_match:
+                    understood["context"]["property_type"] = type_match.group(1).title()
+                    break
         st.session_state.search_context = understood["context"]
         st.session_state.buyer_memory = understood["memory"]
         st.session_state.pending_area_source_check = False
