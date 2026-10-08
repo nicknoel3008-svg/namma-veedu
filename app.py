@@ -63,6 +63,33 @@ def load_learning_rules() -> list[dict]:
 
 def save_learning_rules(rules: list[dict]) -> list[dict]:
     return storage_backend.save_learning_rules(rules, local_save_learning_rules)
+
+
+def refresh_learning_library_drafts(*, force: bool = False) -> int:
+    """Periodically add recurring reviewed patterns as inactive Draft rules.
+
+    This runs during normal app use as well as in Mira Studio. It never changes
+    an existing rule and never promotes a Draft to Approved, so customer turns
+    cannot silently change Mira's behavior.
+    """
+    now = datetime.now(INDIA_TZ).timestamp()
+    last_refresh = float(st.session_state.get("learning_library_last_refresh", 0) or 0)
+    if not force and now - last_refresh < 300:
+        return 0
+    st.session_state.learning_library_last_refresh = now
+    try:
+        rows = read_inquiries()
+        suggestions = suggested_draft_rules(rows)
+        if not suggestions:
+            return 0
+        existing = load_learning_rules()
+        merged, added = merge_suggested_drafts(existing, suggestions)
+        if added:
+            save_learning_rules(merged)
+        return added
+    except Exception:
+        logging.exception("Could not refresh Mira Learning Library drafts")
+        return 0
 from property_search import format_price_for_card, load_properties, rank_matches, search_properties
 
 ROOT = Path(__file__).parent
@@ -1761,6 +1788,7 @@ if owner_request_is_local and st.session_state.owner_dashboard_authenticated:
 
             st.markdown("#### Mira Learning Library")
             st.caption("Approved rules guide future replies. Mira now groups recurring quality-review cues and creates safe Draft rules for owner review. Draft or paused rules never reach Mira; only Approved rules are applied.")
+            refresh_learning_library_drafts(force=True)
             learning_rules = load_learning_rules()
             automatic_drafts = suggested_draft_rules(filtered_rows)
             learning_rules, drafts_added = merge_suggested_drafts(learning_rules, automatic_drafts)
@@ -2885,6 +2913,9 @@ def local_loan_response(text: str, chat_history: list[dict]) -> tuple[str, str] 
 
 
 def _respond_without_logging(text: str):
+    # Keep recurring reviewed patterns discoverable without making customer
+    # messages wait on or alter the approved guidance set.
+    refresh_learning_library_drafts()
     normalized = text.casefold()
     if st.session_state.get("conversation_closed"):
         st.session_state.chat.extend([
