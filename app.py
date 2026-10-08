@@ -2971,6 +2971,7 @@ def _respond_without_logging(text: str):
             st.session_state.conversation_ended_at = datetime.now(INDIA_TZ).isoformat(timespec="seconds")
             reply = "சரி, உரையாடலை முடித்துவிட்டேன்; இந்த உரையாடலின் விவரங்கள் பாதுகாப்பான பதிவில் சேமிக்கப்பட்டுள்ளன. மீண்டும் பேச விரும்பினால் புதிய உரையாடலைத் தொடங்கலாம்." if language == "தமிழ்" else "Of course. I’ve ended our chat and saved its details in a private chat record. You can start a new conversation whenever you need."
             st.session_state.chat.extend([{"role": "user", "content": text}, {"role": "assistant", "content": reply, "mode": "conversation_end"}])
+            clear_active_preferences()
             return
         if negative:
             st.session_state.end_chat_confirmation_pending = False
@@ -2984,6 +2985,7 @@ def _respond_without_logging(text: str):
         st.session_state.conversation_ended_at = datetime.now(INDIA_TZ).isoformat(timespec="seconds")
         reply = "சரி, உரையாடலை முடித்துவிட்டேன்; இந்த உரையாடலின் விவரங்கள் பாதுகாப்பான பதிவில் சேமிக்கப்பட்டுள்ளன. மீண்டும் பேச விரும்பினால் புதிய உரையாடலைத் தொடங்கலாம்." if language == "தமிழ்" else "Of course. I’ve ended our chat and saved its details in a private chat record. You can start a new conversation whenever you need."
         st.session_state.chat.extend([{"role": "user", "content": text}, {"role": "assistant", "content": reply, "mode": "conversation_end"}])
+        clear_active_preferences()
         return
     # Route callback requests through the consent flow before the general
     # conversation engine or hosted model can turn them into a vague fallback.
@@ -3037,6 +3039,7 @@ def _respond_without_logging(text: str):
             st.session_state.conversation_close_reason = "Customer ended the conversation"
             st.session_state.conversation_ended_at = datetime.now(INDIA_TZ).isoformat(timespec="seconds")
             st.session_state.end_chat_confirmation_pending = False
+            clear_active_preferences()
         if conversation.get("reminder_due") or conversation.get("open_followups"):
             st.session_state.active_info_panel = "followups"
             st.session_state.followup_summary_input = conversation.get("reminder_summary", text)
@@ -4396,6 +4399,7 @@ def close_conversation_from_button() -> None:
     st.session_state.chat = []
     st.session_state.agent_history = []
     st.session_state.show_full_chat_history = False
+    clear_active_preferences()
 
 
 def start_new_conversation() -> None:
@@ -4430,6 +4434,7 @@ def start_new_conversation() -> None:
     st.session_state.awaiting_address_preference = not bool(address)
     st.session_state.show_full_chat_history = False
     st.session_state.followup_schedule = {}
+    clear_active_preferences()
 
 
 def clear_active_preferences() -> None:
