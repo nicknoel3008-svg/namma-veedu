@@ -4113,6 +4113,16 @@ def capture_customer_address(text: str) -> bool:
         "sad", "frustrated", "stressed", "tired", "overwhelmed", "angry", "upset", "confused", "unhappy", "sorry",
     }:
         name = ""
+    # Do not treat an emotional phrase such as “I’m really frustrated” as a
+    # customer name. The conversational response should acknowledge the
+    # feeling without repeating it as a salutation.
+    emotion_tokens = {
+        "frustrated", "stressed", "overwhelmed", "angry", "upset", "confused",
+        "disappointed", "dissatisfied", "worried", "concerned", "nervous",
+        "anxious", "scared", "afraid", "sad", "tired", "unhappy", "sorry",
+    }
+    if name and emotion_tokens.intersection(set(re.findall(r"[a-z]+", name.casefold()))):
+        name = ""
     if name:
         st.session_state.customer_name = name[:80]
         if not chosen_address:
