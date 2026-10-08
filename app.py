@@ -1137,7 +1137,12 @@ if pending_mira_sync:
     for index, value in enumerate(sync_locations):
         st.session_state[f"filter_location_option_{index}"] = value in selected_location_set
     for value in ("Plot", "House", "Flat"):
-        st.session_state[f"filter_property_type_{value.casefold()}"] = value in synced.get("property_type", [])
+        # Drop the previous widget value before setting the authoritative
+        # conversational value. This avoids a stale checkbox surviving a
+        # replacement such as “remove Flat, add House”.
+        key = f"filter_property_type_{value.casefold()}"
+        st.session_state.pop(key, None)
+        st.session_state[key] = value in synced.get("property_type", [])
     for value in ("Existing sale", "Project reference", "Auction"):
         key_value = value.casefold().replace(" ", "_")
         st.session_state[f"filter_listing_kind_{key_value}"] = value in synced.get("status", [])
