@@ -60,6 +60,10 @@ def parse_request(text: str, data: pd.DataFrame) -> SearchIntent:
     elif any(word in query for word in ("new project", "promoter", "developer project")):
         intent.status = "Project reference"
     budget = re.search(r"(?:under|below|within|up to|max(?:imum)?|budget(?: of)?(?:\s+(?:around|about|approximately))?)\s*₹?\s*(\d+(?:,\d{2,3})*(?:\.\d+)?)\s*(crore|crores|cr|lakh|lakhs|lac|lacs|k)?", query)
+    # Natural Tanglish often places the amount before the word "budget", for
+    # example: "50 lakh budget". Keep this equivalent to "budget 50 lakh".
+    if not budget:
+        budget = re.search(r"\b(\d+(?:,\d{2,3})*(?:\.\d+)?)\s*(crore|crores|cr|lakh|lakhs|lac|lacs|k)\s+budget\b", query)
     if budget:
         amount = float(budget.group(1).replace(",", ""))
         unit = budget.group(2) or ""
@@ -99,6 +103,19 @@ def parse_request(text: str, data: pd.DataFrame) -> SearchIntent:
         if city.casefold() == intent.location.casefold():
             intent.location = city
             break
+    # If the customer says an area in colloquial Tamil/Tanglish ("Taramani
+    # pakkathula", "Velachery la"), retain the named area even when the
+    # catalogue has no exact row for it. The UI can then explain that the
+    # saved records need widening instead of silently dropping the request.
+    if not intent.location:
+        colloquial_area = re.search(
+            r"\b([a-z][a-z-]{2,}(?:\s+[a-z][a-z-]{2,})?)\s+(?:pakkathula|pakathula|la|ile|il)\b",
+            query,
+        )
+        if colloquial_area:
+            candidate = colloquial_area.group(1).strip()
+            if candidate not in {"budget", "office", "home", "work", "area", "city"}:
+                intent.location = candidate.title()
     return intent
 
 
