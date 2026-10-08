@@ -183,6 +183,13 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
             "நன்றி! அந்தப் பரிந்துரை உதவியாக இருந்ததில் மகிழ்ச்சி. அடுத்து எதைப் பார்க்க விரும்புகிறீர்கள்?",
             "Thank you! Suggestion useful-aa irundhadhu sandhosham. Next enna paakalaam?",
         )
+    if re.search(r"(?:explain|verify|check|review).{0,45}(?:listing|property).{0,70}(?:pay|payment|advance|before committing)|(?:listing|property).{0,70}(?:before paying|before payment|before committing)", query):
+        return answer(
+            "listing_verification",
+            "To verify a listing before paying: confirm the current source listing and availability, check title and approval or RERA details, inspect the property, review written payment and refund terms, and have a qualified professional review the documents. Do not send an advance under pressure.",
+            "பணம் செலுத்தும் முன் பட்டியலைச் சரிபார்க்கவும்: தற்போதைய மூலப் பதிவு மற்றும் கிடைப்பை உறுதி செய்து, title, approval அல்லது RERA விவரங்களைப் பாருங்கள்; சொத்தை நேரில் ஆய்வு செய்து, பணம் மற்றும் திருப்பித் தரும் நிபந்தனைகளை எழுத்துப்பூர்வமாகப் பெற்று, தகுதியான நிபுணரிடம் ஆவணங்களை ஆய்வு செய்யுங்கள். அழுத்தத்தில் முன்பணம் அனுப்ப வேண்டாம்.",
+            "Payment panna munna listing verify pannunga: current source listing/availability confirm panni, title, approval/RERA details check pannunga; property visit panni, written payment/refund terms vaangi, qualified professional documents review pannattum. Pressure-la advance anuppaadheenga.",
+        )
     if re.search(r"\b(?:email|e-mail|mail)\b.{0,50}\b(?:send|share|suggestion|suggestions|option|options|result|results|property|properties)\b|\b(?:send|share)\b.{0,50}\b(?:email|e-mail|mail)\b", query):
         return answer(
             "email_followup_request",
