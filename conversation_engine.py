@@ -189,6 +189,11 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
     if guidance:
         return guidance
     frustration_signal = bool(re.search(r"frustrat|not helpful|going in circles|slow|seekiram|கோப|புரியவில்லை", query))
+    payment_concern_signal = bool(re.search(
+        r"advance|deposit|token|முன்பணம்", query
+    )) and bool(re.search(
+        r"send|pay|transfer|anupp|urgent|செலுத்த|அனுப்ப", query
+    ))
     search_request_signal = bool(re.search(
         r"\b(?:show|find|search|list|browse|recommend|suggest)\b.{0,70}"
         r"(?:property|properties|home|house|flat|apartment|plot|land|listing|bhk|option|வீடு|சொத்து|மனை)"
@@ -196,7 +201,9 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
         r"\b(?:show|find|search|list|browse|recommend|suggest)\b",
         query,
     ))
-    if frustration_signal:
+    # Payment requests are consequential: let the safety response below run
+    # even when the customer also says they are frustrated or rushed.
+    if frustration_signal and not payment_concern_signal:
         memory["emotion"] = "frustration signal"
         if not search_request_signal:
             return answer(
@@ -210,8 +217,8 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
         memory["emotion"] = "concern signal"
 
     # Consequential questions take precedence over searches and buying preferences.
-    if re.search(r"advance|deposit|token|முன்பணம்", query) and re.search(r"send|pay|transfer|anupp|urgent|செலுத்த|அனுப்ப", query):
-        return answer("payment_concern", "Please pause before sending the advance under pressure. I can’t verify this payment request: independently confirm the seller, property documents, written payment/refund terms and recipient through trusted channels; have a qualified professional review the documents before committing money. Never share OTPs or banking credentials.",
+    if payment_concern_signal:
+        return answer("payment_concern", "I’m sorry this feels urgent and stressful. Please pause before sending the advance under pressure. I can’t verify this payment request: independently confirm the seller, property documents, written payment/refund terms and recipient through trusted channels; have a qualified professional review the documents before committing money. Never share OTPs or banking credentials.",
             "அவசரப்படுத்துகிறார்கள் என்பதற்காக முன்பணத்தை அனுப்ப வேண்டாம். இந்தக் கோரிக்கையை என்னால் சரிபார்க்க முடியாது; விற்பவர், சொத்து ஆவணங்கள், எழுத்துப்பூர்வ பணம்/திருப்பித் தரும் நிபந்தனைகள் மற்றும் பெறுநரை தனியாக உறுதிப்படுத்தி, தகுதியான நிபுணரிடம் ஆவணங்களை ஆய்வு செய்யுங்கள். OTP அல்லது வங்கி ரகசியங்களைப் பகிர வேண்டாம்.",
             "Urgent-nu pressure panninaalum advance anuppa avasarappadaadheenga. Indha payment request-ai naan verify panna mudiyadhu; seller, property documents, written payment/refund terms, recipient-ai independent-aa check panni qualified professional review vaangunga. OTP, banking password share pannaadheenga.")
     if re.search(r"bye|goodbye|that's all|இன்னைக்கு போதும்|naalaiku pesalam|நாளை பேச", query):
