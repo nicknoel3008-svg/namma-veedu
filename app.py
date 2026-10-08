@@ -2961,6 +2961,7 @@ def _respond_without_logging(text: str):
             st.session_state.main_results = ranked.head(3).copy()
             st.session_state.main_results_total_count = len(ranked)
             st.session_state.main_results_mode = "chat"
+            st.session_state.active_listing_view = "all"
             st.session_state.property_inquiry_active = True
             st.session_state.awaiting_search_preferences = False
             intent = parse_request("", properties)
@@ -3054,6 +3055,7 @@ def _respond_without_logging(text: str):
             st.session_state.main_results = records.head(3).copy()
             st.session_state.main_results_total_count = len(records)
             st.session_state.main_results_mode = "chat"
+            st.session_state.active_listing_view = "all"
             st.session_state.filters_applied = True
             reply = (
                 f"சரி. {len(records)} பதிவுகள் கிடைத்துள்ளன; முதல் பொருத்தங்கள் மேலே உள்ளன. இவற்றில் ஏலத் தேதி இல்லை, மேலும் ஆதாரம் கிடைக்காது எனக் குறித்துள்ளது. ஒவ்வொரு பதிவிலும் உள்ள மூல இணைப்பைத் திறந்து தற்போதைய அறிவிப்பை நேரடியாகச் சரிபார்க்கவும்."
@@ -3222,6 +3224,7 @@ def _respond_without_logging(text: str):
         st.session_state.main_results = comparison.head(3).copy()
         st.session_state.main_results_total_count = len(comparison)
         st.session_state.main_results_mode = "chat"
+        st.session_state.active_listing_view = "all"
         st.session_state.filters_applied = True
         st.session_state.property_inquiry_active = False
         st.session_state.awaiting_search_preferences = False
@@ -3271,6 +3274,8 @@ def _respond_without_logging(text: str):
                     st.session_state.last_results = unique
                     st.session_state.main_results = unique.head(3).copy()
                     st.session_state.main_results_total_count = len(unique)
+                    st.session_state.main_results_mode = "chat"
+                    st.session_state.active_listing_view = "all"
         st.session_state.chat.extend([
             {"role": "user", "content": text},
             {"role": "assistant", "content": land_reply, "mode": "local_property_support"},
@@ -3505,8 +3510,10 @@ def _respond_without_logging(text: str):
                 queue_mira_filter_sync(api_intent)
                 property_records = property_tool.data.get("records", [])
                 st.session_state.main_results = pd.DataFrame(property_records[:3])
+                st.session_state.last_results = pd.DataFrame(property_records[:30])
                 st.session_state.main_results_total_count = int(property_tool.data.get("count", 0))
                 st.session_state.main_results_mode = "chat"
+                st.session_state.active_listing_view = "all"
                 st.session_state.filters_applied = True
                 if contact_question and property_records:
                     contact_reply = local_property_contact_reply(
@@ -3744,6 +3751,7 @@ def _respond_without_logging(text: str):
     st.session_state.main_results = ranked.head(3).copy()
     st.session_state.main_results_total_count = len(result)
     st.session_state.main_results_mode = "chat"
+    st.session_state.active_listing_view = "all"
     st.session_state.filters_applied = True
     project_reference_only = (
         len(result) > 0
