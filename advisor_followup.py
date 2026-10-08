@@ -12,7 +12,7 @@ def advisor_reply(text, state=None, tamil=False, handoff=False):
     callback = bool(re.search(r"\b(?:callback|call back|follow.up|call me|human only|prefer.*human)\b|பின்னர்.*அழை|தொடர்பு", query))
     decline = bool(re.fullmatch(r"(?:no|no thanks|not now|cancel|never mind|வேண்டாம்|இப்போது வேண்டாம்)[.! ]*", query))
     stage = state.get("stage")
-    if stage and re.search(r"\b(?:help me instead|let'?s (?:keep chatting|continue)|forget the callback|no callback)\b", query):
+    if stage and re.search(r"\b(?:help me instead|let'?s (?:keep chatting|continue)|forget the callback|no callback|(?:i )?(?:don't|do not|no longer) need (?:a )?(?:call ?back|callback))\b", query):
         return {}, "சரி, கோரிக்கை சேமிக்கப்படவில்லை. எதில் உதவலாம்?" if tamil else "Of course—no callback request was saved. What would you like help with?"
     if decline and stage:
         return {}, "சரி, தொடர்பு கோரிக்கை சேமிக்கப்படவில்லை. வேறு உதவி வேண்டுமெனில் சொல்லுங்கள்." if tamil else "Of course—no callback request was saved. I’m here if you need anything else."

@@ -7,7 +7,8 @@ from agent import parse_request
 
 def update_preferences(text, data, previous=None):
     """Merge only stated preferences; questions never erase existing constraints."""
-    remembered = dict(previous or {})
+    previous_context = dict(previous or {})
+    remembered = dict(previous_context)
     normalized = text.casefold()
     if re.search(r"\b(?:start (?:over|again)|reset (?:my )?(?:search|preferences)|forget my preferences)\b", normalized):
         remembered = {}
@@ -24,6 +25,18 @@ def update_preferences(text, data, previous=None):
     ):
         if re.search(pattern, normalized):
             remembered.pop(key, None)
+    # Understand named removals in the same turn as additions, for example
+    # “keep 2BHK under 60 lakh but remove Velachery” or “drop the flat type”.
+    removal = r"(?:remove|ignore|forget|drop|no longer want|don't want|do not want)"
+    prior_location = str(remembered.get("location") or previous_context.get("location") or "").strip()
+    if prior_location and re.search(rf"{removal}[^.?!\n]{{0,45}}{re.escape(prior_location)}|{re.escape(prior_location)}[^.?!\n]{{0,25}}{removal}", normalized):
+        remembered.pop("location", None)
+    if re.search(rf"{removal}[^.?!\n]{{0,35}}(?:\d+\s*bhk|bedroom(?:s)?|bhk)", normalized):
+        remembered.pop("bedrooms", None)
+    if re.search(rf"{removal}[^.?!\n]{{0,35}}(?:budget|lakh|crore|price)", normalized):
+        remembered.pop("max_budget", None)
+    if re.search(rf"{removal}[^.?!\n]{{0,35}}(?:flat|house|plot|property type)", normalized):
+        remembered.pop("property_type", None)
     return remembered
 
 

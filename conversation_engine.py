@@ -119,7 +119,8 @@ def response_language(text, previous="English"):
 def conversational_turn(text, data, chat, context=None, memory=None, language="English", now=None):
     """Interpret current intent first; retain state independently of provider availability."""
     query = " ".join(text.casefold().replace("’", "'").split())
-    context = update_preferences(text, data, context)
+    previous_context = dict(context or {})
+    context = update_preferences(text, data, previous_context)
     memory = deepcopy(memory or {})
     for key, value in (("preferences", {}), ("rejected", []), ("corrections", []), ("selected", None)):
         memory.setdefault(key, value)
@@ -185,6 +186,52 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
             "Previous suggestions-ai remove pannitten; neenga ketkaama adha thirumba kaatta maatten. Different area, budget, illa property type-oda fresh search venuma?",
             removed_suggestions=removed,
         )
+    explicit_search = bool(re.search(r"\b(?:find|search|show|list|browse|filter|refine|narrow)\b|காட்டு|தேடு", query))
+    preference_signal = bool(re.search(
+        r"\b(?:prefer|preference|want|need|keep|add|remove|ignore|forget|drop|set|under|around|near|bhk|bedroom|flat|house|plot|lift|hospital|east[- ]?facing|budget|lakh|crore)\b|விருப்பம்|வேண்டும்|பட்ஜெட்|அருகில்",
+        query,
+    ))
+    context_changed = context != previous_context
+    named_preference_change = bool(re.search(
+        r"\b(?:remove|ignore|forget|drop|no longer want|don't want|do not want|add|also|keep|prefer)\b",
+        query,
+    ))
+    if preference_signal and (context_changed or named_preference_change) and not explicit_search:
+        # Collect all changes from one message, then invite the next change
+        # instead of forcing the customer through a one-field-at-a-time loop.
+        additions = []
+        if context.get("location"):
+            additions.append(str(context["location"]))
+        if context.get("property_type") not in (None, "Any"):
+            additions.append(str(context["property_type"]))
+        if context.get("bedrooms"):
+            additions.append(f"{context['bedrooms']} BHK")
+        if context.get("max_budget") is not None:
+            additions.append(f"₹{context['max_budget'] / 100000:g} lakh budget")
+        if re.search(r"lift", query):
+            additions.append("a building with a lift")
+        if re.search(r"hospital", query):
+            additions.append("hospital access")
+        if re.search(r"east[- ]?facing|கிழக்கு", query):
+            additions.append("east-facing")
+        removed = [label for key, label in (
+            ("location", "the previous area"),
+            ("property_type", "the previous property type"),
+            ("bedrooms", "the previous BHK"),
+            ("max_budget", "the previous budget"),
+        ) if previous_context.get(key) and not context.get(key)]
+        added_text = ", ".join(additions)
+        removed_text = ", ".join(removed)
+        if language == "Tamil":
+            reply = (f"சரி, ஒரே செய்தியில் மாற்றிய விருப்பங்களைப் புதுப்பித்துவிட்டேன்: {added_text or 'புதிய விருப்பங்கள் இல்லை'}. "
+                     f"{removed_text + ' நீக்கப்பட்டது. ' if removed_text else ''}அடுத்து வேறு விருப்பம் சேர்க்கவா அல்லது இந்த விருப்பங்களுடன் தேடவா?")
+        elif language == "Tanglish":
+            reply = (f"Seri, ore message-la preferences update pannitten: {added_text or 'new preference illa'}. "
+                     f"{removed_text + ' remove pannitten. ' if removed_text else ''}Next vera preference add pannalama, illa indha preferences-oda search pannalama?")
+        else:
+            reply = (f"Got it—I updated these preferences together: {added_text or 'no new preference'}. "
+                     f"{removed_text + ' was removed. ' if removed_text else ''}Would you like to add another preference, or should I search with these now?")
+        return answer("preference_update", reply, reply, reply)
     guidance = document_guidance_turn(query, language, answer, context, memory)
     if guidance:
         return guidance

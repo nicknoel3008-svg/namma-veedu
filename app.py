@@ -2961,6 +2961,25 @@ def _respond_without_logging(text: str):
         reply = "சரி, உரையாடலை முடித்துவிட்டேன்; இந்த உரையாடலின் விவரங்கள் பாதுகாப்பான பதிவில் சேமிக்கப்பட்டுள்ளன. மீண்டும் பேச விரும்பினால் புதிய உரையாடலைத் தொடங்கலாம்." if language == "தமிழ்" else "Of course. I’ve ended our chat and saved its details in a private chat record. You can start a new conversation whenever you need."
         st.session_state.chat.extend([{"role": "user", "content": text}, {"role": "assistant", "content": reply, "mode": "conversation_end"}])
         return
+    # Route callback requests through the consent flow before the general
+    # conversation engine or hosted model can turn them into a vague fallback.
+    callback_phrase = bool(re.search(r"\b(?:callback|call back|call me|contact me)\b|பின்னர்.*அழை|தொடர்பு", normalized))
+    advisor_state = st.session_state.get("advisor_request", {})
+    if callback_phrase or advisor_state:
+        next_state, advisor_message = advisor_reply(
+            text,
+            advisor_state,
+            language == "தமிழ்",
+            handoff=callback_phrase,
+        )
+        if advisor_message:
+            st.session_state.advisor_request = next_state
+            st.session_state.chat.extend([
+                {"role": "user", "content": text},
+                {"role": "assistant", "content": advisor_message,
+                 "mode": "callback_request_confirmed" if next_state.get("stage") == "confirmed" else "advisor_preferences"},
+            ])
+            return
     conversation = conversational_turn(text, properties, st.session_state.chat,
         st.session_state.get("search_context"), st.session_state.get("buyer_memory"),
         st.session_state.get("response_language", "Tamil" if language == "தமிழ்" else "English"))
