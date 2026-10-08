@@ -3674,10 +3674,25 @@ def _respond_without_logging(text: str):
             # emitting a search tool call. Recover the visible results locally
             # from the same saved inventory instead of leaving Mira's answer
             # disconnected from the page.
-            property_search_request = bool(re.search(
-                r"\b(?:property|properties|home|house|flat|apartment|plot|land|listing|bhk)\b|சொத்து|வீடு|மனை|நிலம்",
-                normalized,
-            )) and explicit_search
+            # A user may say “search now” after already giving the property
+            # criteria, without repeating words such as “property” or “flat”.
+            # Treat that as a search too; otherwise the hosted model can
+            # answer the emotion and leave the visible results untouched.
+            remembered_search = st.session_state.get("search_context", {})
+            has_remembered_criteria = bool(
+                remembered_search.get("location")
+                or remembered_search.get("property_type") not in (None, "Any")
+                or remembered_search.get("bedrooms")
+                or remembered_search.get("max_budget") is not None
+                or remembered_search.get("min_area_sqm") is not None
+            )
+            property_search_request = explicit_search and (
+                bool(re.search(
+                    r"\b(?:property|properties|home|house|flat|apartment|plot|land|listing|bhk)\b|சொத்து|வீடு|மனை|நிலம்",
+                    normalized,
+                ))
+                or has_remembered_criteria
+            )
             if property_search_request and not property_tool:
                 fallback_intent = parse_request(text, properties)
                 previous = st.session_state.get("search_context", {})
@@ -3713,6 +3728,25 @@ def _respond_without_logging(text: str):
                         {"records": fallback_ranked.head(3).to_dict("records"), "count": len(fallback_ranked)},
                         st.session_state.get("buyer_memory", {}),
                         language == "தமிழ்",
+                    )
+                    if re.search(r"frustrat|not helpful|going in circles|fed up|upset|ஏமாற்றம்|உதவவில்லை", normalized):
+                        empathy = (
+                            "இந்தத் தேடல் உங்களுக்கு ஏமாற்றமாக இருந்ததற்கு மன்னிக்கவும். "
+                            if language == "தமிழ்" else
+                            "I’m sorry this has been frustrating. "
+                        )
+                        turn.text = empathy + turn.text
+                else:
+                    st.session_state.last_results = pd.DataFrame()
+                    st.session_state.main_results = pd.DataFrame()
+                    st.session_state.main_results_total_count = 0
+                    st.session_state.main_results_mode = "chat"
+                    st.session_state.active_listing_view = "all"
+                    st.session_state.filters_applied = True
+                    turn.text = (
+                        "இந்த விருப்பங்களுடன் பொருந்தும் பதிவு கிடைக்கவில்லை; தேடலைச் செய்துவிட்டேன். பகுதி, பட்ஜெட் அல்லது BHK-ஐ மாற்றிப் பார்க்கலாமா?"
+                        if language == "தமிழ்" else
+                        "I’m sorry this has been frustrating. I searched with the preferences you gave me, but found no matching saved listing. Would you like to change the area, budget, or BHK?"
                     )
             st.session_state.chat.append({"role": "user", "content": text})
             st.session_state.chat.append({
