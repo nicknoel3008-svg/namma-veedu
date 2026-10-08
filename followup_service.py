@@ -75,6 +75,12 @@ def schedule_email_followup(
     schedule_id = uuid4().hex
     next_send = next_three_day_boundary(started_at, now)
     with _connect(db_path) as connection:
+        existing = connection.execute(
+            "SELECT id FROM email_followups WHERE user_id=? AND conversation_id=? AND recipient_email=? AND preference_summary=? AND max_messages=? AND status IN ('scheduled','sending','saved_pending_activation') ORDER BY updated_at DESC LIMIT 1",
+            (user_id, conversation_id, recipient_email.strip().lower(), preference_summary.strip()[:500], max_messages),
+        ).fetchone()
+        if existing:
+            return str(existing["id"])
         connection.execute("""
             INSERT INTO email_followups
             (id,user_id,conversation_id,recipient_email,customer_name,preference_summary,
