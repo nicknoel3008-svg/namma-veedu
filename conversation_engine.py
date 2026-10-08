@@ -140,7 +140,7 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
     replacement_area = re.search(r"\b(?:add|instead|replace|switch to)\s+(?:the\s+)?([a-z][a-z-]*)\b", query)
     if replacement_area and re.search(rf"{removal_clause}[^.?!\n]{{0,40}}(?:area|location|[a-z][a-z-]*)", query):
         candidate = replacement_area.group(1).strip()
-        if candidate not in {"instead", "the", "area", "location", "flat", "apartment", "house", "plot", "bhk", "budget"}:
+        if candidate not in {"instead", "the", "area", "location", "flat", "apartment", "house", "plot", "bhk", "budget", "east", "east-facing", "facing"}:
             context["location"] = candidate.upper()
     memory = deepcopy(memory or {})
     for key, value in (("preferences", {}), ("rejected", []), ("corrections", []), ("selected", None)):
@@ -228,6 +228,8 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
         memory["facing"] = "East"
     if re.search(r"(?:remove|ignore|forget|drop|don't need|not needed).*lift", query):
         memory["preferences"].pop("lift", None)
+    if re.search(r"(?:remove|ignore|forget|drop|don't need|not needed).{0,30}hospital", query):
+        memory["preferences"].pop("hospital_access", None)
     explicit_search = bool(re.search(r"\b(?:find|search|show|list|browse|filter|refine|narrow)\b|காட்டு|தேடு", query))
     preference_signal = bool(re.search(
         r"\b(?:prefer|preference|want|need|keep|add|remove|ignore|forget|drop|set|under|around|near|bhk|bedroom|flat|house|plot|lift|hospital|east[- ]?facing|budget|lakh|crore)\b|விருப்பம்|வேண்டும்|பட்ஜெட்|அருகில்",
@@ -252,9 +254,9 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
             additions.append(f"{context['bedrooms']} BHK")
         if context.get("max_budget") is not None:
             additions.append(f"₹{context['max_budget'] / 100000:g} lakh budget")
-        if re.search(r"lift", query):
+        if re.search(r"lift", query) and not re.search(r"(?:remove|ignore|forget|drop|don't need|not needed).{0,30}lift", query):
             additions.append("a building with a lift")
-        if re.search(r"hospital", query):
+        if re.search(r"hospital", query) and not re.search(r"(?:remove|ignore|forget|drop|don't need|not needed).{0,30}hospital", query):
             additions.append("hospital access")
         if re.search(r"east[- ]?facing|கிழக்கு", query):
             additions.append("east-facing")
