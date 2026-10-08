@@ -37,6 +37,7 @@ import storage_backend
 from mira_dialogue_libraries import local_dialogue_reply, local_land_conversation_reply
 from mira_quality import quality_flags
 from mira_learning_library import active_learning_guidance, load_learning_rules as local_load_learning_rules, merge_suggested_drafts, save_learning_rules as local_save_learning_rules, suggested_draft_rules
+from map_service import map_points
 
 
 def read_inquiries() -> list[dict]:
@@ -179,6 +180,7 @@ def configured_value(name: str, default: str = "") -> str:
 
 st.set_page_config(page_title="Namma Illam | Tamil Nadu Property Guide", page_icon="⌂", layout="wide", initial_sidebar_state="expanded")
 AI_PROVIDER, AI_API_KEY, AI_MODEL = select_ai_config(configured_value)
+MAPBOX_ACCESS_TOKEN = configured_value("MAPBOX_ACCESS_TOKEN", "")
 FOLLOWUP_EMAIL_CONFIG = {
     key: configured_value(key)
     for key in (
@@ -4638,6 +4640,20 @@ with results_slot.container(border=has_visible_results, key="results-content-was
             if result.empty:
                 st.info("இந்த வகை மற்றும் தற்போதைய வடிகட்டிகளுக்கு பதிவுகள் இல்லை. வேறு பட்டியல் வகையையோ பகுதியையோ தேர்ந்தெடுத்துப் பாருங்கள்." if language == "தமிழ்" else "No records in this listing type match the current filters. Try another listing type or area.")
             else:
+                if MAPBOX_ACCESS_TOKEN:
+                    points, has_exact_coordinates = map_points(result.head(8).to_dict("records"), MAPBOX_ACCESS_TOKEN)
+                    if points:
+                        st.markdown("**📍 Location suggestions**" if language != "தமிழ்" else "**📍 இட பரிந்துரைகள்**")
+                        st.map(pd.DataFrame(points), latitude="lat", longitude="lon", size=90, zoom=7, use_container_width=True)
+                        st.caption(
+                            "Exact source coordinates are marked where supplied; other pins are approximate locality suggestions. Verify the address and availability with the official listing."
+                            if language != "தமிழ்" else
+                            "ஆதாரத்தில் இருந்தால் சரியான coordinates குறிக்கப்படும்; மற்ற pins அருகிலுள்ள பகுதியின் தோராயமான பரிந்துரைகள். அதிகாரப்பூர்வ listing-ல் முகவரியையும் கிடைப்பையும் சரிபார்க்கவும்."
+                        )
+                    elif not has_exact_coordinates:
+                        st.caption("A map pin is unavailable for these records; the saved source does not contain coordinates." if language != "தமிழ்" else "இந்த பதிவுகளுக்கு map pin இல்லை; சேமித்த ஆதாரத்தில் coordinates இல்லை.")
+                elif result is not None:
+                    st.caption("Add MAPBOX_ACCESS_TOKEN in Streamlit Secrets to show Tamil Nadu map suggestions. Saved results remain available without it." if language != "தமிழ்" else "Tamil Nadu map பரிந்துரைகளுக்கு Streamlit Secrets-ல் MAPBOX_ACCESS_TOKEN சேர்க்கவும். Map இல்லாமலும் சேமித்த முடிவுகள் கிடைக்கும்.")
                 for i, (_, row) in enumerate(result.head(visible_limit).iterrows(), 1):
                     render_property_card(row, i)
                 shown_count = min(len(result), visible_limit)
