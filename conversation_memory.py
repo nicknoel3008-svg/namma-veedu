@@ -47,7 +47,7 @@ def update_preferences(text, data, previous=None):
         (r"\b(?:any (?:bhk|bedroom count)|(?:remove|ignore|forget) (?:the )?(?:bhk|bedroom count))\b", "bedrooms"),
         (r"\b(?:any property type|(?:remove|ignore|forget) (?:the )?(?:property type|flat|house|plot))\b", "property_type"),
     ):
-        if re.search(pattern, normalized):
+        if re.search(pattern, normalized) and not (key == "property_type" and explicit_property_type_addition):
             remembered.pop(key, None)
     # Understand named removals in the same turn as additions, for example
     # “keep 2BHK under 60 lakh but remove Velachery” or “drop the flat type”.
@@ -60,7 +60,7 @@ def update_preferences(text, data, previous=None):
         remembered.pop("bedrooms", None)
     if re.search(rf"{removal}[^.?!\n]{{0,45}}(?:budget|lakh|crore|price)", normalized) and not re.search(r"\bkeep\b[^.?!\n]{0,25}(?:budget|lakh|crore|price|\d+\s*(?:lakh|crore))", normalized):
         remembered.pop("max_budget", None)
-    if re.search(rf"{removal}[^.?!\n]{{0,45}}(?:flat|house|plot|property type)", normalized):
+    if re.search(rf"{removal}[^.?!\n]{{0,45}}(?:flat|house|plot|property type)", normalized) and not explicit_property_type_addition:
         remembered.pop("property_type", None)
         remembered["_property_type_cleared"] = True
     # If a message names a replacement area, prefer that replacement over the
