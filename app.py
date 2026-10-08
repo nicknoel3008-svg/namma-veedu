@@ -1127,6 +1127,8 @@ def queue_mira_filter_sync(intent) -> None:
 pending_mira_sync = st.session_state.pop("mira_pending_filter_sync", None)
 if pending_mira_sync:
     synced = pending_mira_sync["filters"]
+    st.session_state["filter_type_widget_version"] = int(st.session_state.get("filter_type_widget_version", 0)) + 1
+    type_widget_version = st.session_state["filter_type_widget_version"]
     sync_locations = sorted({
         str(value).strip()
         for column in ("city", "district", "locality")
@@ -1140,7 +1142,7 @@ if pending_mira_sync:
         # Drop the previous widget value before setting the authoritative
         # conversational value. This avoids a stale checkbox surviving a
         # replacement such as “remove Flat, add House”.
-        key = f"filter_property_type_{value.casefold()}"
+        key = f"filter_property_type_{value.casefold()}_{type_widget_version}"
         st.session_state.pop(key, None)
         st.session_state[key] = value in synced.get("property_type", [])
     for value in ("Existing sale", "Project reference", "Auction"):
@@ -1200,11 +1202,11 @@ with st.sidebar:
         for index in range(len(locations)):
             st.session_state[f"filter_location_option_{index}"] = False
         for key in (
-            "filter_property_type_plot", "filter_property_type_house", "filter_property_type_flat",
             "filter_listing_kind_existing_sale", "filter_listing_kind_project_reference", "filter_listing_kind_auction",
             "filter_include_ended",
         ):
             st.session_state[key] = False
+        st.session_state["filter_type_widget_version"] = int(st.session_state.get("filter_type_widget_version", 0)) + 1
         st.session_state["filter_preferred_budget"] = 0.0
         st.session_state["filter_preferred_size"] = 0.0
         st.session_state["filter_preferred_bedrooms"] = 0
@@ -1245,7 +1247,8 @@ with st.sidebar:
             type_column, status_column = st.columns(2, gap="small")
             with type_column:
                 st.markdown(f"**{tr('Property type')}**")
-                type_filter = [value for value in ("Plot", "House", "Flat") if st.checkbox(tr(value), key=f"filter_property_type_{value.casefold()}")]
+                type_widget_version = int(st.session_state.get("filter_type_widget_version", 0))
+                type_filter = [value for value in ("Plot", "House", "Flat") if st.checkbox(tr(value), key=f"filter_property_type_{value.casefold()}_{type_widget_version}")]
             with status_column:
                 st.markdown(f"**{tr('Listing kind')}**")
                 status_filter = [value for value in ("Existing sale", "Project reference", "Auction") if st.checkbox(tr(value), key=f"filter_listing_kind_{value.casefold().replace(' ', '_')}")]
