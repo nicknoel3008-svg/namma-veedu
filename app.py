@@ -2972,8 +2972,12 @@ def _respond_without_logging(text: str):
     # Route callback requests through the consent flow before the general
     # conversation engine or hosted model can turn them into a vague fallback.
     callback_phrase = bool(re.search(r"\b(?:callback|call back|call me|contact me)\b|பின்னர்.*அழை|தொடர்பு", normalized))
+    followup_override = bool(re.search(
+        r"\b(?:follow[- ]?up|remind(?:er)?|check back with me|email me later|send me a follow[- ]?up)\b|நினைவூட்ட|பின்னர் தொடர்பு",
+        normalized,
+    ))
     advisor_state = st.session_state.get("advisor_request", {})
-    if callback_phrase or advisor_state:
+    if (callback_phrase or advisor_state) and not (advisor_state and followup_override and not callback_phrase):
         next_state, advisor_message = advisor_reply(
             text,
             advisor_state,
