@@ -2336,7 +2336,7 @@ def local_chat_reply(text: str, chat_history: list[dict]) -> str | None:
     elif asks_about_data_privacy:
         choices = (
             ["உங்கள் தனியுரிமை குறித்த கவலை புரிகிறது. இந்தச் செயலியில் உரையாடல் விவரங்கள் உரிமையாளர் டாஷ்போர்டுக்கான தனிப்பட்ட inquiry பதிவில் சேமிக்கப்படுகின்றன; ஆதார், PAN, தொலைபேசி எண் போன்ற தனிப்பட்ட விவரங்களைப் பகிர வேண்டாம்."]
-            if tamil else ["Your privacy concern is understandable. This app saves conversation details in a private inquiry log for the owner dashboard. Please don’t share sensitive details such as Aadhaar, PAN, or your phone number here."]
+            if tamil else ["Your privacy concern is understandable. This app saves conversation details in a private chat record. Please don’t share sensitive details such as Aadhaar, PAN, or your phone number here."]
         )
     elif corrects_mira:
         choices = (
@@ -2822,7 +2822,7 @@ def _respond_without_logging(text: str):
             st.session_state.conversation_closed = True
             st.session_state.conversation_close_reason = "User confirmed Mira's end-of-chat question"
             st.session_state.conversation_ended_at = datetime.now(INDIA_TZ).isoformat(timespec="seconds")
-            reply = "சரி, உரையாடலை முடித்துவிட்டேன்; இந்த உரையாடலின் விவரங்கள் டாஷ்போர்டிலும் Excel பதிவிலும் சேமிக்கப்பட்டுள்ளன. மீண்டும் பேச விரும்பினால் புதிய உரையாடலைத் தொடங்கலாம்." if language == "தமிழ்" else "Of course. I’ve ended our chat and saved its details in the owner dashboard and Excel record. You can start a new conversation whenever you need."
+            reply = "சரி, உரையாடலை முடித்துவிட்டேன்; இந்த உரையாடலின் விவரங்கள் பாதுகாப்பான பதிவில் சேமிக்கப்பட்டுள்ளன. மீண்டும் பேச விரும்பினால் புதிய உரையாடலைத் தொடங்கலாம்." if language == "தமிழ்" else "Of course. I’ve ended our chat and saved its details in a private chat record. You can start a new conversation whenever you need."
             st.session_state.chat.extend([{"role": "user", "content": text}, {"role": "assistant", "content": reply, "mode": "conversation_end"}])
             return
         if negative:
@@ -2835,7 +2835,7 @@ def _respond_without_logging(text: str):
         st.session_state.conversation_closed = True
         st.session_state.conversation_close_reason = "User requested to end the chat"
         st.session_state.conversation_ended_at = datetime.now(INDIA_TZ).isoformat(timespec="seconds")
-        reply = "சரி, உரையாடலை முடித்துவிட்டேன்; இந்த உரையாடலின் விவரங்கள் டாஷ்போர்டிலும் Excel பதிவிலும் சேமிக்கப்பட்டுள்ளன. மீண்டும் பேச விரும்பினால் புதிய உரையாடலைத் தொடங்கலாம்." if language == "தமிழ்" else "Of course. I’ve ended our chat and saved its details in the owner dashboard and Excel record. You can start a new conversation whenever you need."
+        reply = "சரி, உரையாடலை முடித்துவிட்டேன்; இந்த உரையாடலின் விவரங்கள் பாதுகாப்பான பதிவில் சேமிக்கப்பட்டுள்ளன. மீண்டும் பேச விரும்பினால் புதிய உரையாடலைத் தொடங்கலாம்." if language == "தமிழ்" else "Of course. I’ve ended our chat and saved its details in a private chat record. You can start a new conversation whenever you need."
         st.session_state.chat.extend([{"role": "user", "content": text}, {"role": "assistant", "content": reply, "mode": "conversation_end"}])
         return
     conversation = conversational_turn(text, properties, st.session_state.chat,
@@ -4046,7 +4046,7 @@ def respond(text: str):
                 st.session_state.advisor_request = {}
         except Exception:
             logging.exception("Could not save inquiry %s to the private workbook", inquiry_id)
-            st.session_state.inquiry_log_error = "I couldn’t save this turn to the private inquiry workbook. Please check the Owner dashboard before relying on the log."
+            st.session_state.inquiry_log_error = "I couldn’t save this turn to the private chat record. Please try again before relying on the saved history."
             if assistant_message and assistant_message.get("mode") == "callback_request_confirmed":
                 assistant_message["content"] = "I couldn’t save your callback request. Please try again; no call is arranged."
                 st.session_state.advisor_request["stage"] = "confirm"
@@ -4081,7 +4081,7 @@ def close_conversation_from_button() -> None:
     final_reply = (
         f"{salutation}; உரையாடல் விவரங்கள் டாஷ்போர்டிலும் Excel பதிவிலும் சேமிக்கப்பட்டுள்ளன. மீண்டும் உதவி தேவைப்பட்டால் புதிய உரையாடலைத் தொடங்கலாம்."
         if language == "தமிழ்" else
-        f"{salutation}. The conversation details have been saved to the owner dashboard and Excel record. Start a new conversation whenever you need help again."
+        f"{salutation}. The conversation details have been saved to a private chat record. Start a new conversation whenever you need help again."
     )
     st.session_state.chat.append({"role": "assistant", "content": final_reply, "mode": "conversation_end"})
     conversation_id = str(st.session_state.get("inquiry_conversation_id") or "")
@@ -4095,7 +4095,7 @@ def close_conversation_from_button() -> None:
             })
         except Exception:
             logging.exception("Could not save the end-of-chat status for %s", conversation_id)
-            st.session_state.inquiry_log_error = "The chat ended, but its completion status could not be saved. Please check the Owner dashboard workbook."
+        st.session_state.inquiry_log_error = "The chat ended, but its completion status could not be saved. Please try again before relying on the saved history."
 
 
     st.session_state.chat = []
@@ -4383,7 +4383,7 @@ with chat_slot.container(key="mira-content-wash"):
         st.caption(
             f"உரையாடல் உரிமையாளர் பார்வைக்கான தனிப்பட்ட கோப்பில் சேமிக்கப்படும். AI இயக்கப்பட்டால், சமீபத்திய உரையாடல், விருப்பங்கள் மற்றும் பொருந்தும் பதிவுகளின் பகுதிகள் {AI_PROVIDER.title()} சேவைக்கு அனுப்பப்படும்; முழு சொத்து கோப்பு பதிவேற்றப்படாது. Aadhaar, PAN, வங்கி கணக்கு அல்லது அடையாள ஆவணங்களை பகிர வேண்டாம். தேவையில்லாத பதிவுகளை உரிமையாளர் நீக்க வேண்டும்."
             if language == "தமிழ்" else
-            f"Your conversation is saved in a private workbook for owner review. When AI is enabled, recent conversation, remembered preferences and matching record snippets are sent to {AI_PROVIDER.title()}; the full property file is not uploaded. Do not share Aadhaar, PAN, bank-account details, or identity documents. The owner should delete records when they are no longer needed."
+            f"Your conversation is saved in a private chat record. When AI is enabled, recent conversation, remembered preferences and matching record snippets are sent to {AI_PROVIDER.title()}; the full property file is not uploaded. Do not share Aadhaar, PAN, bank-account details, or identity documents. Records should be deleted when they are no longer needed."
         )
     active_memory = st.session_state.get("buyer_memory", {})
     has_active_preferences = bool(
@@ -4401,7 +4401,7 @@ with chat_slot.container(key="mira-content-wash"):
     if st.session_state.get("agent_error"):
         st.caption(st.session_state.pop("agent_error"))
     if st.session_state.get("offer_delay_callback") and not st.session_state.get("conversation_closed"):
-        st.caption("You can keep chatting here or request a callback for owner review. A live advisor or response time isn’t guaranteed." if language != "தமிழ்" else "இங்கே தொடரலாம் அல்லது உரிமையாளர் பார்வைக்கு தொடர்பு கோரலாம். நேரடி ஆலோசகர் அல்லது பதில் நேரம் உறுதியில்லை.")
+        st.caption("You can keep chatting here or request a callback from the support team. A live advisor or response time isn’t guaranteed." if language != "தமிழ்" else "இங்கே தொடரலாம் அல்லது ஆதரவு குழுவிடம் தொடர்பு கோரலாம். நேரடி ஆலோசகர் அல்லது பதில் நேரம் உறுதியில்லை.")
         if st.button("Request a human callback" if language != "தமிழ்" else "மனித ஆலோசகர் தொடர்பு கோரிக்கை", key="delay_callback_request"):
             st.session_state.offer_delay_callback = False
             st.session_state.pending_prompt = "Connect me to a human and save a callback request"
@@ -4515,7 +4515,7 @@ with chat_slot.container(key="mira-content-wash"):
                     respond(prompt.strip())
             st.rerun()
         has_user_turn = any(message.get("role") == "user" for message in st.session_state.chat)
-        if st.button("உரையாடலை முடிக்கவும்" if language == "தமிழ்" else "End chat", key="end_mira_chat", disabled=not has_user_turn, help="Save this conversation as ended in the owner dashboard and Excel." if language != "தமிழ்" else "இந்த உரையாடலை முடிந்ததாக டாஷ்போர்டிலும் Excel-லும்சேமிக்கவும்.", use_container_width=True):
+        if st.button("உரையாடலை முடிக்கவும்" if language == "தமிழ்" else "End chat", key="end_mira_chat", disabled=not has_user_turn, help="Save this conversation as ended in a private chat record." if language != "தமிழ்" else "இந்த உரையாடலை பாதுகாப்பான பதிவில் முடிந்ததாகச் சேமிக்கவும்.", use_container_width=True):
             close_conversation_from_button()
             st.rerun()
         if "pending_prompt" in st.session_state:

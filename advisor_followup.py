@@ -18,13 +18,13 @@ def advisor_reply(text, state=None, tamil=False, handoff=False):
         return {}, "சரி, தொடர்பு கோரிக்கை சேமிக்கப்படவில்லை. வேறு உதவி வேண்டுமெனில் சொல்லுங்கள்." if tamil else "Of course—no callback request was saved. I’m here if you need anything else."
     if handoff and not stage:
         if callback:
-            return reply("I can save a callback request for owner review, though a call isn’t guaranteed. How would you prefer to be contacted—phone or email?", "உரிமையாளர் பார்வைக்கு தொடர்பு கோரிக்கையைச் சேமிக்கலாம்; அழைப்பு உறுதியில்லை. தொலைபேசியிலா மின்னஞ்சலிலா தொடர்பு கொள்ள விரும்புகிறீர்கள்?", "method")
+            return reply("I can save a callback request for the support team, though a call isn’t guaranteed. How would you prefer to be contacted—phone or email?", "ஆதரவு குழுவுக்கான தொடர்பு கோரிக்கையைச் சேமிக்கலாம்; அழைப்பு உறுதியில்லை. தொலைபேசியிலா மின்னஞ்சலிலா தொடர்பு கொள்ள விரும்புகிறீர்கள்?", "method")
         return reply("A human advisor isn’t available through this app right now. Before we consider a follow-up, can I help another way—perhaps check a listing or explain a detail? If you prefer a callback request, just say so.", "இப்போது இந்தச் செயலியில் மனித ஆலோசகர் கிடைக்கவில்லை. பின்னர் தொடர்பு கோருவதற்கு முன், பட்டியலைச் சரிபார்ப்பது அல்லது விவரத்தை விளக்குவது போன்ற வேறு வழியில் உதவலாமா? பின்னர் தொடர்பு வேண்டுமெனில் சொல்லுங்கள்.", "offer_help")
     if not stage:
         return state, None
     if stage == "offer_help":
         if callback:
-            return reply("I can save a request for owner review; it won’t confirm a call. Would you prefer phone or email?", "உரிமையாளர் பார்வைக்கு கோரிக்கையைச் சேமிக்கலாம்; அழைப்பை உறுதிப்படுத்தாது. தொலைபேசியா மின்னஞ்சலா?", "method")
+        return reply("I can save a request for the support team; it won’t confirm a call. Would you prefer phone or email?", "ஆதரவு குழுவுக்கான கோரிக்கையைச் சேமிக்கலாம்; அழைப்பை உறுதிப்படுத்தாது. தொலைபேசியா மின்னஞ்சலா?", "method")
         if re.fullmatch(r"(?:yes|sure|okay|ok|help me|ஆம்|சரி)[.! ]*", query):
             return reply("What would you like help with?", "எதில் உதவி வேண்டும்?")
         return {}, None  # A substantive question continues the ordinary chat.
@@ -44,10 +44,10 @@ def advisor_reply(text, state=None, tamil=False, handoff=False):
         return reply("When would you prefer a follow-up? Please include the day and time; this is a preference, not a booking.", "எந்த நாள், எந்த நேரத்தில் தொடர்பு விரும்புகிறீர்கள்? இது விருப்ப நேரம் மட்டுமே; முன்பதிவு அல்ல.", "time")
     if stage == "time":
         state["preferred_time"] = text.strip()[:200]
-        return reply(f"May I save your {state['method'].lower()} contact and preferred time ({state['preferred_time']}) in the private owner dashboard for a callback request? A response isn’t guaranteed.", f"உங்கள் தொடர்பையும் விருப்ப நேரத்தையும் ({state['preferred_time']}) தனிப்பட்ட உரிமையாளர் டாஷ்போர்டில் சேமிக்கலாமா? பதில் உறுதியில்லை.", "confirm")
+        return reply(f"May I save your {state['method'].lower()} contact and preferred time ({state['preferred_time']}) in a private follow-up record for a callback request? A response isn’t guaranteed.", f"உங்கள் தொடர்பையும் விருப்ப நேரத்தையும் ({state['preferred_time']}) தனிப்பட்ட follow-up பதிவில் சேமிக்கலாமா? பதில் உறுதியில்லை.", "confirm")
     if stage == "confirm":
         if re.fullmatch(r"(?:yes|yes please|confirm|save|save it|okay|ok|ஆம்|சரி)[.! ]*", query):
             state["stage"] = "confirmed"
-            return reply("Your callback request is saved for owner review. Your preferred time isn’t a confirmed appointment, and a response isn’t guaranteed.", "உரிமையாளர் பார்வைக்கு தொடர்பு கோரிக்கை சேமிக்கப்பட்டது. விருப்ப நேரம் உறுதியான சந்திப்பு அல்ல; பதிலும் உறுதியில்லை.")
+        return reply("Your callback request is saved for the support team. Your preferred time isn’t a confirmed appointment, and a response isn’t guaranteed.", "ஆதரவு குழுவுக்கான தொடர்பு கோரிக்கை சேமிக்கப்பட்டது. விருப்ப நேரம் உறுதியான சந்திப்பு அல்ல; பதிலும் உறுதியில்லை.")
         return reply("Should I save this request, or cancel it?", "கோரிக்கையைச் சேமிக்கவா ரத்து செய்யவா?")
     return state, None
