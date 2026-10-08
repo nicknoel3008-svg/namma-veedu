@@ -126,6 +126,36 @@ _DRAFT_PATTERNS = (
         "Acknowledge the request on the next available turn, briefly explain that the answer was not delivered, and answer the current request without asking the customer to repeat it.",
         "Missing Mira response",
     ),
+    (
+        "suggested-callback-continuity",
+        "A customer asks for a callback or human follow-up more than once.",
+        "Acknowledge the callback request, preserve the customer’s stated property context, and open the callback form or explain exactly what information is still needed. Do not send the customer back to a generic error message.",
+        "Callback request not completed",
+    ),
+    (
+        "suggested-email-sharing-continuity",
+        "A customer asks to email or share property details and the request is not addressed.",
+        "Acknowledge the sharing request, state whether email is configured, and offer the available safe next step. Do not imply that an email was sent until the user has consented and delivery succeeds.",
+        "Email or sharing request not addressed",
+    ),
+    (
+        "suggested-preference-removal",
+        "A customer removes a BHK, budget, area, or other preference but Mira repeats it.",
+        "Remove the named preference from the active search memory, preserve the remaining requirements, confirm the change briefly, and refresh the search before recommending anything else.",
+        "Preference removal not reflected",
+    ),
+    (
+        "suggested-loan-continuity",
+        "A customer asks about funding, a loan, or the remaining purchase cost during a property conversation.",
+        "Keep the selected property and stated amounts in context, calculate only the arithmetic difference that is supported by the saved details, and provide official lender links without promising approval.",
+        "Loan request lost in conversation",
+    ),
+    (
+        "suggested-appreciation-response",
+        "A customer thanks or compliments Mira and receives an unrelated fallback reply.",
+        "Thank the customer warmly and briefly, acknowledge what helped, and leave the next step open unless they ask for more help.",
+        "Appreciation not acknowledged",
+    ),
 )
 
 
