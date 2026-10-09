@@ -5,7 +5,7 @@
 - Mira asks once whether to include auction properties. Yes includes auctions alongside sales; no excludes auctions. Users can subsequently request auctions only or cancel them.
 - Multiple property types can be selected together, added, and individually removed without discarding the remaining budget, area, or other preferences. Cancelled filters are cleared from the website controls as well as chat memory.
 - Moving to a new city clears an inherited auction-only search unless the customer explicitly requests auctions again.
-- The owner dashboard has four primary KPIs: conversations, user sessions, open follow-ups, and feedback received. Detailed outcomes remain available in charts, tables, and exports.
+- The owner dashboard has eight primary KPIs: conversations, user sessions, open follow-ups, feedback received, confirmed interested leads, search match rate, completed follow-ups, and average customer satisfaction. Detailed outcomes remain available in charts, tables, and exports.
 - Open follow-ups include saved Mira schedules and owner-marked actions, counted once per conversation. Cancelled or completed schedules do not remain open unless the owner explicitly marks another action needed.
 - Follow-up descriptions are included in newly saved records, customer summaries, and exports, alongside the method, status, cadence, and next scheduled time.
 

@@ -1621,6 +1621,18 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
         kpi_cols[2].metric("Follow-ups open", f"{followups_open:,}", help="Conversations with a saved active follow-up or owner-marked Needed/Scheduled. Counted once per conversation.")
         feedback_count = len({row.get("Feedback ID") for row in filtered_rows if row.get("Feedback ID")})
         kpi_cols[3].metric("Feedback received", f"{feedback_count:,}")
+        interested_conversations = sum(str(summary.get("Customer interest (owner)") or "").casefold() == "interested" for summary in rating_summary)
+        search_conversations = {str(row.get("Conversation ID") or "") for row in filtered_rows
+                                if pd.notna(pd.to_numeric(row.get("Matching records"), errors="coerce")) and row.get("Conversation ID")}
+        matched_conversations = {str(row.get("Conversation ID") or "") for row in filtered_rows
+                                 if pd.to_numeric(row.get("Matching records"), errors="coerce") > 0 and row.get("Conversation ID")}
+        satisfaction_ratings = [pd.to_numeric(summary.get("User satisfaction rating (1-5)"), errors="coerce") for summary in rating_summary]
+        satisfaction_ratings = [float(value) for value in satisfaction_ratings if pd.notna(value) and 1 <= value <= 5]
+        analysis_cols = st.columns(4)
+        analysis_cols[0].metric("Confirmed interested leads", f"{interested_conversations:,}", help="Conversations marked Interested by the owner, counted once per conversation.")
+        analysis_cols[1].metric("Search match rate", f"{len(matched_conversations) / len(search_conversations):.0%}" if search_conversations else "No searches", help="Share of conversations with recorded search results that found at least one match. A match does not confirm availability or a sale.")
+        analysis_cols[2].metric("Follow-ups completed", f"{followups_completed:,}", help="Conversations with a completed schedule or owner-marked completion, counted once per conversation.")
+        analysis_cols[3].metric("Average satisfaction", f"{sum(satisfaction_ratings) / len(satisfaction_ratings):.1f} / 5" if satisfaction_ratings else "Not rated", help=f"Latest customer satisfaction rating per conversation; {len(satisfaction_ratings)} rated conversations in this date range.")
         st.caption("KPIs use the selected date range. Follow-ups are counted once per conversation; user sessions identify browsers, not verified people. Detailed outcomes and ratings remain in the tables and exports.")
 
         if filtered_rows:

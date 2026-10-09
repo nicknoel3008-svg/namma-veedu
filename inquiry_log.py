@@ -423,6 +423,7 @@ def customer_summary_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         summary.update({
             "Email follow-ups": "Yes" if last_value("Follow-up method") in {"Email", "Email follow-up"} and last_value("Follow-up consent timestamp (Asia/Kolkata)") else "No",
             "Interested in property": "Yes" if interest in {"Interested", "Interested signal"} else "No",
+            "Customer interest (owner)": last_value("Customer interest (owner)"),
             "Not interested in property": "Yes" if interest in {"Not interested", "Not interested signal"} else "No",
             "Interest stated": "Yes" if interest else "No",
             "Follow-up requested": "Yes" if any(turn.get("Follow-up requested signal") == "Yes" for turn in turns) else "No",
