@@ -1,4 +1,4 @@
-"""Persistent storage adapter with a safe local-file fallback.
+"""Shared persistent storage; local files are used only when unconfigured.
 
 The hosted app can use PostgreSQL (for example a Supabase database) when a
 ``DATABASE_URL`` secret is configured.  Development and unconfigured hosted
@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 log = logging.getLogger(__name__)
+_imported_local_databases: set[str] = set()
 _AADHAAR_PATTERN = re.compile(r"(?<![\w-])(?:\d[\s-]?){11}\d(?![\w-])")
 _PAN_PATTERN = re.compile(r"\b[A-Z]{5}\d{4}[A-Z]\b", re.IGNORECASE)
 
@@ -97,18 +98,41 @@ def _ensure_schema(connection) -> None:
 
 
 def _db_call(action, fallback):
-    if not is_configured():
+    if not _database_url():
         return fallback()
+    if not is_configured():
+        raise RuntimeError("Shared storage is configured but its database driver is unavailable.")
     try:
         with _connect() as connection:
             return action(connection)
     except Exception:
-        log.exception("Persistent storage request failed; using local fallback")
-        return fallback()
+        log.error("Shared storage request failed; local fallback is disabled to keep records consistent")
+        raise RuntimeError("Shared storage is unavailable. Please try again; no local-only save was made.") from None
 
 
 def read_inquiries(local_reader) -> list[dict[str, Any]]:
     def action(connection):
+        # Preserve older hosted/local files when this instance first switches
+        # to shared storage. Existing cloud records and owner edits win.
+        database_key = _database_url()
+        if database_key not in _imported_local_databases:
+            legacy_rows = local_reader()
+            with connection.cursor() as cursor:
+                for legacy in legacy_rows:
+                    record = _redact(legacy)
+                    inquiry_id = str(record.get("Inquiry ID") or "").strip()
+                    if not inquiry_id:
+                        continue
+                    cursor.execute(
+                        "INSERT INTO mira_inquiry_turns (inquiry_id, conversation_id, occurred_at, payload) "
+                        "VALUES (%s, %s, COALESCE(%s::timestamptz, NOW()), %s::jsonb) "
+                        "ON CONFLICT (inquiry_id) DO NOTHING",
+                        (inquiry_id, str(record.get("Conversation ID") or inquiry_id),
+                         record.get("Timestamp (Asia/Kolkata)") or None,
+                         json.dumps(record, ensure_ascii=False, default=str)),
+                    )
+            connection.commit()
+            _imported_local_databases.add(database_key)
         with connection.cursor() as cursor:
             cursor.execute(
                 "SELECT payload FROM mira_inquiry_turns "
