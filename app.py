@@ -1454,7 +1454,7 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
     blueprint_path = ROOT / "WEBSITE_BLUEPRINT.md"
     with st.expander("Website Blueprint", expanded=False):
         st.caption("Private product and engineering map. It contains no passwords, API keys, or customer conversation text.")
-        st.image(str(ROOT / "static" / "mira-blueprint-flowchart.svg"), caption="Mira conversation, follow-up and owner review flow", use_container_width=True)
+        st.image(str(ROOT / "static" / "mira-blueprint-flowchart.svg"), caption="Mira blueprint: intent, preferences, safe tools, validated responses and private owner reports", use_container_width=True)
         if blueprint_path.exists():
             blueprint_text = blueprint_path.read_text(encoding="utf-8")
             st.download_button("Download blueprint", data=blueprint_text, file_name="namma_veedu_website_blueprint.md", mime="text/markdown", key="download_website_blueprint")
