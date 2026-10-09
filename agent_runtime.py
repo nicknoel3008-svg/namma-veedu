@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import json
 import logging
+import re
 import time
 from email.utils import parsedate_to_datetime
 from datetime import timezone
@@ -444,6 +445,10 @@ def run_openai_agent(
                     arguments = json.loads(call.arguments)
                     inventory = properties
                     if call.name in {"search_saved_properties", "search_bank_auctions"}:
+                        ownership_question = re.search(r"\b(?:leasehold|freehold|ground rent|lease renewal)\b", text.casefold())
+                        listing_request = re.search(r"\b(?:find|search|browse|recommend|list)\b|\bshow(?: me)?\b.{0,45}\b(?:property|properties|listings?|plots?|homes?|flats?|houses?)\b", text.casefold())
+                        if ownership_question and not listing_request:
+                            raise ValueError("The user asked about ownership concepts, not for listings. Answer their question without a property search or recommendation.")
                         memory = (buyer_context or {}).get("buyer_memory", {})
                         requirements = memory.get("requirements", buyer_context or {})
                         arguments = enforce_search_args(arguments, requirements)

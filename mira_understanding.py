@@ -38,7 +38,7 @@ def understand_request(text, data, chat, context=None, memory=None, tamil=False)
         memory.setdefault(key, default)
     records = shown_records(chat)
     if re.fullmatch(r"[\W_]*(?:hi|hello|hey|good morning|good afternoon|good evening|vanakkam|வணக்கம்|ஹாய்)(?:[\s,]+mira)?[\W_]*", query):
-        return {"reply": "வணக்கம்! இன்று எதில் உதவலாம்?" if tamil else "Hi! What would you like help with today?",
+        return {"reply": "வணக்கம்! Namma Veedu-க்கு வரவேற்கிறேன். நான் Mira, உங்கள் AI சொத்து வழிகாட்டி. நீங்கள் எதைத் தேடுகிறீர்கள் என்று சொல்லுங்கள்; உங்களுக்கான வாய்ப்புகளைப் பார்க்க உதவுகிறேன்." if tamil else "Welcome to Namma Veedu! I’m Mira, your AI property guide. Tell me what you’re looking for, and I’ll help you explore your options.",
                 "context": context, "memory": memory, "greeting": True}
     reply = None
     search = False

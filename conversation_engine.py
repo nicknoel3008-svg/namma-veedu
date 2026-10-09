@@ -20,6 +20,20 @@ def document_guidance_turn(query, language, answer, context, memory):
     def say(english, tamil, tanglish):
         return {"English": english, "Tamil": tamil, "Tanglish": tanglish}[language]
 
+    if re.search(r"\bfixed\b", query) and re.search(r"\bfloating\b", query) and re.search(r"rate|interest|loan", query):
+        return answer("loan_rate_education",
+            "A fixed rate stays unchanged for the fixed period specified in the agreement; check whether that covers the whole tenure or includes a reset clause. A floating rate can reset with the benchmark and lender terms, affecting the EMI, tenure, or both. Compare the lender’s official reset, switching and prepayment terms; neither option guarantees a lower total cost.",
+            "Fixed வட்டி ஒப்பந்தத்தில் குறிப்பிட்ட காலத்திற்கு மாறாது; அது முழுக் கடன் காலமா, reset நிபந்தனை உள்ளதா என்று சரிபார்க்கவும். Floating வட்டி benchmark மற்றும் வங்கி நிபந்தனைப்படி மாறலாம்; EMI, கடன் காலம் அல்லது இரண்டும் மாறலாம். வங்கியின் அதிகாரப்பூர்வ reset, மாற்றம், முன்கூட்டிச் செலுத்தும் நிபந்தனைகளை ஒப்பிடுங்கள்; எந்த முறையும் குறைந்த மொத்தச் செலவை உறுதி செய்யாது.",
+            "Fixed rate agreement-la sonna fixed period-ku maaradhu; full tenure-aa illa reset clause irukkaa-nu check pannunga. Floating rate benchmark/lender terms-padi reset aagalam; EMI, tenure, illa rendum maaralam. Official reset, switching, prepayment terms compare pannunga; endha option-um lower total cost guarantee pannaadhu.")
+
+    if (re.search(r"\b(?:freehold|leasehold)\b", query)
+            and re.search(r"\b(?:explain|difference|versus|compare|how|what|mean|meaning|vs)\b", query)
+            and not re.search(r"\b(?:find|search|browse|recommend|list)\b|\bshow(?: me)?\b.{0,45}\b(?:property|properties|listings?|plots?|homes?|flats?|houses?)\b", query)):
+        return answer("ownership_education",
+            "Freehold generally means ownership without a fixed lease term, subject to law and the recorded title. Leasehold rights come from a lease: rights over the land and buildings, duration, renewal, transfer restrictions and any charges depend on its terms. Have a qualified property lawyer check the actual deed and lease before relying on ownership claims.",
+            "Freehold என்பது பொதுவாக குறிப்பிட்ட குத்தகைக் கால வரம்பில்லாத உரிமை; சட்டமும் பதிவு ஆவணமும் பொருந்தும். Leasehold உரிமைகள் குத்தகை ஒப்பந்தத்தைச் சார்ந்தவை: நிலம், கட்டிடம், காலம், புதுப்பிப்பு, மாற்றக் கட்டுப்பாடுகள், கட்டணங்கள் அனைத்தும் அதன் நிபந்தனைகளைப் பொறுத்தவை. உரிமையை நம்புவதற்கு முன் உண்மையான ஆவணத்தையும் குத்தகையையும் தகுதியான சொத்து வழக்கறிஞரிடம் சரிபார்க்கவும்.",
+            "Freehold-na generally fixed lease term illaadha ownership; law-um recorded title-um apply aagum. Leasehold rights lease-la irundhu varum: land/building rights, duration, renewal, transfer restrictions, charges ellam terms-ai poruthadhu. Ownership claim-ai namburadhukku munna actual deed/lease-ai qualified property lawyer-kitta check pannunga.")
+
     if re.search(r"(?:(?:don't|do not) know (?:anything|where|what)|first[- ]time buyer|starting my search|start.*buying)", query):
         return answer("first_time_buyer",
             "That’s completely fine—many first-time buyers start there. A simple path is budget, loan comfort, shortlist, visit, document checks, then payment and registration. Would you like to start with budget or area?",
@@ -158,6 +172,13 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
         # Tanglish customers often put the amount before the noun: “50 lakh
         # budget”. Accept that natural order as the same budget preference.
         amount = re.search(r"(\d+(?:\.\d+)?)\s*(lakhs?|lacs?|crores?|cr)\s*(?:budget|varamb[ue]|limit)?\b", query)
+    payment_amount = bool(re.search(r"advance|deposit|down payment|முன்பணம்", query)) and not re.search(r"\bbudget\b|பட்ஜெட்", query)
+    if payment_amount:
+        amount = None
+        if "max_budget" in previous_context:
+            context["max_budget"] = previous_context["max_budget"]
+        else:
+            context.pop("max_budget", None)
     if amount:
         context["max_budget"] = float(amount.group(1)) * (10000000 if amount.group(2).startswith("cr") else 100000)
     if re.search(r"flat|apartment|குடியிருப்பு", query) and not re.search(
@@ -179,7 +200,7 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
         memory["selected"] = selected
     selected = memory.get("selected")
     if re.fullmatch(r"[\W_]*(?:hi|hello|hey|good morning|good afternoon|good evening|vanakkam|வணக்கம்|ஹாய்)(?:[\s,]+mira)?[\W_]*", query):
-        return answer("greeting", "Hi! What would you like help with today?", "வணக்கம்! இன்று எதில் உதவலாம்?", "Vanakkam! Innikku enna help venum?")
+        return answer("greeting", "Welcome to Namma Veedu! I’m Mira, your AI property guide. Tell me what you’re looking for, and I’ll help you explore your options.", "வணக்கம்! Namma Veedu-க்கு வரவேற்கிறேன். நான் Mira, உங்கள் AI சொத்து வழிகாட்டி. நீங்கள் எதைத் தேடுகிறீர்கள் என்று சொல்லுங்கள்; உங்களுக்கான வாய்ப்புகளைப் பார்க்க உதவுகிறேன்.", "Vanakkam! Namma Veedu-ku varaverkiren. Naan Mira, unga AI property guide. Neenga enna thedureenga-nu sollunga; unga options-a paarka udhavuren.")
     if re.search(r"\b(?:thank(?:s| you)?|appreciate(?: it)?|that(?:'s| is) helpful|great suggestion|good suggestion|nice suggestion|good job|well done|awesome|super helpful)\b|நன்றி|ரொம்ப நல்லா", query):
         return answer(
             "appreciation",
@@ -245,6 +266,9 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
         r"\b(?:remove|ignore|forget|drop|no longer want|don't want|do not want|add|also|keep|prefer)\b",
         query,
     ))
+    guidance = document_guidance_turn(query, language, answer, context, memory)
+    if guidance and not explicit_search:
+        return guidance
     if preference_signal and (context_changed or named_preference_change) and not explicit_search:
         # Collect all changes from one message, then invite the next change
         # instead of forcing the customer through a one-field-at-a-time loop.

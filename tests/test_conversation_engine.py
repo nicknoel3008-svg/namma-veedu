@@ -53,6 +53,9 @@ class ConversationEngineTests(unittest.TestCase):
 
     def test_human_guidance_scenarios_from_customer_library(self):
         scenarios = {
+            "Explain freehold versus leasehold ownership simply.": "ownership_education",
+            "How do leasehold duration and renewal affect a buyer?": "ownership_education",
+            "Please compare fixed and floating interest rates without quoting a rate.": "loan_rate_education",
             "I want to buy a flat but I don't know anything about the process.": "first_time_buyer",
             "Just looking around, not sure what I want.": "exploring",
             "Need a flat. Fast.": "urgent_search",

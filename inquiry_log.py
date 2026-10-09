@@ -17,6 +17,7 @@ from threading import Lock, Timer
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment, Font, PatternFill
+from mira_feedback import FEEDBACK_HEADERS
 
 
 INQUIRY_LOG_PATH = Path(__file__).resolve().parent / "data" / "private" / "inquiries.xlsx"
@@ -80,10 +81,11 @@ HEADERS = (
     "Mira review status (owner)",
     "Mira corrected intent (owner)",
     "Mira review notes (owner)",
+    "Feedback ID", "Feedback category", "Feedback comment", "Feedback related Mira response",
 )
 _WRITE_LOCK = Lock()
 _MAX_CELL_LENGTH = 32_000
-_AADHAAR_PATTERN = re.compile(r"(?<!\d)(?:\d[\s-]?){11}\d(?!\d)")
+_AADHAAR_PATTERN = re.compile(r"(?<![\w-])(?:\d[\s-]?){11}\d(?![\w-])")
 _PAN_PATTERN = re.compile(r"\b[A-Z]{5}\d{4}[A-Z]\b", re.IGNORECASE)
 _SNAPSHOT_TIMER_LOCK = Lock()
 _SNAPSHOT_TIMER: Timer | None = None
@@ -393,6 +395,7 @@ CUSTOMER_SUMMARY_HEADERS = (
     "Follow-up cadence", "Next follow-up time (Asia/Kolkata)", "Chat ended at (Asia/Kolkata)",
     "Mira performance rating (1-5)", "User satisfaction rating (1-5)",
     "Customer interest (owner)", "Follow-up status (owner)", "Lead priority (owner)",
+    "Feedback submissions", "Latest feedback category", "Latest feedback comment",
 )
 
 MIRA_RESPONSE_HEADERS = (
@@ -428,6 +431,9 @@ def customer_summary_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "Budget": "",
             "Mira performance rating (1-5)": last_value("Mira performance rating (1-5)"),
             "User satisfaction rating (1-5)": last_value("User satisfaction rating (1-5)"),
+            "Feedback submissions": sum(bool(turn.get("Feedback ID")) for turn in turns),
+            "Latest feedback category": last_value("Feedback category"),
+            "Latest feedback comment": last_value("Feedback comment"),
         })
         budget = last_value("Customer budget / price stated")
         amount = re.search(r"(?:₹|rs\.?\s*)?\d[\d,.]*\s*(?:lakh|lakhs|lac|crore|cr|k)\b|(?:₹|rs\.?\s*)\s*\d[\d,.]*", budget, re.I)
@@ -440,6 +446,7 @@ CONVERSATION_TRANSCRIPT_HEADERS = (
     "Conversation ID", "Customer name", "User ID", "Language", "Conversation started at (Asia/Kolkata)",
     "Chat ended at (Asia/Kolkata)", "Conversation status", "Conversation close reason",
     "Mira performance rating (1-5)", "User satisfaction rating (1-5)", "Saved turns", "Complete chat transcript",
+    "Customer feedback",
 )
 
 
@@ -480,6 +487,7 @@ def conversation_transcript_rows(rows: list[dict[str, Any]]) -> list[dict[str, A
             "User satisfaction rating (1-5)": last_value("User satisfaction rating (1-5)"),
             "Saved turns": len(turns),
             "Complete chat transcript": transcript,
+            "Customer feedback": "\n\n".join(f"{turn.get('Timestamp (Asia/Kolkata)', '')} · {turn.get('Feedback category', '')}: {turn.get('Feedback comment', '')}" for turn in turns if turn.get("Feedback ID")),
         })
     return conversations
 
@@ -555,12 +563,28 @@ def build_inquiry_export(rows: list[dict[str, Any]], period_label: str, start_da
     responses.auto_filter.ref = f"A1:{responses.cell(1, len(MIRA_RESPONSE_HEADERS)).column_letter}{responses.max_row}"
     for index, header in enumerate(MIRA_RESPONSE_HEADERS, start=1):
         responses.column_dimensions[get_column_letter(index)].width = 72 if header == "Mira response" else 28
+    feedback_sheet = workbook.create_sheet("Customer feedback")
+    feedback_sheet.append(list(FEEDBACK_HEADERS))
+    for row in raw_rows:
+        if row.get("Feedback ID"):
+            feedback_sheet.append([_excel_text(row.get(header)) for header in FEEDBACK_HEADERS])
+    feedback_sheet.freeze_panes = "A2"
+    feedback_sheet.auto_filter.ref = feedback_sheet.dimensions
+    for index, header in enumerate(FEEDBACK_HEADERS, 1):
+        feedback_sheet.column_dimensions[get_column_letter(index)].width = 65 if "comment" in header or "response" in header else 28
+    for cell in feedback_sheet[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="087D78")
+    for row in feedback_sheet:
+        for cell in row:
+            cell.alignment = Alignment(wrap_text=True, vertical="top")
     info = workbook.create_sheet("Export details")
     info.append(["Selected date filter", period_label])
     info.append(["Start date", start_date])
     info.append(["End date", end_date])
     info.append(["Conversations exported", len(rows)])
     info.append(["Mira responses exported", responses.max_row - 1])
+    info.append(["Feedback submissions exported", feedback_sheet.max_row - 1])
     info.append(["Format", "One row per conversation. Yes means recorded evidence; No means not recorded. Both interest fields are No when interest is unstated. Email follow-ups means consent recorded, not delivery confirmed."])
     info.append(["Exported at (Asia/Kolkata)", datetime.now(ZoneInfo("Asia/Kolkata")).isoformat(timespec="seconds")])
     info.column_dimensions["A"].width = 34

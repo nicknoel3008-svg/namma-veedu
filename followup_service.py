@@ -1,4 +1,4 @@
-"""Persistent, consent-based email follow-up queue for Namma Illam."""
+"""Persistent, consent-based email follow-up queue for Namma Veedu."""
 
 from __future__ import annotations
 
@@ -215,11 +215,11 @@ def send_due_followups(config: dict[str, str], db_path: Path = FOLLOWUP_DB) -> t
         summary = row["preference_summary"].strip()
         summary_text = f"\nYou asked us to follow up about: {summary}\n" if summary else ""
         message = EmailMessage()
-        message["Subject"] = "A quick check-in from Namma Illam"
+        message["Subject"] = "A quick check-in from Namma Veedu"
         message["From"] = config["FOLLOWUP_SMTP_FROM"]
         message["To"] = recipient
         message.set_content(
-            f"{greeting}\n\nJust checking in from Namma Illam. Would you like to continue exploring your property options?{summary_text}\nThere is no pressure to reply. This is an AI-guided property portal, and this message does not confirm listing availability or loan terms.\n\nTo stop these follow-up emails, use this link: {unsubscribe_url}\n\nNamma Illam"
+            f"{greeting}\n\nJust checking in from Namma Veedu. Would you like to continue exploring your property options?{summary_text}\nThere is no pressure to reply. This is an AI-guided property portal, and this message does not confirm listing availability or loan terms.\n\nTo stop these follow-up emails, use this link: {unsubscribe_url}\n\nNamma Veedu"
         )
         try:
             port = int(config.get("FOLLOWUP_SMTP_PORT") or "587")

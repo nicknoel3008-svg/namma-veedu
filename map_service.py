@@ -22,7 +22,7 @@ def _mapbox_point(query: str, token: str) -> tuple[float, float] | None:
                 "limit": 1,
                 "types": "place,locality,neighborhood",
             },
-            headers={"User-Agent": "Namma-Illam/1.0 property-guide"},
+            headers={"User-Agent": "Namma-Veedu/1.0 property-guide"},
             timeout=8,
         )
         response.raise_for_status()

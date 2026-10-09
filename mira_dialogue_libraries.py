@@ -18,7 +18,7 @@ DIALOGUE_LIBRARIES: dict[str, tuple[dict[str, str], ...]] = {
         },
         {
             "user": "Hello?",
-            "mira": "Hi, I’m Mira, Namma Illam’s AI guide. What’s on your mind?",
+            "mira": "Hi, I’m Mira, Namma Veedu’s AI guide. What’s on your mind?",
         },
     ),
     "empathy_and_pace": (

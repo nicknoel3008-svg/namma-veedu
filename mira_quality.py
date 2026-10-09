@@ -66,7 +66,7 @@ def quality_flags(row: dict[str, Any]) -> list[str]:
         flags.append("Preference removal not reflected")
     if _LOAN_REQUEST.search(inquiry) and response_type in {"gather_budget", "property_detail", "local_support", "welcome"}:
         flags.append("Loan request lost in conversation")
-    if _APPRECIATION.search(inquiry) and response_type in {"local_support", "property_detail", "welcome"}:
+    if _APPRECIATION.search(inquiry) and not _FRUSTRATION.search(inquiry) and response_type in {"local_support", "property_detail", "welcome"}:
         flags.append("Appreciation not acknowledged")
     if not response.strip():
         flags.append("Missing Mira response")

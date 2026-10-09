@@ -8,6 +8,7 @@ from uuid import uuid4
 from typing import Any
 
 from mira_quality import quality_flags
+from mira_feedback import feedback_drafts
 
 
 LIBRARY_PATH = Path(__file__).parent / "data" / "private" / "mira_learning_library.json"
@@ -42,7 +43,7 @@ BASELINE_RULES = [
         "Scenario": "Any request Mira cannot complete or verify directly",
         "Guidance": "Say what is known, state the limit plainly, and offer the safest practical next step. Never invent availability, prices, contact details, guarantees, or a human response time.",
         "Status": "Approved",
-        "Source": "Namma Illam property-safety policy",
+        "Source": "Namma Veedu property-safety policy",
     },
     {
         "Rule ID": "baseline-language-and-tone",
@@ -162,7 +163,7 @@ _DRAFT_PATTERNS = (
 def suggested_draft_rules(rows: list[dict[str, Any]], minimum_occurrences: int = 2) -> list[dict[str, str]]:
     """Turn recurring, explainable quality cues into inactive owner-review drafts."""
     cues = [cue for row in rows for cue in quality_flags(row)]
-    drafts: list[dict[str, str]] = []
+    drafts: list[dict[str, str]] = feedback_drafts(rows)
     for rule_id, scenario, guidance, cue in _DRAFT_PATTERNS:
         occurrences = cues.count(cue)
         if occurrences >= minimum_occurrences:

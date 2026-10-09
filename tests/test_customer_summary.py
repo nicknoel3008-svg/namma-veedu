@@ -39,7 +39,8 @@ class CustomerSummaryTests(unittest.TestCase):
         function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "close_conversation_from_button")
         save = Mock()
         namespace = {"st": SimpleNamespace(session_state=state), "datetime": datetime, "INDIA_TZ": INDIA_TZ,
-                     "language": "English", "update_conversation_fields": save, "conversation_transcript": lambda chat: str(chat)}
+                     "language": "English", "update_conversation_fields": save, "conversation_transcript": lambda chat: str(chat),
+                     "clear_active_preferences": Mock()}
         exec(compile(ast.Module(body=[function], type_ignores=[]), "app.py", "exec"), namespace)
         namespace["close_conversation_from_button"]()
         self.assertTrue(state.conversation_closed)

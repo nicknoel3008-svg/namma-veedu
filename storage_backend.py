@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 log = logging.getLogger(__name__)
-_AADHAAR_PATTERN = re.compile(r"(?<!\d)(?:\d[\s-]?){11}\d(?!\d)")
+_AADHAAR_PATTERN = re.compile(r"(?<![\w-])(?:\d[\s-]?){11}\d(?![\w-])")
 _PAN_PATTERN = re.compile(r"\b[A-Z]{5}\d{4}[A-Z]\b", re.IGNORECASE)
 
 

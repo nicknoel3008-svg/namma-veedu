@@ -1,4 +1,4 @@
-"""Namma Illam — a local, chat-first Tamil Nadu property guide."""
+"""Namma Veedu — a local, chat-first Tamil Nadu property guide."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import base64
 import hmac
+import inspect
 import json
 import logging
 import os
@@ -18,6 +19,8 @@ import streamlit.components.v1 as components
 
 from agent import friendly_reply, parse_request
 from conversation_memory import update_preferences, contextual_reply
+from chat_followup import followup_turn
+from mira_feedback import CATEGORIES as FEEDBACK_CATEGORIES, FEEDBACK_HEADERS, feedback_record
 from ai_config import select_ai_config
 from advisor_followup import advisor_reply
 from buyer_memory import update_buyer_memory, shown_records as current_shown_records, record_detail_reply, prepare_inventory, grounded_search_reply
@@ -91,6 +94,44 @@ def refresh_learning_library_drafts(*, force: bool = False) -> int:
     except Exception:
         logging.exception("Could not refresh Mira Learning Library drafts")
         return 0
+def render_feedback_panel():
+    tamil = language == "தமிழ்"
+    if st.session_state.pop("feedback_saved_notice", False):
+        st.success("நன்றி—உங்கள் கருத்து பரிசீலனைக்காகச் சேமிக்கப்பட்டது." if tamil else "Thank you—your feedback has been saved for review.")
+    if st.button("கருத்தைப் பகிருங்கள்" if tamil else "Share feedback", key="mira_share_feedback"):
+        st.session_state.feedback_form_open = not st.session_state.get("feedback_form_open", False)
+        if st.session_state.feedback_form_open:
+            st.session_state.feedback_submission_id = uuid4().hex
+    if not st.session_state.get("feedback_form_open"):
+        return
+    labels = {"Incorrect answer": "தவறான பதில்", "Misunderstood my request": "என் கோரிக்கையைத் தவறாகப் புரிந்துகொண்டார்", "Difficult to use": "பயன்படுத்துவதில் சிரமம்", "Suggestion": "பரிந்துரை", "Other": "மற்றவை"}
+    with st.form("mira_feedback_form"):
+        st.caption("உங்கள் கருத்தும் தொடர்புடைய Mira பதிலும் உரிமையாளரின் பரிசீலனைக்காகச் சேமிக்கப்படும். அடையாள எண்கள் அல்லது வங்கி விவரங்களைச் சேர்க்க வேண்டாம்." if tamil else "Your feedback and the relevant Mira response will be saved for owner review. Please leave out identity numbers and bank details.")
+        category = st.selectbox("கருத்து வகை" if tamil else "Feedback category", FEEDBACK_CATEGORIES, format_func=lambda value: labels[value] if tamil else value)
+        comment = st.text_area("உங்கள் கருத்து (விருப்பத்தேர்வு)" if tamil else "Your feedback (optional)", max_chars=2000)
+        submitted = st.form_submit_button("கருத்தைச் சமர்ப்பிக்கவும்" if tamil else "Submit feedback")
+    if not submitted:
+        return
+    try:
+        conversation_id = st.session_state.setdefault("inquiry_conversation_id", str(uuid4()))
+        record = feedback_record(feedback_id=st.session_state.feedback_submission_id,
+            conversation_id=conversation_id, user_id=st.session_state.user_id, category=category,
+            comment=comment, language=language, timestamp=datetime.now(INDIA_TZ).isoformat(timespec="seconds"), chat=st.session_state.chat)
+        record["Conversation status"] = "Ended" if st.session_state.get("conversation_closed") else "Active"
+        record["Customer name"] = st.session_state.get("customer_name", "")
+        append_inquiry(record)
+    except ValueError as exc:
+        st.error("இந்த வகைக்கு ஒரு கருத்தைச் சேர்க்கவும்." if tamil else str(exc))
+    except Exception:
+        logging.exception("Could not save customer feedback")
+        st.error("கருத்தைச் சேமிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்." if tamil else "Your feedback could not be saved. Please try again.")
+    else:
+        refresh_learning_library_drafts(force=True)
+        st.session_state.feedback_form_open = False
+        st.session_state.feedback_saved_notice = True
+        st.rerun()
+
+
 from property_search import format_price_for_card, load_properties, rank_matches, search_properties
 
 ROOT = Path(__file__).parent
@@ -178,7 +219,7 @@ def configured_value(name: str, default: str = "") -> str:
         return os.environ.get(name, default)
 
 
-st.set_page_config(page_title="Namma Illam | Tamil Nadu Property Guide", page_icon="⌂", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Namma Veedu | Tamil Nadu Property Guide", page_icon="⌂", layout="wide", initial_sidebar_state="expanded")
 AI_PROVIDER, AI_API_KEY, AI_MODEL = select_ai_config(configured_value)
 MAPBOX_ACCESS_TOKEN = configured_value("MAPBOX_ACCESS_TOKEN", "")
 FOLLOWUP_EMAIL_CONFIG = {
@@ -251,7 +292,7 @@ except Exception:
 if followup_stop_token:
     if cancel_followup_from_link(followup_stop_token):
         st.session_state.followup_schedule = {**st.session_state.get("followup_schedule", {}), "status": "Stopped by user", "next_at": ""}
-        st.success("Your scheduled Namma Illam follow-up emails have been stopped.")
+        st.success("Your scheduled Namma Veedu follow-up emails have been stopped.")
     else:
         st.info("There are no active follow-up emails for this link.")
     try:
@@ -259,6 +300,9 @@ if followup_stop_token:
     except Exception:
         pass
 
+pending_language = st.session_state.pop("pending_chat_language", None)
+if pending_language:
+    st.session_state.language = pending_language
 with st.sidebar:
     st.markdown(f'<div class="language-heading">{"மொழி விருப்பம்" if st.session_state.get("language") == "தமிழ்" else "Language preference"} <span>மொழி</span></div>', unsafe_allow_html=True)
     language = st.selectbox("Language / மொழி", ["English", "தமிழ்"], key="language", label_visibility="collapsed")
@@ -269,6 +313,10 @@ with st.sidebar:
 previous_chat_language = st.session_state.get("chat_language_applied")
 if previous_chat_language and previous_chat_language != language:
     st.session_state.language_switch_notice = language
+    st.session_state.language_preference_chosen = True
+    language_memory = dict(st.session_state.get("buyer_memory", {}))
+    language_memory["response_language"] = "Tamil" if language == "தமிழ்" else "English"
+    st.session_state.buyer_memory = language_memory
 st.session_state.chat_language_applied = language
 
 TAMIL_UI = {
@@ -1048,7 +1096,7 @@ st.markdown(_base_styles, unsafe_allow_html=True)
 st.markdown(f'''
 <section class="hero" style="background-image:linear-gradient(90deg,rgba(9,28,37,.84) 0%,rgba(9,28,37,.57) 46%,rgba(9,28,37,.08) 100%),linear-gradient(0deg,rgba(9,28,37,.52),transparent 48%),url('{HERO_IMAGE_URL}');">
   <div class="hero-topline">
-    <div class="hero-brand"><img src="{LOGO_IMAGE_URL}" alt="Namma Illam — homes, with heart and honesty"></div>
+    <div class="hero-brand"><img src="{LOGO_IMAGE_URL}" alt="Namma Veedu — homes, with heart and honesty"></div>
     <span class="hero-pill">{"தமிழ்நாடு · ஆதாரத் தகவல் · உங்கள் வேகத்தில்" if language == "தமிழ்" else "Tamil Nadu · Source-aware · At your pace"}</span>
   </div>
   <div class="hero-main">
@@ -1305,7 +1353,7 @@ with st.sidebar:
             "include_ended": include_ended,
         }
         applied_filter_snapshot = st.session_state.get("applied_property_filters")
-        if applied_filter_snapshot is not None and current_filter_snapshot != applied_filter_snapshot:
+        if applied_filter_snapshot is not None and current_filter_snapshot != applied_filter_snapshot and not pending_mira_sync:
             # Streamlit reruns when a filter widget changes. Commit this new
             # snapshot immediately and show the filtered catalogue on that run.
             st.session_state.main_results_mode = "filters"
@@ -1325,7 +1373,7 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
     st.caption("A clear view of saved records, customer conversations, and owner-tracked outcomes. Property counts describe saved records, not live availability.")
     st.markdown("""
     <div class="owner-dashboard-hero" style="background:linear-gradient(115deg,#075e5a 0%,#0b8d83 58%,#ef704e 100%);border-radius:18px;padding:24px 28px;margin:8px 0 20px;color:#fff;box-shadow:0 16px 34px rgba(3,48,48,.30)">
-      <div style="font-size:12px;font-weight:750;letter-spacing:.14em;opacity:.9">NAMMA ILLAM · MIRA STUDIO</div>
+      <div style="font-size:12px;font-weight:750;letter-spacing:.14em;opacity:.9">NAMMA VEEDU · MIRA STUDIO</div>
       <div style="font-size:27px;font-weight:750;margin-top:5px">A clearer view of every inquiry</div>
       <div style="font-size:14px;margin-top:5px;opacity:.94">Review conversations, improve Mira, and track the website blueprint in one private workspace.</div>
       <div class="owner-hero-pills"><span>● Live signals</span><span>✦ Private workspace</span><span>↗ Action-ready insights</span></div>
@@ -1406,54 +1454,10 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
     blueprint_path = ROOT / "WEBSITE_BLUEPRINT.md"
     with st.expander("Website Blueprint", expanded=False):
         st.caption("Private product and engineering map. It contains no passwords, API keys, or customer conversation text.")
-        blueprint_visual = ROOT / "static" / "mira-blueprint-map.png"
-        if blueprint_visual.exists():
-            st.image(blueprint_visual, caption="Mira's end-to-end customer, property, review, and learning flow", use_container_width=True)
-        st.markdown("""
-        <div class="blueprint-stage-grid">
-          <div class="blueprint-stage stage-teal"><b>👤 Customer message</b><span>Receives the customer's request, language, and context.</span></div>
-          <div class="blueprint-stage stage-blue"><b>🧠 Understand intent</b><span>Detects language, need, emotion, and preferences.</span></div>
-          <div class="blueprint-stage stage-coral"><b>🏠 Search property data</b><span>Finds relevant homes, auctions, sources, and filters.</span></div>
-          <div class="blueprint-stage stage-amber"><b>🔎 Verify listing details</b><span>Explains saved facts and highlights what must be verified.</span></div>
-          <div class="blueprint-stage stage-violet"><b>💬 Mira response</b><span>Creates a clear, safe, human-friendly answer.</span></div>
-          <div class="blueprint-stage stage-mint"><b>🗂️ Save chat record</b><span>Stores structured signals, ratings, and follow-up state.</span></div>
-          <div class="blueprint-stage stage-sky"><b>🔍 Quality Review</b><span>Finds missed intent, frustration, or correction opportunities.</span></div>
-          <div class="blueprint-stage stage-pink"><b>✅ Approve learning rule</b><span>Turns reviewed improvements into approved Mira guidance.</span></div>
-        </div>
-        <div class="blueprint-branch-title">Conversation decision paths from the original map</div>
-        <div class="blueprint-branch-grid">
-          <div class="blueprint-branch"><b>🧭 What does the customer need?</b><span>Routes the message to the most useful response path.</span></div>
-          <div class="blueprint-branch"><b>🏘️ Find property</b><span>Searches saved properties using location, budget, BHK, and listing preferences.</span></div>
-          <div class="blueprint-branch"><b>📄 Ask about listing</b><span>Explains verified price, source, availability, and property details.</span></div>
-          <div class="blueprint-branch"><b>🛠️ Correction or frustration</b><span>Acknowledges the concern, removes unwanted suggestions, and corrects course.</span></div>
-          <div class="blueprint-branch"><b>📅 Follow-up request</b><span>Collects consent and contact preference without promising a call.</span></div>
-          <div class="blueprint-branch"><b>🙏 Thanks or compliment</b><span>Thanks the customer and offers the next relevant help.</span></div>
-          <div class="blueprint-branch"><b>📚 Apply approved Mira rules</b><span>Uses only owner-approved guidance for similar situations.</span></div>
-          <div class="blueprint-branch"><b>✍️ Generate human-friendly reply</b><span>Combines the current request, verified data, and approved guidance.</span></div>
-          <div class="blueprint-branch"><b>📝 Draft Learning Library rule</b><span>Turns repeated quality cues into an editable draft, never an automatic behavior change.</span></div>
-        </div>
-        <style>
-        .blueprint-stage-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:10px 0 18px}
-        .blueprint-stage{border-radius:14px;padding:13px 14px;min-height:86px;border:1px solid rgba(255,255,255,.3);box-shadow:0 8px 18px rgba(3,35,45,.18);color:#fff}
-        .blueprint-stage b{display:block;font-size:14px;margin-bottom:7px}.blueprint-stage span{display:block;font-size:12px;line-height:1.45;opacity:.96}
-        .stage-teal{background:linear-gradient(135deg,#087d78,#10b7ab)} .stage-blue{background:linear-gradient(135deg,#1264d8,#398ef6)}
-        .stage-coral{background:linear-gradient(135deg,#e6574c,#f58969)} .stage-amber{background:linear-gradient(135deg,#df9911,#f6bd3f)}
-        .stage-violet{background:linear-gradient(135deg,#6540db,#9269f4)} .stage-mint{background:linear-gradient(135deg,#159d76,#45d2a3)}
-        .stage-sky{background:linear-gradient(135deg,#087fc1,#42b8f2)} .stage-pink{background:linear-gradient(135deg,#c93c86,#f267ad)}
-        @media(max-width:800px){.blueprint-stage-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-        @media(max-width:480px){.blueprint-stage-grid{grid-template-columns:1fr}}
-        .blueprint-branch-title{font-size:15px;font-weight:750;color:#E8FFFA;margin:8px 0 10px}
-        .blueprint-branch-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 18px}
-        .blueprint-branch{background:rgba(255,255,255,.12);border:1px solid rgba(196,244,235,.28);border-radius:12px;padding:11px 13px;color:#F5FFFD;min-height:78px}
-        .blueprint-branch b{display:block;font-size:13px;margin-bottom:5px}.blueprint-branch span{display:block;font-size:11px;line-height:1.45;opacity:.93}
-        @media(max-width:800px){.blueprint-branch-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-        @media(max-width:480px){.blueprint-branch-grid{grid-template-columns:1fr}}
-        </style>
-        """, unsafe_allow_html=True)
+        st.image(str(ROOT / "static" / "mira-blueprint-flowchart.svg"), caption="Mira conversation, follow-up and owner review flow", use_container_width=True)
         if blueprint_path.exists():
             blueprint_text = blueprint_path.read_text(encoding="utf-8")
-            st.markdown(blueprint_text)
-            st.download_button("Download blueprint", data=blueprint_text, file_name="namma_illam_website_blueprint.md", mime="text/markdown", key="download_website_blueprint")
+            st.download_button("Download blueprint", data=blueprint_text, file_name="namma_veedu_website_blueprint.md", mime="text/markdown", key="download_website_blueprint")
         else:
             st.info("The blueprint file is not available in this deployment yet.")
 
@@ -1668,7 +1672,7 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
             st.download_button(
                 f"Download {period_label} inquiry data (.xlsx)",
                 data=manual_export,
-                file_name=f"namma_illam_inquiries_{period_label.lower().replace(' ', '_')}.xlsx",
+                file_name=f"namma_veedu_inquiries_{period_label.lower().replace(' ', '_')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
                 key="download_inquiry_history",
@@ -1679,7 +1683,7 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
             st.download_button(
                 f"Download every complete chat for {period_label} (.xlsx)",
                 data=complete_chat_export,
-                file_name=f"namma_illam_complete_chats_{period_label.lower().replace(' ', '_')}.xlsx",
+                file_name=f"namma_veedu_complete_chats_{period_label.lower().replace(' ', '_')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
                 key="download_complete_chat_archive",
@@ -1825,7 +1829,14 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
                 st.info("No conversations in this period are currently flagged for review.")
 
             st.markdown("#### Mira Learning Library")
-            st.caption("Approved rules guide future replies. Mira now groups recurring quality-review cues and creates safe Draft rules for owner review. Draft or paused rules never reach Mira; only Approved rules are applied.")
+            customer_feedback = [row for row in filtered_rows if row.get("Feedback ID")]
+            st.markdown("##### Customer feedback")
+            st.metric("Feedback submissions", len(customer_feedback))
+            if customer_feedback:
+                st.dataframe(pd.DataFrame(customer_feedback).reindex(columns=FEEDBACK_HEADERS).fillna(""), hide_index=True, use_container_width=True)
+            else:
+                st.caption("No feedback was submitted in this period.")
+            st.caption("Each feedback submission creates a Draft linked by Feedback ID. Review the comment, edit the guidance, then approve or reject it. Only Approved rules guide Mira; feedback never changes her automatically.")
             refresh_learning_library_drafts(force=True)
             learning_rules = load_learning_rules()
             automatic_drafts = suggested_draft_rules(filtered_rows)
@@ -1833,9 +1844,9 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
             if drafts_added:
                 learning_rules = save_learning_rules(learning_rules)
             if automatic_drafts:
-                st.info(f"{len(automatic_drafts):,} recurring quality pattern(s) have draft rule suggestions below. Review the guidance and change Status to Approved only when you want Mira to use it.")
+                st.info(f"{len(automatic_drafts):,} feedback or recurring-quality suggestion(s) are linked to learning drafts. Review and edit the guidance; choose Approved only when you want Mira to use it.")
             else:
-                st.caption("Mira will create a draft when the same explainable quality cue appears in at least two conversations. One isolated issue will not change her future behavior.")
+                st.caption("Each submitted feedback creates a draft. Other quality cues need at least two occurrences. All drafts wait for owner approval before affecting Mira.")
             active_rule_count = len(active_learning_guidance(learning_rules))
             library_metric, library_note = st.columns([1, 4])
             library_metric.metric("Active learning rules", active_rule_count)
@@ -1851,7 +1862,7 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
                         "Rule ID": st.column_config.TextColumn("Rule ID", disabled=True, width="medium"),
                         "Scenario": st.column_config.TextColumn("When this happens", width="large", required=True),
                         "Guidance": st.column_config.TextColumn("Mira should do this", width="large", required=True),
-                        "Status": st.column_config.SelectboxColumn("Status", options=["Draft", "Approved", "Paused", "Retired"], required=True),
+                        "Status": st.column_config.SelectboxColumn("Status", options=["Draft", "Approved", "Rejected", "Paused", "Retired"], required=True),
                         "Source": st.column_config.TextColumn("Origin", width="medium"),
                     },
                     key=f"mira_learning_library_{editor_key}",
@@ -2183,6 +2194,7 @@ def render_agent_tool_result(result, message_index):
                         "status": "saved",
                     })
                     result["data"]["status"] = "saved"
+                    st.session_state.followup_saved_toast = True
                     st.rerun()
                 if no.button("Dismiss", key=f"dismiss_followup_{message_index}"):
                     result["data"]["status"] = "dismissed"
@@ -2347,7 +2359,7 @@ def local_policy_reply(text: str) -> str | None:
     if re.search(r"\b(?:aadhaar|aadhar|pan card|pan number)\b", normalized):
         return "ஆதார், PAN அல்லது வேறு அடையாள எண்களை இந்த உரையாடலில் பகிர வேண்டாம். அவை எனக்குத் தேவையில்லை; இந்தச் செயலியில் சொத்தை முன்பதிவு செய்ய முடியாது. ஆவணங்கள் தேவைப்பட்டால், சரிபார்க்கப்பட்ட விற்பனையாளர் அல்லது வங்கியின் அதிகாரப்பூர்வ வழியைப் பயன்படுத்துங்கள்." if language == "தமிழ்" else "Please don’t share Aadhaar, PAN, or other identity numbers in this chat. I don’t need those details, and this app can’t book a property. Contact the verified seller or bank through its official channel for any required documents."
     if re.search(r"\b(?:real person|human or a bot|are you a bot|are you human|ai assistant)\b", normalized):
-        return "நான் Mira, Namma Illam-ன் AI உதவியாளர். எனக்கு மனிதர்களைப் போல உணர்வுகள் இல்லை; இருப்பினும் கவனமாகப் பதிலளித்து சேமிக்கப்பட்ட சொத்து தகவல்களில் உதவ முடியும்." if language == "தமிழ்" else "I’m Mira, an AI assistant for Namma Illam. I don’t have human feelings, but I can respond thoughtfully and help with the saved property information."
+        return "நான் Mira, Namma Veedu-ன் AI உதவியாளர். எனக்கு மனிதர்களைப் போல உணர்வுகள் இல்லை; இருப்பினும் கவனமாகப் பதிலளித்து சேமிக்கப்பட்ட சொத்து தகவல்களில் உதவ முடியும்." if language == "தமிழ்" else "I’m Mira, an AI assistant for Namma Veedu. I don’t have human feelings, but I can respond thoughtfully and help with the saved property information."
     if re.search(r"\b(?:appreciat\w*|increase in value|return on investment)\b|(?<!\d)\d{1,3}\s*%", normalized):
         return "எதிர்கால விலை உயர்வையோ குறிப்பிட்ட வருமான சதவீதத்தையோ உறுதி செய்ய முடியாது. சேமிக்கப்பட்ட பதிவுகள் எதிர்கால விலையைச் சரிபார்ப்பதில்லை; சுயாதீன சந்தைத் தகவல்களை ஒப்பிட்டு தகுதியான உள்ளூர் ஆலோசகரிடம் பேசுங்கள்." if language == "தமிழ்" else "I can’t promise future appreciation or a percentage return. The saved property records don’t verify future prices; please compare independent market evidence and speak with a qualified local adviser."
     if re.search(r"\b(?:rera|title clear|clear title|title status|encumbrance)\b", normalized):
@@ -2955,6 +2967,17 @@ def _respond_without_logging(text: str):
     # messages wait on or alter the approved guidance set.
     refresh_learning_library_drafts()
     normalized = text.casefold()
+    language_choice = re.fullmatch(r"\s*(?:(?:i prefer|i choose|use|speak in|continue in|please use)\s+)?(english|tamil|தமிழ்|ஆங்கிலம்)(?:\s+(?:please|only))?[.!\s]*", normalized)
+    if language_choice:
+        chosen_tamil = language_choice.group(1) in {"tamil", "தமிழ்"}
+        st.session_state.pending_chat_language = "தமிழ்" if chosen_tamil else "English"
+        st.session_state.language_preference_chosen = True
+        memory = dict(st.session_state.get("buyer_memory", {}))
+        memory["response_language"] = "Tamil" if chosen_tamil else "English"
+        st.session_state.buyer_memory = memory
+        reply = "சரி, தமிழில் பேசலாம். நீங்கள் எதைத் தேடுகிறீர்கள் என்று சொல்லுங்கள்." if chosen_tamil else "Of course, we’ll continue in English. Tell me what you’re looking for."
+        st.session_state.chat.extend([{"role": "user", "content": text}, {"role": "assistant", "content": reply, "mode": "language_preference"}])
+        return
     if st.session_state.get("conversation_closed"):
         st.session_state.chat.extend([
             {"role": "user", "content": text},
@@ -2986,6 +3009,66 @@ def _respond_without_logging(text: str):
         reply = "சரி, உரையாடலை முடித்துவிட்டேன்; இந்த உரையாடலின் விவரங்கள் பாதுகாப்பான பதிவில் சேமிக்கப்பட்டுள்ளன. மீண்டும் பேச விரும்பினால் புதிய உரையாடலைத் தொடங்கலாம்." if language == "தமிழ்" else "Of course. I’ve ended our chat and saved its details in a private chat record. You can start a new conversation whenever you need."
         st.session_state.chat.extend([{"role": "user", "content": text}, {"role": "assistant", "content": reply, "mode": "conversation_end"}])
         clear_active_preferences()
+        return
+    followup = followup_turn(text, st.session_state.get("chat_followup"), tamil=language == "தமிழ்")
+    if followup and followup.get("resume"):
+        st.session_state.chat_followup = {}
+        followup = None
+    if followup:
+        st.session_state.chat_followup = followup["state"]
+        action, reply = followup["action"], followup["reply"]
+        saved = False
+        if followup.get("cancel_saved"):
+            schedule = st.session_state.get("followup_schedule", {})
+            reminder = next((item for item in reversed(st.session_state.in_app_reminders)
+                             if item["status"] == "saved" and (not schedule.get("reminder_id") or item["id"] == schedule["reminder_id"])), None)
+            if schedule.get("method") == "Email":
+                reply = "மின்னஞ்சல் follow-up நிறுத்தப்பட்டது." if language == "தமிழ்" else "Your email follow-up has been stopped."
+            elif reminder:
+                update_in_app_followup_status(reminder, "Removed")
+                st.session_state.in_app_reminders = [item for item in st.session_state.in_app_reminders if item["id"] != reminder["id"]]
+                reply = "உங்கள் சமீபத்திய நினைவூட்டலை நீக்கிவிட்டேன்." if language == "தமிழ்" else "I’ve cancelled your latest saved reminder."
+            else:
+                reply = "ரத்து செய்ய செயலில் உள்ள நினைவூட்டல் இல்லை." if language == "தமிழ்" else "There isn’t an active saved reminder to cancel here."
+        if action:
+            try:
+                now = datetime.now(INDIA_TZ)
+                if action["method"] == "email":
+                    schedule_id = schedule_email_followup(
+                        user_id=str(st.session_state.user_id),
+                        conversation_id=str(st.session_state.setdefault("inquiry_conversation_id", str(uuid4()))),
+                        recipient_email=action["email"],
+                        customer_name=str(st.session_state.get("customer_name", "")),
+                        preference_summary=action["summary"], started_at=now,
+                        max_messages=1,
+                        initial_status="scheduled" if FOLLOWUP_EMAIL_READY else "saved_pending_activation",
+                    )
+                    record = next(item for item in list_email_followups(str(st.session_state.user_id)) if item["id"] == schedule_id)
+                    next_at = record["next_send_at"] if FOLLOWUP_EMAIL_READY else ""
+                    method, cadence = "Email", "One email after 3 days"
+                    status = "Scheduled" if FOLLOWUP_EMAIL_READY else "Saved (email delivery off)"
+                    reply = "மின்னஞ்சல் follow-up சேமிக்கப்பட்டது." if language == "தமிழ்" else "I’ve saved your email follow-up."
+                    reply += (" " + next_at if FOLLOWUP_EMAIL_READY else (" மின்னஞ்சல் அனுப்புதல் முடக்கப்பட்டுள்ளது; எதுவும் அனுப்பப்படாது." if language == "தமிழ்" else " Email delivery is off, so the request is saved for review and nothing will be sent."))
+                else:
+                    next_at = action["due_at"]
+                    reminder_id = uuid4().hex
+                    st.session_state.in_app_reminders.append({
+                        "id": reminder_id, "due_at": next_at,
+                        "preferences_summary": action["summary"], "method": "In-app reminder", "status": "saved",
+                    })
+                    method, cadence, status = "In-app reminder", "One-time", "Scheduled"
+                    label = datetime.fromisoformat(next_at).strftime("%d %b %Y, %I:%M %p IST")
+                    reply = (f"{label} நேரத்திற்கு follow-up சேமித்துவிட்டேன். இந்த உலாவி அமர்வில் மட்டும் நினைவூட்டல் தெரியும்." if language == "தமிழ்" else f"I’ve saved your follow-up for {label}. The reminder appears in this browser session; it won’t notify you after the session ends.")
+                st.session_state.followup_schedule = {"method": method, "status": status, "cadence": cadence, "consent_at": now.isoformat(timespec="seconds"), "next_at": next_at}
+                if action["method"] == "in_app":
+                    st.session_state.followup_schedule["reminder_id"] = reminder_id
+                st.session_state.chat_followup = {}
+                saved = True
+                st.session_state.followup_saved_toast = True
+            except Exception:
+                logging.exception("Could not save chat follow-up")
+                reply = "Couldn’t save your follow-up. Please try again."
+        st.session_state.chat.extend([{"role": "user", "content": text}, {"role": "assistant", "content": reply, "mode": "followup_saved" if saved else "followup_cancelled" if followup.get("cancel_saved") else "followup_setup"}])
         return
     # Route callback requests through the consent flow before the general
     # conversation engine or hosted model can turn them into a vague fallback.
@@ -4212,7 +4295,11 @@ def capture_customer_address(text: str) -> bool:
     if not name_match and language == "தமிழ்":
         name_match = re.search(r"(?:என் பெயர்|என்னை)\s+([\u0B80-\u0BFF]+(?:\s+[\u0B80-\u0BFF]+){0,2})", text)
     name = name_match.group(1).strip(" .,!?'\"-") if name_match else ""
-    if not name and st.session_state.get("awaiting_address_preference"):
+    task_request = bool(re.search(
+        r"\b(?:set|show|find|search|browse|remind|reminder|follow[- ]?up|email|send|help|explain|convert|calculate|cancel|english|tamil)\b|நினைவூட்ட|தேடு|காட்டு|பின்தொடர்|தமிழ்|ஆங்கிலம்",
+        normalized,
+    ))
+    if not name and st.session_state.get("awaiting_address_preference") and not task_request:
         candidate = text.strip().strip(" .,!?'\"")
         if re.fullmatch(r"[^\W\d_]+(?:[ '-][^\W\d_]+){0,2}", candidate, re.UNICODE) and candidate.casefold() not in {
             "hi", "hello", "hey", "good morning", "good afternoon", "good evening", "yes", "no", "okay", "ok", "sure", "thanks", "thank you", "thanks so much", "thank you so much", "skip", "none", "sir", "madam", "ma'am", "bye", "goodbye", "that's all", "that is all", "that's it", "that is it", "i'm done", "we're done",
@@ -4272,8 +4359,32 @@ def conversation_transcript(chat: list[dict]) -> str:
     )
 
 
+def update_in_app_followup_status(reminder: dict, status: str) -> None:
+    """Keep the conversation's latest reminder status aligned with its list."""
+    schedule = dict(st.session_state.get("followup_schedule", {}))
+    if schedule.get("reminder_id") and schedule["reminder_id"] != reminder["id"]:
+        return
+    saved_due = schedule.get("next_at") or schedule.get("reminder_due_at")
+    if schedule.get("method") != "In-app reminder" or not saved_due:
+        return
+    if datetime.fromisoformat(saved_due) != datetime.fromisoformat(reminder["due_at"]):
+        return
+    schedule.update({"status": status, "next_at": "", "reminder_due_at": reminder["due_at"]})
+    st.session_state.followup_schedule = schedule
+    conversation_id = str(st.session_state.get("inquiry_conversation_id") or "")
+    if conversation_id:
+        try:
+            update_conversation_fields(conversation_id, {
+                "Follow-up schedule status": status,
+                "Next follow-up time (Asia/Kolkata)": "",
+            })
+        except Exception:
+            logging.exception("Could not update reminder status for conversation %s", conversation_id)
+
+
 def add_followup_confirmation_to_chat(method: str, summary: str, schedule_text: str) -> None:
     """Keep an explicitly saved follow-up visible in Mira's conversation."""
+    st.session_state.followup_saved_toast = True
     if language == "தமிழ்":
         content = f"சரி. {method} follow-up சேமிக்கப்பட்டது: **{summary}** · {schedule_text}. இதை Follow-ups பகுதியில் பார்க்கலாம்."
     else:
@@ -4455,11 +4566,11 @@ def start_new_conversation() -> None:
     """Start a clean transcript while retaining this browser user's identity."""
     address = str(st.session_state.get("preferred_form_of_address", "") or "").strip()
     if address and address.casefold().startswith("neutral"):
-        greeting = "Hi, welcome back to Namma Illam! I’m Mira, your AI guide. We can continue at your pace—what’s on your mind?"
+        greeting = "Hi, welcome back to Namma Veedu! I’m Mira, your AI guide. We can continue at your pace—what’s on your mind?"
     elif address:
-        greeting = f"Hi, welcome back to Namma Illam! I’m Mira, your AI guide. I’ll address you as {address}. What would be helpful today?"
+        greeting = f"Hi, welcome back to Namma Veedu! I’m Mira, your AI guide. I’ll address you as {address}. What would be helpful today?"
     else:
-        greeting = "Hi, welcome to Namma Illam! I’m Mira, your AI guide. What should I call you? Your name, Sir or Ma’am, or I can keep it neutral—whichever you prefer. You can skip this and tell me what’s on your mind whenever you’re ready."
+        greeting = "Hi, welcome to Namma Veedu! I’m Mira, your AI guide. What should I call you? Your name, Sir or Ma’am, or I can keep it neutral—whichever you prefer. You can skip this and tell me what’s on your mind whenever you’re ready."
     if language == "தமிழ்":
         greeting = "மீண்டும் வணக்கம்! நான் Mira, உங்கள் AI வழிகாட்டி. உங்கள் வேகத்தில் தொடரலாம்—இன்று எதில் உதவலாம்?" if address else "வணக்கம்! நான் Mira, உங்கள் AI வழிகாட்டி. உங்களை என்ன சொல்லி அழைக்கலாம்? உங்கள் பெயரா, Sir/Ma’am என்றா, அல்லது நடுநிலையாகப் பேசவா—உங்கள் விருப்பம்."
     st.session_state.chat = [{"role": "assistant", "content": greeting, "mode": "welcome"}]
@@ -4483,6 +4594,7 @@ def start_new_conversation() -> None:
     st.session_state.awaiting_address_preference = not bool(address)
     st.session_state.show_full_chat_history = False
     st.session_state.followup_schedule = {}
+    st.session_state.chat_followup = {}
     clear_active_preferences()
 
 
@@ -4513,30 +4625,39 @@ def clear_active_preferences() -> None:
     )
 
 if "chat" not in st.session_state:
-    st.session_state.chat = [{"role": "assistant", "content": "வணக்கம்! Namma Illam-க்கு வரவேற்கிறேன். நான் Mira, உங்கள் AI வழிகாட்டி. உங்களை என்ன சொல்லி அழைக்கலாம்? உங்கள் பெயரா, Sir/Ma’am என்றா, அல்லது நடுநிலையாகப் பேசவா—உங்கள் விருப்பம். இதைத் தவிர்க்கலாம்; தயாரானபோது எதைப் பற்றி பேச விரும்புகிறீர்களோ அதிலிருந்து தொடங்குங்கள்." if language == "தமிழ்" else "Hi, welcome to Namma Illam! I’m Mira, your AI guide. What should I call you? Your name, Sir or Ma’am, or I can keep it neutral—whichever you prefer. You can skip this and tell me what’s on your mind whenever you’re ready.", "mode": "welcome"}]
+    st.session_state.chat = [{"role": "assistant", "content": "வணக்கம்! Namma Veedu-க்கு வரவேற்கிறேன். நான் Mira, உங்கள் AI வழிகாட்டி. உங்களை என்ன சொல்லி அழைக்கலாம்? உங்கள் பெயரா, Sir/Ma’am என்றா, அல்லது நடுநிலையாகப் பேசவா—உங்கள் விருப்பம். இதைத் தவிர்க்கலாம்; தயாரானபோது எதைப் பற்றி பேச விரும்புகிறீர்களோ அதிலிருந்து தொடங்குங்கள்." if language == "தமிழ்" else "Hi, welcome to Namma Veedu! I’m Mira, your AI guide. What should I call you? Your name, Sir or Ma’am, or I can keep it neutral—whichever you prefer. You can skip this and tell me what’s on your mind whenever you’re ready.", "mode": "welcome"}]
     st.session_state.last_results = pd.DataFrame()
 elif st.session_state.chat and st.session_state.chat[0].get("mode") == "welcome":
     # Replace the old pushy first message for sessions that were already open.
     address_choice = str(st.session_state.get("preferred_form_of_address", "") or "")
     if address_choice and not address_choice.casefold().startswith("neutral"):
         first_message = (
-            f"வணக்கம்! Namma Illam-க்கு மீண்டும் வரவேற்கிறேன். {address_choice} என்று அழைக்கிறேன். நீங்கள் தயாரானபோது பேசலாம்."
+            f"வணக்கம்! Namma Veedu-க்கு மீண்டும் வரவேற்கிறேன். {address_choice} என்று அழைக்கிறேன். நீங்கள் தயாரானபோது பேசலாம்."
             if language == "தமிழ்" else
-            f"Welcome to Namma Illam! I’ll address you as {address_choice}. We can pick up whenever you’re ready."
+            f"Welcome to Namma Veedu! I’ll address you as {address_choice}. We can pick up whenever you’re ready."
         )
     elif address_choice:
         first_message = (
-            "வணக்கம்! Namma Illam-க்கு மீண்டும் வரவேற்கிறேன். உங்கள் வேகத்தில் பேசலாம்."
+            "வணக்கம்! Namma Veedu-க்கு மீண்டும் வரவேற்கிறேன். உங்கள் வேகத்தில் பேசலாம்."
             if language == "தமிழ்" else
-            "Welcome back to Namma Illam. We can continue at your pace."
+            "Welcome back to Namma Veedu. We can continue at your pace."
         )
     else:
         first_message = (
-            "வணக்கம்! Namma Illam-க்கு வரவேற்கிறேன். நான் Mira, உங்கள் AI வழிகாட்டி. உங்களை என்ன சொல்லி அழைக்கலாம்? உங்கள் பெயரா, Sir/Ma’am என்றா, அல்லது நடுநிலையாகப் பேசவா—உங்கள் விருப்பம். இதைத் தவிர்க்கலாம்; தயாரானபோது எதைப் பற்றி பேச விரும்புகிறீர்களோ அதிலிருந்து தொடங்குங்கள்."
+            "வணக்கம்! Namma Veedu-க்கு வரவேற்கிறேன். நான் Mira, உங்கள் AI வழிகாட்டி. உங்களை என்ன சொல்லி அழைக்கலாம்? உங்கள் பெயரா, Sir/Ma’am என்றா, அல்லது நடுநிலையாகப் பேசவா—உங்கள் விருப்பம். இதைத் தவிர்க்கலாம்; தயாரானபோது எதைப் பற்றி பேச விரும்புகிறீர்களோ அதிலிருந்து தொடங்குங்கள்."
             if language == "தமிழ்" else
-            "Hi, welcome to Namma Illam! I’m Mira, your AI guide. What should I call you? Your name, Sir or Ma’am, or I can keep it neutral—whichever you prefer. You can skip this and tell me what’s on your mind whenever you’re ready."
+            "Hi, welcome to Namma Veedu! I’m Mira, your AI guide. What should I call you? Your name, Sir or Ma’am, or I can keep it neutral—whichever you prefer. You can skip this and tell me what’s on your mind whenever you’re ready."
         )
     st.session_state.chat[0]["content"] = first_message
+
+if st.session_state.chat and st.session_state.chat[0].get("mode") == "welcome":
+    welcome = ("வணக்கம்! Namma Veedu-க்கு வரவேற்கிறேன். நான் Mira, உங்கள் AI சொத்து வழிகாட்டி." if language == "தமிழ்" else "Welcome to Namma Veedu! I’m Mira, your AI property guide.")
+    if not st.session_state.get("language_preference_chosen"):
+        welcome += " எந்த மொழியில் பேச விரும்புகிறீர்கள்—English அல்லது தமிழ்?" if language == "தமிழ்" else " Which language would you prefer—English or தமிழ் (Tamil)?"
+    else:
+        welcome += " நீங்கள் எதைத் தேடுகிறீர்கள் என்று சொல்லுங்கள்; உங்களுக்கான வாய்ப்புகளைப் பார்க்க உதவுகிறேன்." if language == "தமிழ்" else " Tell me what you’re looking for, and I’ll help you explore your options."
+    st.session_state.chat[0]["content"] = welcome
+    st.session_state.chat[0]["content"] += (" நான் உதவத் தவறினாலோ இன்னும் மேம்படலாம் என்று நினைத்தாலோ, இந்த உரையாடலில் உள்ள ‘கருத்தைப் பகிருங்கள்’ விருப்பத்தைப் பயன்படுத்துங்கள்." if language == "தமிழ்" else " If I miss something or could help you better, please use Share feedback in this chat. Your suggestions help us improve Mira.")
 
 st.session_state.setdefault("filters_applied", False)
 st.session_state.setdefault("main_results", pd.DataFrame())
@@ -4828,6 +4949,7 @@ with chat_slot.container(key="mira-content-wash"):
                 if quick_cols[index].button(label, key=f"chat_starter_{index}", use_container_width=True):
                     st.session_state.pending_prompt = queued_prompt
                     st.rerun()
+    render_feedback_panel()
     if st.session_state.get("conversation_closed"):
         st.info("உரையாடல் முடிந்தது. மீண்டும் உதவி தேவைப்பட்டால் புதிய உரையாடலைத் தொடங்குங்கள்." if language == "தமிழ்" else "This conversation has ended. Start a new conversation whenever you need help again.")
         st.markdown("#### Mira எப்படி உதவினார்?" if language == "தமிழ்" else "#### How did Mira do?")
@@ -5097,7 +5219,9 @@ with st.container(key="info-panel-content"):
                         st.error("எதிர்கால நேரத்தைத் தேர்ந்தெடுக்கவும்." if language == "தமிழ்" else "Choose a future time.")
                     else:
                         conversation_id = st.session_state.setdefault("inquiry_conversation_id", str(uuid4()))
+                        reminder_id = uuid4().hex
                         st.session_state.followup_schedule = {
+                            "reminder_id": reminder_id,
                             "method": "In-app reminder",
                             "status": "Scheduled",
                             "cadence": "One-time",
@@ -5112,7 +5236,7 @@ with st.container(key="info-panel-content"):
                             "Next follow-up time (Asia/Kolkata)": due.isoformat(timespec="seconds"),
                         })
                         st.session_state.in_app_reminders.append({
-                            "id": uuid4().hex,
+                            "id": reminder_id,
                             "due_at": due.isoformat(timespec="minutes"),
                             "preferences_summary": preference_summary.strip()[:500],
                             "method": "In-app reminder",
@@ -5179,8 +5303,10 @@ with st.container(key="info-panel-content"):
                     buttons = st.columns(2)
                     if reminder["status"] == "saved" and buttons[0].button("முடிந்தது" if language == "தமிழ்" else "Mark complete", key=f"complete_{reminder['id']}"):
                         reminder["status"] = "complete"
+                        update_in_app_followup_status(reminder, "Completed")
                         st.rerun()
                     if buttons[1].button("நீக்கு" if language == "தமிழ்" else "Remove", key=f"remove_{reminder['id']}"):
+                        update_in_app_followup_status(reminder, "Removed")
                         st.session_state.in_app_reminders = [item for item in reminders if item["id"] != reminder["id"]]
                         st.rerun()
     
@@ -5206,6 +5332,13 @@ with st.container(key="info-panel-content"):
                 st.info("இன்னும் follow-up எதுவும் அமைக்கப்படவில்லை. In-app அல்லது Email முறையைத் தேர்வு செய்து அமைக்கலாம்." if language == "தமிழ்" else "No follow-ups are scheduled yet. Choose an in-app reminder or opt in to email follow-ups above.")
     
         render_followup_list()
+
+# Show success after the chat's rerun, so the popup survives form submission.
+if st.session_state.pop("followup_saved_toast", False):
+    toast_options = {"icon": "✅"}
+    if "duration" in inspect.signature(st.toast).parameters:
+        toast_options["duration"] = "long"
+    st.toast("Follow-up சேமிக்கப்பட்டது" if language == "தமிழ்" else "Follow-up saved", **toast_options)
     
     
     

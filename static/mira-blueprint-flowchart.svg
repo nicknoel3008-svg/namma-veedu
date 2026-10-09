@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1180" role="img" aria-labelledby="title desc">
+<title id="title">Namma Veedu — Mira conversation flowchart</title>
+<desc id="desc">Welcome, language choice, intent decision, five conversation paths, response, saved record, quality review, draft rule and owner approval. Only approved rules feed back into Mira.</desc>
+<defs><marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0 0L10 4L0 8Z" fill="#94cfc7"/></marker></defs>
+<rect width="1200" height="1180" rx="24" fill="#0b2631"/>
+<style>text{font-family:Segoe UI,Arial,sans-serif;fill:#f4fffc;text-anchor:middle;font-size:18px}.label{font-size:15px;fill:#c9e4df}.heading{font-size:28px;font-weight:700}.node{stroke:#83cfc4;stroke-width:2;rx:14;fill:#12564f}.edge{fill:none;stroke:#94cfc7;stroke-width:2;marker-end:url(#arrow)}</style>
+<text x="600" y="48" class="heading">Namma Veedu · Mira flowchart</text>
+<rect class="node" x="390" y="76" width="420" height="68" rx="34"/>
+<text x="600" y="105">Welcome the customer</text><text x="600" y="128" class="label">Introduce Mira as the AI property guide</text>
+<path class="edge" d="M600 144V174"/>
+<rect class="node" x="390" y="176" width="420" height="68"/>
+<text x="600" y="205">Ask language preference</text><text x="600" y="228" class="label">English or Tamil · allow later changes</text>
+<path class="edge" d="M600 244V274"/>
+<rect class="node" x="390" y="276" width="420" height="68"/>
+<text x="600" y="305">Understand the customer message</text><text x="600" y="328" class="label">Intent, preferences, context and emotion</text>
+<path class="edge" d="M600 344V365"/>
+<path d="M600 368L770 420L600 472L430 420Z" fill="#694a13" stroke="#efc16b" stroke-width="2"/>
+<text x="600" y="416">What does the</text><text x="600" y="440">customer need?</text>
+<path class="edge" d="M600 472V502H130V532"/><path class="edge" d="M600 502H365V532"/><path class="edge" d="M600 502V532"/><path class="edge" d="M600 502H835V532"/><path class="edge" d="M600 502H1070V532"/>
+<rect class="node" x="25" y="534" width="210" height="108"/><text x="130" y="563">Find property</text><text x="130" y="589" class="label">Search saved records</text><text x="130" y="613" class="label">Respect all constraints</text>
+<rect class="node" x="260" y="534" width="210" height="108"/><text x="365" y="563">Explain or verify</text><text x="365" y="589" class="label">Use recorded facts</text><text x="365" y="613" class="label">Flag missing evidence</text>
+<rect class="node" x="495" y="534" width="210" height="108"/><text x="600" y="563">Correction or concern</text><text x="600" y="589" class="label">Acknowledge and adjust</text><text x="600" y="613" class="label">Preserve other preferences</text>
+<rect class="node" x="730" y="534" width="210" height="108"/><text x="835" y="563">Set a follow-up</text><text x="835" y="589" class="label">Collect missing details</text><text x="835" y="613" class="label">Email requires consent</text>
+<rect class="node" x="965" y="534" width="210" height="108"/><text x="1070" y="563">Greeting or closing</text><text x="1070" y="589" class="label">Reply naturally</text><text x="1070" y="613" class="label">Respect pause or end</text>
+<path class="edge" d="M130 642V675H600V705"/><path d="M365 642V675M600 642V675M835 642V675H600M1070 642V675H600" fill="none" stroke="#94cfc7" stroke-width="2"/>
+<rect class="node" x="340" y="707" width="520" height="68"/><text x="600" y="736">Respond in the preferred language</text><text x="600" y="759" class="label">Save requested follow-up → show “Follow-up saved”</text>
+<path class="edge" d="M600 775V800"/>
+<rect class="node" x="390" y="802" width="420" height="62"/><text x="600" y="828">Save conversation record</text><text x="600" y="850" class="label">Preferences, response and follow-up status</text>
+<path class="edge" d="M600 864V889"/>
+<rect class="node" x="390" y="891" width="420" height="62"/><text x="600" y="917">Quality review</text><text x="600" y="939" class="label">Identify missed intent and repeated issues</text>
+<path class="edge" d="M600 953V978"/>
+<rect class="node" x="390" y="980" width="420" height="62"/><text x="600" y="1006">Draft a Learning Library rule</text><text x="600" y="1028" class="label">Drafts do not change Mira automatically</text>
+<path class="edge" d="M600 1042V1067"/>
+<rect class="node" x="390" y="1069" width="420" height="62"/><text x="600" y="1095">Owner reviews and approves</text><text x="600" y="1117" class="label">Only approved guidance is reused</text>
+<path class="edge" d="M390 1100H12V310H388" stroke-dasharray="7 5"/>
+<path class="edge" d="M860 740H1040V800"/>
+<rect class="node" x="885" y="802" width="290" height="142"/><text x="1030" y="832">Share feedback</text><text x="1030" y="858" class="label">Save category and comment</text><text x="1030" y="884" class="label">Link conversation and reply</text><text x="1030" y="910" class="label">Include in dashboard reports</text><text x="1030" y="932" class="label">Wait for owner approval</text>
+<path class="edge" d="M1030 944V1010H812"/>
+<text x="600" y="1160" class="label">Saved snapshots · no promise of live availability, title or loan approval</text>
+</svg>

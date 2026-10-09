@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 112" role="img" aria-labelledby="title desc">
-  <title id="title">Namma Illam</title>
+  <title id="title">Namma Veedu</title>
   <desc id="desc">A welcoming home mark with a teal roof and coral doorway.</desc>
   <defs>
     <linearGradient id="roof" x1="0" y1="0" x2="1" y2="1">
@@ -14,6 +14,6 @@
     <path d="M13 59h72" stroke="#0A6D70" stroke-width="4" stroke-linecap="round" opacity=".26"/>
     <circle cx="55" cy="65" r="1.8" fill="#FFF8EB"/>
   </g>
-  <text x="118" y="58" fill="#FFF8EB" font-family="Aptos, Segoe UI, sans-serif" font-size="35" font-weight="750" letter-spacing="-.8">Namma Illam</text>
+  <text x="118" y="58" fill="#FFF8EB" font-family="Aptos, Segoe UI, sans-serif" font-size="35" font-weight="750" letter-spacing="-.8">Namma Veedu</text>
   <text x="120" y="84" fill="#E8F4EE" font-family="Aptos, Segoe UI, sans-serif" font-size="12" font-weight="700" letter-spacing="2.1">HOMES, WITH HEART &amp; HONESTY</text>
 </svg>
