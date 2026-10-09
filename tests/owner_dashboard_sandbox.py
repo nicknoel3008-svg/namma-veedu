@@ -12,7 +12,7 @@ st.query_params["studio"] = "1"
 st.session_state.owner_dashboard_authenticated = True
 with patch("ai_config.select_ai_config", return_value=("offline", "", "")), \
      patch("storage_backend._database_url", return_value=""), \
-     patch("inquiry_log.read_inquiries", return_value=[]), \
+     patch("inquiry_log.read_inquiries", return_value=st.session_state.get("qa_inquiry_rows", [])), \
      patch("inquiry_log.append_inquiry"), \
      patch("inquiry_log.update_conversation_fields"), \
      patch("mira_learning_library.load_learning_rules", return_value=[]), \

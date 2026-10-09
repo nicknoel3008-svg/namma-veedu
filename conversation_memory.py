@@ -53,8 +53,8 @@ def update_preferences(text, data, previous=None):
             remembered.pop(key, None)
     # Understand named removals in the same turn as additions, for example
     # “keep 2BHK under 60 lakh but remove Velachery” or “drop the flat type”.
-    removal = r"(?:remove|ignore|forget|drop|no longer want|don't want|do not want)"
-    prior_location = str(remembered.get("location") or previous_context.get("location") or "").strip()
+    removal = r"(?:remove|cancel|exclude|ignore|forget|drop|no longer want|don't want|do not want)"
+    prior_location = str(previous_context.get("location") or remembered.get("location") or "").strip()
     prior_location_query = prior_location.casefold()
     if prior_location and re.search(rf"{removal}[^.?!\n]{{0,80}}{re.escape(prior_location_query)}|{re.escape(prior_location_query)}[^.?!\n]{{0,35}}{removal}", normalized):
         remembered.pop("location", None)
@@ -75,7 +75,7 @@ def update_preferences(text, data, previous=None):
         }, key=len, reverse=True)
         replacement = next((value for value in candidates
             if value.casefold() != prior_location_query
-                            and re.search(rf"(?:add|instead|replace|switch to|use)\s+(?:the\s+)?{re.escape(value.casefold())}\b", normalized)), None)
+                            and re.search(rf"(?:add|instead|replace|switch to|use|\bin|\baround|\bnear)\s+(?:the\s+)?{re.escape(value.casefold())}\b", normalized)), None)
         if replacement:
             remembered["location"] = replacement
         else:
@@ -108,6 +108,34 @@ def update_preferences(text, data, previous=None):
             and re.search(rf"(?<!\w){re.escape(value.casefold())}(?!\w)", normalized)), None)
         if actual_place:
             remembered["location"] = actual_place
+    # A turn can add and remove several types without erasing other fields.
+    type_terms = {"Flat": r"flats?|apartments?", "House": r"houses?|homes?|villas?", "Plot": r"plots?|land"}
+    selected_types = list(previous_context.get("property_types") or ([previous_context["property_type"]] if previous_context.get("property_type") not in (None, "Any") else []))
+    mentioned = []
+    for label, terms in type_terms.items():
+        if re.search(rf"\b(?:{terms})\b", normalized):
+            if re.search(rf"{removal}\s+(?:the\s+)?(?:{terms})\b", normalized):
+                selected_types = [value for value in selected_types if value != label]
+            else:
+                mentioned.append(label)
+    if mentioned:
+        additive = bool(re.search(r"\b(?:add|also|as well|too)\b", normalized))
+        selected_types = list(dict.fromkeys((selected_types if additive else []) + mentioned))
+    if mentioned or previous_context.get("property_types") or re.search(rf"{removal}\s+(?:the\s+)?(?:flat|house|plot)", normalized):
+        remembered["property_types"] = selected_types
+        remembered["property_type"] = selected_types[0] if len(selected_types) == 1 else "Any"
+    if re.search(r"\b(?:no|exclude|remove|cancel|skip|don't want|do not want)\s+(?:the\s+)?auctions?\b", normalized):
+        remembered["status"] = "Any"
+        remembered["listing_statuses"] = ["Existing sale", "Project reference"]
+    elif re.search(r"\bauctions?\b", normalized):
+        both = bool(re.search(r"\b(?:as well|also|too|both|include)\b", normalized)) and not re.search(r"\bonly\b", normalized)
+        remembered["status"] = "Any" if both else "Auction"
+        remembered["listing_statuses"] = ["Existing sale", "Project reference", "Auction"] if both else ["Auction"]
+    elif remembered.get("location") != previous_context.get("location") and previous_context.get("status") == "Auction":
+        remembered["status"] = "Any"
+        remembered["listing_statuses"] = ["Existing sale", "Project reference"]
+    if re.search(r"\b(?:find|search|show|browse)\b", normalized) and not re.search(r"auction|ஏலம்", normalized):
+        remembered.setdefault("listing_statuses", ["Existing sale", "Project reference"])
     return remembered
 
 

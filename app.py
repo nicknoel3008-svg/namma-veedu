@@ -1176,7 +1176,15 @@ def queue_mira_filter_sync(intent) -> None:
         current["use_bedrooms"] = True
         current["bedrooms"] = intent.bedrooms
 
-    listing_view = "auctions" if intent.status == "Auction" else (
+    context = st.session_state.get("search_context", {})
+    current["location"] = current["location"] if intent.location else []
+    current["property_type"] = context.get("property_types", [intent.property_type] if intent.property_type != "Any" else [])
+    current["status"] = context.get("listing_statuses", [intent.status] if intent.status != "Any" else [])
+    current["use_budget"] = intent.max_budget is not None
+    current["use_size"] = intent.min_area_sqm is not None
+    current["use_bedrooms"] = intent.bedrooms is not None
+
+    listing_view = "all" if len(current["status"]) > 1 else "auctions" if intent.status == "Auction" else (
         "sales" if intent.status in ("Existing sale", "Project reference") else "all"
     )
     st.session_state.mira_pending_filter_sync = {
@@ -1508,11 +1516,7 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
     valid_prices = current[current["price_inr"].notna()]
     data_modified = datetime.fromtimestamp(PROPERTIES_FILE.stat().st_mtime).astimezone().strftime("%d %b %Y, %I:%M %p %Z")
     st.caption(f"Property file last changed: {data_modified} · Imported source date: {import_date}")
-    metric_cols = st.columns(4)
-    metric_cols[0].metric("Saved property records", f"{len(current):,}")
-    metric_cols[1].metric("Auction records", f"{int(status_counts.get('Auction', 0)):,}")
-    metric_cols[2].metric("Sale listing snapshots", f"{int(status_counts.get('Existing sale', 0)):,}")
-    metric_cols[3].metric("Records with a reported price", f"{len(valid_prices):,}")
+    st.caption(f"Catalogue: {len(current):,} saved property records; {len(valid_prices):,} include a reported price. Category and source breakdowns are shown below.")
     chart_left, chart_right = st.columns(2)
     with chart_left:
         with st.container(key="dashboard_chart_card"):
@@ -1589,8 +1593,10 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
 
         followup_requests = field_count("Follow-up requested signal", {"yes"})
         handoff_requests = field_count("Human handoff requested signal", {"yes"})
-        followups_completed = field_count("Follow-up status (owner)", {"completed"})
-        followups_open = field_count("Follow-up status (owner)", {"needed", "scheduled"})
+        from followup_reporting import followup_metrics
+        followup_counts = followup_metrics(filtered_rows)
+        followups_completed = followup_counts["completed"]
+        followups_open = followup_counts["open"]
         ended_conversations = len({
             str(row.get("Conversation ID") or "").strip()
             for row in filtered_rows
@@ -1609,29 +1615,13 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
             for summary in rating_summary
         ]
         ratings = [float(rating) for rating in ratings if pd.notna(rating)]
-        kpi_cols = st.columns(5)
-        kpi_cols[0].metric("Inquiry turns in period", f"{len(filtered_rows):,}")
+        kpi_cols = st.columns(4)
+        kpi_cols[0].metric("Conversations", f"{len(conversations):,}")
         kpi_cols[1].metric("Unique user sessions", f"{len(unique_users):,}")
-        kpi_cols[2].metric("Conversations", f"{len(conversations):,}")
-        kpi_cols[3].metric("Budget mentions", f"{budget_count:,}")
-        purchase_values = sum(bool(str(row.get("Purchase value / offer stated") or "").strip()) for row in filtered_rows)
-        kpi_cols[4].metric("Purchase values stated", f"{purchase_values:,}")
-        outcome_cols = st.columns(5)
-        outcome_cols[0].metric("Satisfied", f"{satisfied_count:,}")
-        outcome_cols[1].metric("Needs satisfaction follow-up", f"{dissatisfied_count:,}")
-        outcome_cols[2].metric("Marked interested", f"{interested_count:,}")
-        outcome_cols[3].metric("Follow-ups open", f"{followups_open:,}", help="Owner-marked as Needed or Scheduled.")
-        outcome_cols[4].metric("Follow-ups completed", f"{followups_completed:,}")
-        status_cols = st.columns(5)
-        status_cols[0].metric("Human handoff requests", f"{handoff_requests:,}")
-        status_cols[1].metric("Owner-marked live", f"{live_listings:,}")
-        status_cols[2].metric("Owner-tracked sold", f"{tracked_sold:,}")
-        status_cols[3].metric("Turns with matches", f"{matched_inquiries:,}")
-        status_cols[4].metric("Conversations ended", f"{ended_conversations:,}")
-        rating_cols = st.columns(5)
-        rating_cols[0].metric("Mira average rating", f"{sum(ratings) / len(ratings):.1f} / 5" if ratings else "Not rated")
-        rating_cols[1].metric("Satisfaction ratings received", f"{len(ratings):,}")
-        st.caption(f"{followup_requests:,} turns mention follow-up. Customer tone and interest signals are indicators; use owner fields to record confirmed outcomes. Customer names and address preferences are self-reported; user IDs identify browser sessions, not verified people.")
+        kpi_cols[2].metric("Follow-ups open", f"{followups_open:,}", help="Conversations with a saved active follow-up or owner-marked Needed/Scheduled. Counted once per conversation.")
+        feedback_count = len({row.get("Feedback ID") for row in filtered_rows if row.get("Feedback ID")})
+        kpi_cols[3].metric("Feedback received", f"{feedback_count:,}")
+        st.caption("KPIs use the selected date range. Follow-ups are counted once per conversation; user sessions identify browsers, not verified people. Detailed outcomes and ratings remain in the tables and exports.")
 
         if filtered_rows:
             st.markdown("#### Conversation overview")
@@ -1873,7 +1863,7 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
                 st.success(f"Saved {len(saved_rules):,} learning rule(s); {len(active_learning_guidance(saved_rules)):,} approved rule(s) will guide future AI replies.")
                 st.rerun()
 
-            preview_columns = ["User ID", "Customer name", "Preferred form of address", "Details shared by customer", "Inquiry ID", "Conversation ID", "Conversation status", "Chat ended at (Asia/Kolkata)", "Conversation close reason", "Final conversation transcript", "Timestamp (Asia/Kolkata)", "Language", "Conversation topic", "Customer tone signal", "Customer satisfaction signal", "Customer interest signal", "Budget mentioned signal", "Customer budget / price stated", "Purchase value / offer stated", "Property type mentioned", "Location mentioned", "Preferred size stated", "Follow-up requested signal", "Follow-up method", "Follow-up schedule status", "Follow-up cadence", "Follow-up consent timestamp (Asia/Kolkata)", "Next follow-up time (Asia/Kolkata)", "Human handoff requested signal", "Listing status asked signal", "Sale outcome mentioned signal", "User inquiry", "Assistant response", "Response type", "Matching records", *owner_fields]
+            preview_columns = ["User ID", "Customer name", "Preferred form of address", "Details shared by customer", "Inquiry ID", "Conversation ID", "Conversation status", "Chat ended at (Asia/Kolkata)", "Conversation close reason", "Final conversation transcript", "Timestamp (Asia/Kolkata)", "Language", "Conversation topic", "Customer tone signal", "Customer satisfaction signal", "Customer interest signal", "Budget mentioned signal", "Customer budget / price stated", "Purchase value / offer stated", "Property type mentioned", "Location mentioned", "Preferred size stated", "Follow-up requested signal", "Follow-up method", "Follow-up summary", "Follow-up schedule status", "Follow-up cadence", "Follow-up consent timestamp (Asia/Kolkata)", "Next follow-up time (Asia/Kolkata)", "Human handoff requested signal", "Listing status asked signal", "Sale outcome mentioned signal", "User inquiry", "Assistant response", "Response type", "Matching records", *owner_fields]
             preview = pd.DataFrame(customer_summary_rows(filtered_rows)).tail(10).iloc[::-1]
             with st.expander("Customer response summaries", expanded=False):
                 st.dataframe(preview, hide_index=True, use_container_width=True)
@@ -1918,18 +1908,14 @@ def apply_filters(*, intent=None):
     bedrooms = applied.get("bedrooms") if applied.get("use_bedrooms") else None
     include_ended = applied.get("include_ended", False)
     if intent:
-        if intent.location:
-            location = intent.location
-        if intent.property_type != "Any":
-            prop_type = intent.property_type
-        if intent.status != "Any":
-            status = intent.status
-        if intent.max_budget is not None:
-            max_budget = intent.max_budget
-        if intent.min_area_sqm is not None:
-            min_area_sqm = intent.min_area_sqm
-        if intent.bedrooms is not None:
-            bedrooms = intent.bedrooms
+        context = st.session_state.get("search_context", {})
+        intent.location = context.get("location", intent.location)
+        location = intent.location
+        prop_type = context.get("property_types", intent.property_type if intent.property_type != "Any" else [])
+        status = context.get("listing_statuses", intent.status if intent.status != "Any" else [])
+        max_budget = intent.max_budget
+        min_area_sqm = intent.min_area_sqm
+        bedrooms = intent.bedrooms
     result = search_properties(
         properties,
         location=location,
@@ -3059,7 +3045,7 @@ def _respond_without_logging(text: str):
                     method, cadence, status = "In-app reminder", "One-time", "Scheduled"
                     label = datetime.fromisoformat(next_at).strftime("%d %b %Y, %I:%M %p IST")
                     reply = (f"{label} நேரத்திற்கு follow-up சேமித்துவிட்டேன். இந்த உலாவி அமர்வில் மட்டும் நினைவூட்டல் தெரியும்." if language == "தமிழ்" else f"I’ve saved your follow-up for {label}. The reminder appears in this browser session; it won’t notify you after the session ends.")
-                st.session_state.followup_schedule = {"method": method, "status": status, "cadence": cadence, "consent_at": now.isoformat(timespec="seconds"), "next_at": next_at}
+                st.session_state.followup_schedule = {"method": method, "summary": action["summary"], "status": status, "cadence": cadence, "consent_at": now.isoformat(timespec="seconds"), "next_at": next_at}
                 if action["method"] == "in_app":
                     st.session_state.followup_schedule["reminder_id"] = reminder_id
                 st.session_state.chat_followup = {}
@@ -3189,6 +3175,10 @@ def _respond_without_logging(text: str):
             queue_mira_filter_sync(intent)
             records = ranked.head(3).to_dict("records")
             reply = grounded_search_reply({"records": records}, understood["memory"], language == "தமிழ்")
+            if not st.session_state.buyer_memory.get("auction_offer_asked") and not re.search(r"auction|ஏலம்", normalized) and records:
+                st.session_state.buyer_memory["auction_offer_asked"] = True
+                st.session_state.buyer_memory["auction_offer_pending"] = True
+                reply += (" ஏலச் சொத்துகளையும் பார்க்க விரும்புகிறீர்களா?" if language == "தமிழ்" else " Would you like to explore auction properties as well?")
             if re.search(r"frustrat|not helpful|going in circles|fed up|upset|ஏமாற்றம்|உதவவில்லை", normalized):
                 empathy = (
                     "இந்தத் தேடல் உங்களுக்கு ஏமாற்றமாக இருந்ததற்கு மன்னிக்கவும். "
@@ -3548,7 +3538,7 @@ def _respond_without_logging(text: str):
             intent.property_type = previous["property_type"]
         if intent.status == "Any" and previous.get("status", "Any") != "Any":
             intent.status = previous["status"]
-        st.session_state.search_context = intent.__dict__.copy()
+        st.session_state.search_context = {**previous, **intent.__dict__}
         st.session_state.property_inquiry_active = False
         st.session_state.awaiting_search_preferences = False
         reply = (
@@ -3672,7 +3662,9 @@ def _respond_without_logging(text: str):
         st.session_state.chat.append({"role": "user", "content": text})
         st.session_state.chat.append({"role": "assistant", "content": local_reply, "mode": "local_talk"})
         return
-    if AI_API_KEY and not st.session_state.get("agent_rate_limited"):
+    if AI_API_KEY and not st.session_state.get("agent_rate_limited") and not (
+        explicit_search and (st.session_state.search_context.get("listing_statuses") or st.session_state.search_context.get("property_types"))
+    ):
         st.session_state.in_progress_request = {"text": text, "chat": list(st.session_state.chat),
             "preferences": dict(st.session_state.get("search_context", {}))}
         turn = run_openai_agent(
@@ -3890,7 +3882,7 @@ def _respond_without_logging(text: str):
         intent.property_type = previous["property_type"]
     if intent.status == "Any" and previous.get("status", "Any") != "Any":
         intent.status = previous["status"]
-    st.session_state.search_context = intent.__dict__.copy()
+    st.session_state.search_context = {**previous, **intent.__dict__}
     no_more_details = bool(re.search(
         r"\b(?:nothing else|nothing more|that(?:'|’)s all|that is all|all done|that(?:'|’)s enough|no thanks|no more)\b|வேறொன்றுமில்லை|அவ்வளவுதான்",
         normalized,
@@ -4174,6 +4166,10 @@ def _respond_without_logging(text: str):
         )
         if contact_reply:
             reply = contact_reply
+    if not st.session_state.buyer_memory.get("auction_offer_asked") and not re.search(r"auction|ஏலம்", normalized) and "?" not in reply:
+        reply += (" ஏலச் சொத்துகளையும் பார்க்க விரும்புகிறீர்களா?" if language == "தமிழ்" else " Would you like to explore auction properties as well?")
+        st.session_state.buyer_memory["auction_offer_asked"] = True
+        st.session_state.buyer_memory["auction_offer_pending"] = True
     st.session_state.chat.append({"role": "assistant", "content": reply, "mode": "results", "count": len(result), "records": ranked.head(5).to_dict("records"), "intent": intent.__dict__})
 
 
@@ -4242,6 +4238,7 @@ def inquiry_analytics_fields(text: str, chat: list[dict]) -> dict[str, str]:
         "Customer interest signal": interest,
         "Customer interest (owner)": "Not recorded",
             "Follow-up method": st.session_state.get("followup_schedule", {}).get("method", ""),
+            "Follow-up summary": st.session_state.get("followup_schedule", {}).get("summary", ""),
             "Follow-up schedule status": st.session_state.get("followup_schedule", {}).get("status", ""),
             "Follow-up cadence": st.session_state.get("followup_schedule", {}).get("cadence", ""),
             "Follow-up consent timestamp (Asia/Kolkata)": st.session_state.get("followup_schedule", {}).get("consent_at", ""),
@@ -4390,10 +4387,12 @@ def add_followup_confirmation_to_chat(method: str, summary: str, schedule_text: 
     else:
         content = f"Okay. I saved your **{method} follow-up** for: **{summary}** · {schedule_text}. You can review it in Follow-ups."
     st.session_state.chat.append({"role": "assistant", "content": content, "mode": "followup_saved"})
+    st.session_state.followup_schedule["summary"] = summary
     conversation_id = str(st.session_state.get("inquiry_conversation_id") or "")
     if conversation_id:
         try:
             update_conversation_fields(conversation_id, {
+                "Follow-up summary": summary,
                 "Recent conversation context": conversation_transcript(st.session_state.chat),
                 "Final conversation transcript": conversation_transcript(st.session_state.chat) if st.session_state.get("conversation_closed") else "",
             })

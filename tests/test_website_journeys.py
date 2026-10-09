@@ -50,12 +50,57 @@ class WebsiteJourneyTests(unittest.TestCase):
         self.assertFalse(self.app.session_state["conversation_closed"])
         self.assertEqual(self.app.session_state["search_context"], {})
 
+    def test_public_chat_location_correction_and_context_questions(self):
+        self.send("Show me properties in Chennai with minimum price")
+        self.assertEqual(self.send("what are the properties they provide")["mode"], "result_explanation")
+        self.assertEqual(self.send("which property do you suggest")["mode"], "result_comparison")
+        self.assertEqual(self.send("is there only 3 property matching my preference")["mode"], "result_count")
+        self.send("show me properties in auction as well")
+        self.send("im in porur, show me property near my location")
+        self.send("no problem, ignore porur. show me property in chennai")
+        self.assertEqual(self.app.session_state["search_context"]["location"].casefold(), "chennai")
+        records = self.app.session_state["chat"][-1].get("records", [])
+        for row in records:
+            self.assertIn("chennai", " ".join(str(row.get(k,"")) for k in ("city","district","locality","location")).casefold())
+        self.assertEqual(self.send("that;s it for now")["mode"], "pause")
+        self.assertNotIn("?", self.send("no")["content"])
+
+    def test_auction_opt_in_and_multiple_preference_cancellation(self):
+        first = self.send("I want flats in Chennai under 60 lakh")
+        self.assertIn("auction properties as well", first["content"])
+        self.send("yes")
+        self.assertIn("Auction", self.app.session_state["search_context"]["listing_statuses"])
+        self.send("add houses and plots, keep my budget")
+        self.assertEqual(set(self.app.session_state["search_context"]["property_types"]), {"Flat","House","Plot"})
+        self.send("remove flats, remove budget, cancel auctions")
+        ctx = self.app.session_state["search_context"]
+        self.assertEqual(set(ctx["property_types"]), {"House","Plot"})
+        self.assertNotIn("max_budget", ctx)
+        self.assertNotIn("Auction",ctx["listing_statuses"])
+        self.send("show me properties in Chennai")
+        records = self.app.session_state["chat"][-1].get("records", [])
+        self.assertTrue(records)
+        for row in records:
+            self.assertIn(row["property_type"], {"House","Plot"})
+            self.assertNotEqual(row["listing_status"], "Auction")
+
+    def test_new_city_does_not_silently_keep_auction_only(self):
+        self.send("show me only auction properties in Chennai")
+        self.send("im interested in purchasing property in Madurai")
+        ctx = self.app.session_state["search_context"]
+        self.assertEqual(ctx["location"].casefold(), "madurai")
+        self.assertNotEqual(ctx.get("status"), "Auction")
+
     def test_followup_missing_details_then_save_and_cancel_next(self):
         self.send("Set a followup")
         self.assertEqual(len(self.app.session_state["in_app_reminders"]), 0)
         last = self.send("tomorrow at 6 PM")
         self.assertEqual(last["mode"], "followup_saved")
         self.assertEqual(len(self.app.session_state["in_app_reminders"]), 1)
+        saved_record = self.saved.call_args.args[0]
+        self.assertEqual(saved_record["Follow-up method"], "In-app reminder")
+        self.assertEqual(saved_record["Follow-up schedule status"], "Scheduled")
+        self.assertTrue(saved_record["Next follow-up time (Asia/Kolkata)"])
         self.send("Set another followup")
         self.send("cancel")
         self.assertEqual(len(self.app.session_state["in_app_reminders"]), 1)

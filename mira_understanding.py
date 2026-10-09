@@ -53,7 +53,8 @@ def understand_request(text, data, chat, context=None, memory=None, tamil=False)
         known = {str(value).casefold() for column in ("locality", "city", "district") for value in data[column].dropna() if str(value).strip()}
         if place in known or place == str(context.get("location", "")).casefold():
             exclusions.append(place)
-            context["location"] = ""
+            if str(context.get("location", "")).casefold() == place:
+                context["location"] = ""
             search = True
     excluded_brand = re.search(r"\b(?:not|no|exclude|without)\s+(vgn|stepsstone|wisdom)\b", query)
     if excluded_brand:
@@ -110,6 +111,8 @@ def understand_request(text, data, chat, context=None, memory=None, tamil=False)
     if search or amount or broad:
         for key in ("location", "property_type", "bedrooms", "status", "max_budget", "min_area_sqm"):
             value = getattr(parsed, key)
+            if key == "location" and remove_place and context.get("location") and str(value).casefold() in exclusions:
+                continue
             if value not in (None, "", "Any"):
                 context[key] = value
         # An explicitly rejected location must not be reintroduced by parsing.
@@ -129,10 +132,10 @@ def understand_request(text, data, chat, context=None, memory=None, tamil=False)
     if search:
         memory["excluded_terms"] = list(dict.fromkeys(exclusions))
         inventory = prepare_inventory(data, memory)
-        status = context.get("status", "Any")
+        status = context.get("listing_statuses", context.get("status", "Any"))
         if status == "Any":
             status = ["Existing sale", "Project reference"]
-        found = search_properties(inventory, location=context.get("location", ""), property_type=context.get("property_type", "Any"),
+        found = search_properties(inventory, location=context.get("location", ""), property_type=context.get("property_types", context.get("property_type", "Any")),
                                   bedrooms=context.get("bedrooms"), max_budget=context.get("max_budget"), min_area_sqm=context.get("min_area_sqm"), status=status)
         if cheapest:
             # Unknown or rate-only prices cannot establish the lowest total price.

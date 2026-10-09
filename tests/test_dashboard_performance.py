@@ -13,6 +13,19 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class DashboardPerformanceTests(unittest.TestCase):
+    def test_saved_mira_followup_counts_once_in_dashboard(self):
+        app = AppTest.from_file(str(ROOT / "tests" / "owner_dashboard_sandbox.py"), default_timeout=60).run()
+        today = datetime.now().strftime("%Y-%m-%d")
+        app.session_state["qa_inquiry_rows"] = [
+            {"Inquiry ID": f"test-{i}", "Conversation ID": "qa-followup", "User ID": "qa-user",
+             "Timestamp (Asia/Kolkata)": today + "T10:00:00+05:30", "Follow-up method": "In-app reminder",
+             "Follow-up schedule status": "Scheduled", "Follow-up summary": "Check parking",
+             "Next follow-up time (Asia/Kolkata)": today + "T18:00:00+05:30"} for i in range(2)]
+        app.run()
+        self.assertFalse(app.exception)
+        self.assertEqual(next(item.value for item in app.metric if item.label == "Follow-ups open"), "1")
+        self.assertEqual(next(item.value for item in app.metric if item.label == "Conversations"), "1")
+
     def test_owner_dashboard_flowchart_and_empty_counts(self):
         started = perf_counter()
         app = AppTest.from_file(str(ROOT / "tests" / "owner_dashboard_sandbox.py"), default_timeout=60).run()
@@ -21,7 +34,9 @@ class DashboardPerformanceTests(unittest.TestCase):
         self.assertTrue(any(item.label == "Website Blueprint" for item in app.expander))
         self.assertGreaterEqual(len(app.get("image")), 1)
         self.assertFalse(any("blueprint-stage-grid" in str(item.value) for item in app.markdown))
-        self.assertEqual(next(item.value for item in app.metric if item.label == "Inquiry turns in period"), "0")
+        self.assertEqual(next(item.value for item in app.metric if item.label == "Follow-ups open"), "0")
+        self.assertEqual(next(item.value for item in app.metric if item.label == "Feedback received"), "0")
+        self.assertFalse(any(item.label in {"Budget mentions", "Purchase values stated", "Saved follow-ups"} for item in app.metric))
         self.assertEqual(next(item.value for item in app.metric if item.label == "Conversations"), "0")
         self.assertFalse(app.error)
         output = ROOT / "data" / "private" / "continuous_qa" / "owner-dashboard-performance.jsonl"

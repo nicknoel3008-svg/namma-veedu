@@ -199,6 +199,35 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
     if selected:
         memory["selected"] = selected
     selected = memory.get("selected")
+    if memory.get("auction_offer_pending") and re.fullmatch(r"(?:yes|yeah|sure|ok|okay|no|no thanks|not now|ஆம்|சரி|வேண்டாம்)[.! ]*", query):
+        include = not bool(re.match(r"no|not now|வேண்டாம்", query))
+        memory["auction_offer_pending"] = False
+        context["status"] = "Any"
+        context["listing_statuses"] = ["Existing sale", "Project reference"] + (["Auction"] if include else [])
+        return answer("preference_update", "I’ll include auctions alongside ordinary sale listings, keeping your other preferences. Ask me to search whenever you’re ready." if include else "I’ll keep auctions out and retain your other preferences. Ask me to search whenever you’re ready.", "ஏலங்களையும் சேர்த்து மற்ற விருப்பங்களை வைத்திருக்கிறேன்." if include else "ஏலங்களைத் தவிர்த்து மற்ற விருப்பங்களை வைத்திருக்கிறேன்.", "Auctions-um include panren; other preferences same." if include else "Auctions skip panren; other preferences same.")
+    if re.search(r"auction|ஏலம்", query):
+        memory["auction_offer_asked"] = True
+        memory["auction_offer_pending"] = False
+    if re.fullmatch(r"(?:that[';]?s it(?: for now)?|that is it(?: for now)?|nothing else|not now|no thanks|no|போதும்|வேண்டாம்)[.! ]*", query):
+        memory["auction_offer_pending"] = False
+        return answer("pause", "Of course—we can pause here. I’ll keep your preferences in this conversation until you ask to continue.", "சரி, இங்கே நிறுத்தலாம். இந்த உரையாடலில் உங்கள் விருப்பங்களை வைத்திருக்கிறேன்.", "Seri, inga pause pannalaam. Indha conversation-la preferences retain panren.")
+    if records and re.search(r"\b(?:only\s+3|only\s+three|how many|more (?:properties|matches|results))\b", query):
+        last_result = next((item for item in reversed(chat) if item.get("role") == "assistant" and item.get("count") is not None), {})
+        count = last_result.get("count", len(records))
+        return answer("result_count", f"There are {count} matching saved records; I showed only the first three. You can browse the website results or ask me to narrow them further.", f"பொருந்தும் சேமித்த பதிவுகள் {count}; முதலில் மூன்றை மட்டும் காட்டினேன்.", f"{count} saved matches irukku; first three mattum kaattinen.")
+    if records and re.search(r"what are the properties they provide|what (?:types?|properties) (?:do they|are these)|which.*(?:prefer|best|suggest)|asking for your suggestion", query):
+        if re.search(r"provide|types?|are these", query):
+            details = "; ".join(f"{row.get('title', 'Saved listing')}: {row.get('property_type', 'type not stated')} ({row.get('listing_status', 'saved record')})" for row in records[:3])
+            return answer("result_explanation", details + ". These are saved records; live availability needs source confirmation.", details + ". தற்போதைய கிடைப்பை ஆதாரத்தில் உறுதிப்படுத்த வேண்டும்.", details + ". Live availability source-la verify pannanum.")
+        priced = [row for row in records if isinstance(row.get("price_inr"), (int, float)) and row["price_inr"] > 0]
+        if priced:
+            candidate = min(priced, key=lambda row: row["price_inr"])
+            title = candidate.get('title', 'this listing')
+            amount = candidate['price_inr'] / 100000
+            reply = say(f"Among the shown options, {title} has the lowest recorded amount (₹{amount:g} lakh). That alone doesn’t make it the best purchase; verify the price basis, location, availability and documents with the source.", f"காட்டியவற்றில் {title} பதிவுசெய்த தொகை குறைவாக உள்ளது (₹{amount:g} லட்சம்). விலை மட்டும் சிறந்த வாங்குதலை நிர்ணயிக்காது; விலையின் அடிப்படை, இடம், கிடைப்பு மற்றும் ஆவணங்களை மூலத்தில் சரிபார்க்கவும்.", f"Kaattiya options-la {title} recorded amount kammi (₹{amount:g} lakh). Price basis, location, availability, documents source-la verify pannanum.")
+        else:
+            reply = say("I can compare the shown options, but their saved prices aren’t sufficient to choose the cheapest reliably. Which matters most to you: price, location, or property type?", "காட்டியவற்றை ஒப்பிடலாம்; குறைந்த விலையை உறுதியாகத் தேர்வு செய்ய பதிவுகள் போதாது. விலை, இடம், சொத்து வகை—எது முக்கியம்?", "Saved prices-la cheapest reliably choose panna mudiyala. Price, location, property type—edhu mukkiyam?")
+        return answer("result_comparison", reply, reply, reply)
     if re.fullmatch(r"[\W_]*(?:hi|hello|hey|good morning|good afternoon|good evening|vanakkam|வணக்கம்|ஹாய்)(?:[\s,]+mira)?[\W_]*", query):
         return answer("greeting", "Welcome to Namma Veedu! I’m Mira, your AI property guide. Tell me what you’re looking for, and I’ll help you explore your options.", "வணக்கம்! Namma Veedu-க்கு வரவேற்கிறேன். நான் Mira, உங்கள் AI சொத்து வழிகாட்டி. நீங்கள் எதைத் தேடுகிறீர்கள் என்று சொல்லுங்கள்; உங்களுக்கான வாய்ப்புகளைப் பார்க்க உதவுகிறேன்.", "Vanakkam! Namma Veedu-ku varaverkiren. Naan Mira, unga AI property guide. Neenga enna thedureenga-nu sollunga; unga options-a paarka udhavuren.")
     if re.search(r"\b(?:thank(?:s| you)?|appreciate(?: it)?|that(?:'s| is) helpful|great suggestion|good suggestion|nice suggestion|good job|well done|awesome|super helpful)\b|நன்றி|ரொம்ப நல்லா", query):
@@ -269,7 +298,7 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
     guidance = document_guidance_turn(query, language, answer, context, memory)
     if guidance and not explicit_search:
         return guidance
-    if preference_signal and (context_changed or named_preference_change) and not explicit_search:
+    if preference_signal and (context_changed or (named_preference_change and re.search(r"\b(?:remove|ignore|forget|drop|cancel)\b", query))) and not explicit_search:
         # Collect all changes from one message, then invite the next change
         # instead of forcing the customer through a one-field-at-a-time loop.
         additions = []
@@ -279,6 +308,8 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
             additions.append(str(context["location"]))
         if context.get("property_type") not in (None, "Any") and (not property_type_removed or property_type_added):
             additions.append(str(context["property_type"]))
+        elif context.get("property_types"):
+            additions.append(" / ".join(context["property_types"]))
         if context.get("bedrooms"):
             additions.append(f"{context['bedrooms']} BHK")
         if context.get("max_budget") is not None:
@@ -316,6 +347,13 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
             reply = (("I hear you—this has been frustrating. " if mixed_frustration else "")
                      + f"Got it—I updated these preferences together: {added_text or 'no new preference'}. "
                      f"{removed_text + ' was removed. ' if removed_text else ''}Would you like to add another preference, or should I search with these now?")
+        if not memory.get("auction_offer_asked") and not re.search(r"auction|ஏலம்", query) and not context.get("listing_statuses"):
+            memory["auction_offer_asked"] = True
+            memory["auction_offer_pending"] = True
+            context["listing_statuses"] = ["Existing sale", "Project reference"]
+            for question in ("Would you like to add another preference", "அடுத்து வேறு விருப்பம்", "Next vera preference"):
+                reply = reply.split(question)[0]
+            reply += say(" Would you like to explore auction properties as well?", " ஏலச் சொத்துகளையும் பார்க்க விரும்புகிறீர்களா?", " Auction properties-um explore panna viruppama?")
         return answer("preference_update", reply, reply, reply)
     guidance = document_guidance_turn(query, language, answer, context, memory)
     if guidance:
