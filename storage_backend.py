@@ -118,10 +118,12 @@ def read_inquiries(local_reader) -> list[dict[str, Any]]:
         if database_key not in _imported_local_databases:
             legacy_rows = local_reader()
             with connection.cursor() as cursor:
+                cursor.execute("SELECT inquiry_id FROM mira_inquiry_turns")
+                existing_ids = {row[0] for row in cursor.fetchall()}
                 for legacy in legacy_rows:
                     record = _redact(legacy)
                     inquiry_id = str(record.get("Inquiry ID") or "").strip()
-                    if not inquiry_id:
+                    if not inquiry_id or inquiry_id in existing_ids:
                         continue
                     cursor.execute(
                         "INSERT INTO mira_inquiry_turns (inquiry_id, conversation_id, occurred_at, payload) "

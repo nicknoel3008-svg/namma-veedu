@@ -8,7 +8,7 @@ class SharedStorageTests(unittest.TestCase):
         connection = MagicMock()
         connection.__enter__.return_value = connection
         cursor = connection.cursor.return_value.__enter__.return_value
-        cursor.fetchall.return_value = [({"Inquiry ID": "legacy", "Feedback ID": "feedback"},)]
+        cursor.fetchall.side_effect = [[], [({"Inquiry ID": "legacy", "Feedback ID": "feedback"},)], [({"Inquiry ID": "legacy", "Feedback ID": "feedback"},)]]
         reader = Mock(return_value=[{"Inquiry ID": "legacy", "Feedback ID": "feedback"}])
         with patch.object(storage_backend, "_database_url", return_value="test-database"), patch.object(storage_backend, "is_configured", return_value=True), patch.object(storage_backend, "_connect", return_value=connection), patch.object(storage_backend, "_imported_local_databases", set()):
             self.assertEqual(storage_backend.read_inquiries(reader)[0]["Feedback ID"], "feedback")
