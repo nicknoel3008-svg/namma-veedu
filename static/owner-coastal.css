@@ -22,3 +22,49 @@
 .stApp:has(.owner-dashboard-hero) [data-baseweb="tab-highlight"] {background:#E07A5F!important}
 .stApp:has(.owner-dashboard-hero) input,.stApp:has(.owner-dashboard-hero) textarea,.stApp:has(.owner-dashboard-hero) [role="combobox"] {color:#17394D!important;background:#FFF!important}
 @media(max-width:700px){.owner-dashboard-hero h2{font-size:28px}.stApp:has(.owner-dashboard-hero) [data-testid="stMetricValue"]{font-size:1.5rem!important}}
+
+/* Override customer-page white text on the owner's light surfaces, including
+   nested Streamlit markdown and WebKit's separately inherited text fill. */
+.stApp:has(.owner-dashboard-hero) .block-container :is(h1,h2,h3,h4,h5,h6,p,li,label,summary,a,span),
+.stApp:has(.owner-dashboard-hero) section[data-testid="stSidebar"] :is(h1,h2,h3,h4,h5,h6,p,li,label,summary,a,span),
+.stApp:has(.owner-dashboard-hero) .block-container [data-testid="stMarkdownContainer"] :is(p,li),
+.stApp:has(.owner-dashboard-hero) .block-container [data-testid="stCaptionContainer"] p {
+  color:#203C4B!important;-webkit-text-fill-color:#203C4B!important;text-shadow:none!important;opacity:1;
+}
+.stApp:has(.owner-dashboard-hero) .block-container :is(h1,h2,h3,h4,h5,h6) {
+  color:#17394D!important;-webkit-text-fill-color:#17394D!important;
+}
+.stApp:has(.owner-dashboard-hero) .block-container button :is(p,span),
+.stApp:has(.owner-dashboard-hero) section[data-testid="stSidebar"] button :is(p,span) {
+  color:inherit!important;-webkit-text-fill-color:currentColor!important;
+}
+.stApp:has(.owner-dashboard-hero) .block-container :is(input,textarea,[role="combobox"]),
+.stApp:has(.owner-dashboard-hero) section[data-testid="stSidebar"] :is(input,textarea,[role="combobox"]) {
+  color:#17394D!important;-webkit-text-fill-color:#17394D!important;background:#FFF!important;
+}
+.stApp:has(.owner-dashboard-hero) .block-container [data-testid="stVerticalBlockBorderWrapper"] {
+  background:#FFF!important;
+}
+.stApp:has(.owner-dashboard-hero) .block-container button[role="tab"] {
+  color:#203C4B!important;-webkit-text-fill-color:currentColor!important;
+}
+.stApp:has(.owner-dashboard-hero) section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
+.stApp:has(.owner-dashboard-hero) .block-container [data-testid="stWidgetLabel"] p,
+.stApp:has(.owner-dashboard-hero) .block-container [data-testid="stExpander"] summary p {
+  color:#203C4B!important;-webkit-text-fill-color:#203C4B!important;
+}
+.stApp:has(.owner-dashboard-hero) section[data-testid="stSidebar"] button {
+  color:#203C4B!important;-webkit-text-fill-color:#203C4B!important;
+}
+.stApp:has(.owner-dashboard-hero) .block-container button[kind="secondary"] {
+  color:#245A79!important;-webkit-text-fill-color:#245A79!important;
+}
+.stApp:has(.owner-dashboard-hero) .block-container button[kind="primary"],
+.stApp:has(.owner-dashboard-hero) .block-container [data-testid="stDownloadButton"] button {
+  color:#FFF!important;-webkit-text-fill-color:#FFF!important;
+}
+.stApp:has(.owner-dashboard-hero) .block-container [data-testid="stCaptionContainer"],
+.stApp:has(.owner-dashboard-hero) .block-container [data-testid="stCaptionContainer"] *,
+.stApp:has(.owner-dashboard-hero) [data-baseweb="select"] svg {
+  color:#456477!important;-webkit-text-fill-color:#456477!important;opacity:1!important;
+}
