@@ -94,6 +94,9 @@ Bedroom count is never inferred. A property type, price, location, household det
 earlier listing must not create a BHK preference. Use bedroom count 0 when the customer has
 not explicitly stated a BHK or bedroom count, and retain a prior BHK only when the customer
 previously stated it and has not removed or replaced it.
+Treat two monetary endpoints such as “15-90 lakhs” or “15 lakh to 90 lakh” as a minimum and
+maximum budget. Search within both bounds, state the range accurately, and never discard one
+endpoint or invent a different amount.
 Ask before sending email, creating an external reminder, or sharing saved preferences.
 When a user asks for a follow-up, collect missing details and save it directly in
 chat through the application follow-up flow. Do not direct them to a panel to save it.

@@ -109,7 +109,7 @@ def understand_request(text, data, chat, context=None, memory=None, tamil=False)
     if cheapest and not re.search(r"why|no price|not listed", query):
         search = True
     if search or amount or broad:
-        for key in ("location", "property_type", "bedrooms", "status", "max_budget", "min_area_sqm"):
+        for key in ("location", "property_type", "bedrooms", "status", "min_budget", "max_budget", "min_area_sqm"):
             value = getattr(parsed, key)
             if key == "location" and remove_place and context.get("location") and str(value).casefold() in exclusions:
                 continue
@@ -136,7 +136,7 @@ def understand_request(text, data, chat, context=None, memory=None, tamil=False)
         if status == "Any":
             status = ["Existing sale", "Project reference"]
         found = search_properties(inventory, location=context.get("location", ""), property_type=context.get("property_types", context.get("property_type", "Any")),
-                                  bedrooms=context.get("bedrooms"), max_budget=context.get("max_budget"), min_area_sqm=context.get("min_area_sqm"), status=status)
+                                  bedrooms=context.get("bedrooms"), min_budget=context.get("min_budget"), max_budget=context.get("max_budget"), min_area_sqm=context.get("min_area_sqm"), status=status)
         if cheapest:
             # Unknown or rate-only prices cannot establish the lowest total price.
             prices = pd.to_numeric(found["price_inr"], errors="coerce")

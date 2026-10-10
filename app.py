@@ -6,6 +6,7 @@ from html import escape
 from pathlib import Path
 from datetime import datetime, timedelta
 import base64
+import hashlib
 import hmac
 import inspect
 import json
@@ -304,6 +305,7 @@ st.session_state.setdefault("conversation_ended_at", "")
 st.session_state.setdefault("mira_rating", None)
 st.session_state.setdefault("mira_rating_saved", False)
 st.session_state.setdefault("followup_schedule", {})
+st.session_state.setdefault("selected_followup_properties", {})
 
 try:
     followup_stop_token = str(st.query_params.get("stop_followup", "") or "")
@@ -2026,6 +2028,7 @@ def apply_filters(*, intent=None):
         location = intent.location
         prop_type = context.get("property_types", intent.property_type if intent.property_type != "Any" else [])
         status = context.get("listing_statuses", intent.status if intent.status != "Any" else [])
+        min_budget = intent.min_budget
         max_budget = intent.max_budget
         min_area_sqm = intent.min_area_sqm
         bedrooms = intent.bedrooms
@@ -2034,6 +2037,7 @@ def apply_filters(*, intent=None):
         location=location,
         property_type=prop_type,
         status=status,
+        min_budget=min_budget if intent else None,
         max_budget=max_budget,
         min_area_sqm=min_area_sqm,
         bedrooms=bedrooms,
@@ -2231,6 +2235,26 @@ def render_property_card(row, number=None):
         '</div>'
     )
     st.markdown(card_html, unsafe_allow_html=True)
+    followup_key = hashlib.sha256(
+        "|".join(str(record.get(field) or "") for field in ("property_id", "source_url", "title", "locality", "price_inr")).encode("utf-8")
+    ).hexdigest()[:16]
+    selected_followups = st.session_state.setdefault("selected_followup_properties", {})
+    include_followup = st.checkbox(
+        "இந்தச் சொத்தை மின்னஞ்சல்/WhatsApp பின்தொடர்பில் சேர்க்கவும்"
+        if language == "தமிழ்" else
+        "Include this property in my email/WhatsApp follow-up",
+        value=followup_key in selected_followups,
+        key=f"followup_property_{followup_key}",
+        help=(
+            "உங்கள் ஒப்புதலுக்குப் பிறகு, தேர்ந்தெடுத்த சொத்து விவரங்கள் மற்றும் நிதி தொடர்பான அடுத்த படிகள் பின்தொடர்பில் சேர்க்கப்படும்."
+            if language == "தமிழ்" else
+            "After you opt in, selected property details and finance next steps will be included in your follow-up."
+        ),
+    )
+    if include_followup:
+        selected_followups[followup_key] = record
+    else:
+        selected_followups.pop(followup_key, None)
     if st.button("இந்தச் சொத்தைத் தேர்ந்தெடு" if language == "தமிழ்" else "Select this property", key=f"select_property_{visit_card_counter}"):
         try:
             from customer_journey import select_property
@@ -3088,7 +3112,8 @@ def current_followup_recommendations():
             preferences["max_budget"] = float(applied.get("max_budget_lakh") or 0) * 100_000
         if applied.get("use_bedrooms"):
             preferences["bedrooms"] = applied.get("bedrooms")
-    records = frame.head(3).to_dict("records") if isinstance(frame, pd.DataFrame) else []
+    selected = st.session_state.get("selected_followup_properties", {})
+    records = list(selected.values())[:3] if selected else (frame.head(3).to_dict("records") if isinstance(frame, pd.DataFrame) else [])
     return recommendation_snapshot(records, preferences)
 
 
@@ -3890,6 +3915,7 @@ def _respond_without_logging(text: str):
                     property_type=intent.property_type,
                     bedrooms=intent.bedrooms,
                     status=["Auction date not listed"],
+                    min_budget=intent.min_budget,
                     max_budget=intent.max_budget,
                     min_area_sqm=intent.min_area_sqm,
                 )
@@ -3908,7 +3934,7 @@ def _respond_without_logging(text: str):
             if property_tool:
                 api_intent = parse_request(text, properties)
                 previous = st.session_state.get("search_context", {})
-                for key in ("location", "max_budget", "min_area_sqm"):
+                for key in ("location", "min_budget", "max_budget", "min_area_sqm"):
                     if not getattr(api_intent, key) and previous.get(key):
                         setattr(api_intent, key, previous[key])
                 if api_intent.bedrooms is None and previous.get("bedrooms"):
@@ -3978,7 +4004,7 @@ def _respond_without_logging(text: str):
             if property_search_request and not property_tool:
                 fallback_intent = parse_request(text, properties)
                 previous = st.session_state.get("search_context", {})
-                for key in ("location", "max_budget", "min_area_sqm"):
+                for key in ("location", "min_budget", "max_budget", "min_area_sqm"):
                     if not getattr(fallback_intent, key) and previous.get(key):
                         setattr(fallback_intent, key, previous[key])
                 if fallback_intent.bedrooms is None and previous.get("bedrooms"):
@@ -3991,6 +4017,7 @@ def _respond_without_logging(text: str):
                     property_type=fallback_intent.property_type,
                     bedrooms=fallback_intent.bedrooms,
                     status=fallback_intent.status,
+                    min_budget=fallback_intent.min_budget,
                     max_budget=fallback_intent.max_budget,
                     min_area_sqm=fallback_intent.min_area_sqm,
                 )
@@ -4213,6 +4240,7 @@ def _respond_without_logging(text: str):
             property_type=intent.property_type,
             bedrooms=intent.bedrooms,
             status=["Auction date not listed"],
+            min_budget=intent.min_budget,
             max_budget=intent.max_budget,
             min_area_sqm=intent.min_area_sqm,
         )
@@ -4831,6 +4859,7 @@ def clear_active_preferences() -> None:
     st.session_state.main_results_total_count = 0
     st.session_state.main_results_mode = "none"
     st.session_state.filters_applied = False
+    st.session_state.selected_followup_properties = {}
     # Prevent the filter panel's change detector from immediately rebuilding
     # the full catalogue after the customer explicitly cleared everything.
     st.session_state.applied_property_filters = None

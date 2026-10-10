@@ -152,6 +152,7 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
         context.pop("bedrooms", None)
     if re.search(rf"{removal_clause}(?:budget|lakh|crore|price)\b", query) and not re.search(r"\bkeep\b[^.?!\n]{0,25}(?:budget|lakh|crore|price|\d+\s*(?:lakh|crore))", query):
         context.pop("max_budget", None)
+        context.pop("min_budget", None)
     replacement_area = re.search(r"\b(?:add|instead|replace|switch to)\s+(?:the\s+)?([a-z][a-z-]*)\b", query)
     if replacement_area and re.search(rf"{removal_clause}[^.?!\n]{{0,40}}(?:area|location|[a-z][a-z-]*)", query):
         candidate = replacement_area.group(1).strip()
@@ -180,7 +181,7 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
             context["max_budget"] = previous_context["max_budget"]
         else:
             context.pop("max_budget", None)
-    if amount:
+    if amount and context.get("min_budget") is None:
         context["max_budget"] = float(amount.group(1)) * (10000000 if amount.group(2).startswith("cr") else 100000)
     if re.search(r"flat|apartment|குடியிருப்பு", query) and not re.search(
         r"(?:remove|ignore|forget|drop|no longer want|don't want|do not want)[^.?!\n]{0,80}(?:flat|house|plot|property type)",

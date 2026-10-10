@@ -24,7 +24,7 @@ def update_preferences(text, data, previous=None):
         normalized,
     ))
     property_type_was_cleared = bool(previous_context.get("_property_type_cleared"))
-    for key in ("location", "property_type", "bedrooms", "status", "max_budget", "min_area_sqm"):
+    for key in ("location", "property_type", "bedrooms", "status", "min_budget", "max_budget", "min_area_sqm"):
         value = getattr(intent, key)
         if key == "property_type" and (explicit_property_type_removal or property_type_was_cleared):
             continue
@@ -51,6 +51,8 @@ def update_preferences(text, data, previous=None):
     ):
         if re.search(pattern, normalized) and not (key == "property_type" and explicit_property_type_addition):
             remembered.pop(key, None)
+            if key == "max_budget":
+                remembered.pop("min_budget", None)
     # Understand named removals in the same turn as additions, for example
     # “keep 2BHK under 60 lakh but remove Velachery” or “drop the flat type”.
     removal = r"(?:remove|cancel|exclude|ignore|forget|drop|no longer want|don't want|do not want)"
@@ -62,6 +64,7 @@ def update_preferences(text, data, previous=None):
         remembered.pop("bedrooms", None)
     if re.search(rf"{removal}[^.?!\n]{{0,45}}(?:budget|lakh|crore|price)", normalized) and not re.search(r"\bkeep\b[^.?!\n]{0,25}(?:budget|lakh|crore|price|\d+\s*(?:lakh|crore))", normalized):
         remembered.pop("max_budget", None)
+        remembered.pop("min_budget", None)
     if re.search(rf"{removal}[^.?!\n]{{0,45}}(?:flat|house|plot|property type)", normalized) and not explicit_property_type_addition:
         remembered.pop("property_type", None)
         remembered["_property_type_cleared"] = True
@@ -147,7 +150,9 @@ def preference_summary(preferences):
         parts.append(preferences["property_type"].lower())
     if preferences.get("location"):
         parts.append(f"in {preferences['location']}")
-    if preferences.get("max_budget") is not None:
+    if preferences.get("min_budget") is not None and preferences.get("max_budget") is not None:
+        parts.append(f"from ₹{preferences['min_budget'] / 100_000:g} to ₹{preferences['max_budget'] / 100_000:g} lakh")
+    elif preferences.get("max_budget") is not None:
         parts.append(f"within ₹{preferences['max_budget'] / 100_000:g} lakh")
     return " ".join(parts)
 

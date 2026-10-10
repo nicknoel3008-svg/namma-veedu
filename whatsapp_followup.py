@@ -59,6 +59,7 @@ def _send_wati(config, row):
                "broadcast_name": "namma_veedu_followups",
                "channel_number": config["WATI_CHANNEL_NUMBER"],
                "parameters": [
+                   {"name": "name", "value": row["customer_name"] or "there"},
                    {"name": "recommendations", "value": row["recommendations"] or "No matching saved recommendations. Please resume your search."},
                    {"name": "resume_url", "value": public_url},
                    {"name": "stop_url", "value": public_url + "/?" + urlencode({"stop_followup": row["id"]})}]}

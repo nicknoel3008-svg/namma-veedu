@@ -104,6 +104,17 @@ class WhatsAppFollowupTests(unittest.TestCase):
         self.assertIn("Price not reported",text)
         self.assertNotIn("javascript:",text)
         self.assertIn("Source link not recorded",text)
+        self.assertIn("Loans panel", text)
+
+    def test_recommendation_snapshot_keeps_budget_range_and_selected_property(self):
+        text = recommendation_snapshot(
+            [{"title": "Customer choice", "location": "Chennai", "price_display": "₹55 lakh", "source_url": "https://example.com/chosen"}],
+            {"min_budget": 1_500_000, "max_budget": 9_000_000},
+        )
+        self.assertIn("Minimum budget INR: 1500000", text)
+        self.assertIn("Maximum budget INR: 9000000", text)
+        self.assertIn("Customer choice", text)
+        self.assertIn("https://example.com/chosen", text)
 
     def test_stop_link_works_after_meta_accepts_message(self):
         from followup_service import cancel_followup_from_link

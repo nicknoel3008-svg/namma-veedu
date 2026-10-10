@@ -6,7 +6,7 @@ from whatsapp_followup import send_due_whatsapp_followups, whatsapp_config_issue
 
 WATI = dict(FOLLOWUP_WHATSAPP_ENABLED='true', WHATSAPP_PROVIDER='wati',
             WATI_API_BASE_URL='https://live-mt-server.wati.io/123', WATI_ACCESS_TOKEN='test-secret',
-            WATI_TEMPLATE_NAME='namma_veedu_recommendations_en', WATI_CHANNEL_NUMBER='919999999999',
+            WATI_TEMPLATE_NAME='namma_veedu_property_followup', WATI_CHANNEL_NUMBER='919999999999',
             FOLLOWUP_PUBLIC_URL='https://example.com')
 
 class WatiTests(WhatsAppFollowupTests):
@@ -18,8 +18,9 @@ class WatiTests(WhatsAppFollowupTests):
             self.assertEqual(send_due_whatsapp_followups(WATI,self.db),(1,0))
             self.assertEqual(send_due_whatsapp_followups(WATI,self.db),(0,0))
         payload=post.call_args.kwargs['json']
-        self.assertIn('Saved listing A',payload['parameters'][0]['value'])
-        self.assertIn('stop_followup='+key,payload['parameters'][2]['value'])
+        self.assertEqual(payload['parameters'][0], {'name':'name','value':'there'})
+        self.assertIn('Saved listing A',payload['parameters'][1]['value'])
+        self.assertIn('stop_followup='+key,payload['parameters'][3]['value'])
         self.assertEqual(post.call_args.kwargs['params']['whatsappNumber'],'919876543210')
         self.assertFalse(post.call_args.kwargs['allow_redirects'])
         self.assertEqual(list_email_followups('qa',self.db)[0]['provider_message_id'],'wati:local-test')

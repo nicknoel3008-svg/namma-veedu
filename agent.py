@@ -13,6 +13,7 @@ class SearchIntent:
     property_type: str = "Any"
     bedrooms: int | None = None
     status: str = "Any"
+    min_budget: float | None = None
     max_budget: float | None = None
     min_area_sqm: float | None = None
     sort: str = "match"
@@ -59,15 +60,34 @@ def parse_request(text: str, data: pd.DataFrame) -> SearchIntent:
         intent.status = "Existing sale"
     elif any(word in query for word in ("new project", "promoter", "developer project")):
         intent.status = "Project reference"
-    budget = re.search(r"(?:under|below|within|up to|max(?:imum)?|budget(?: of)?(?:\s+(?:around|about|approximately))?)\s*₹?\s*(\d+(?:,\d{2,3})*(?:\.\d+)?)\s*(crore|crores|cr|lakh|lakhs|lac|lacs|k)?", query)
+    def budget_value(amount, unit):
+        unit = (unit or "").casefold()
+        return float(str(amount).replace(",", "")) * (
+            10_000_000 if unit.startswith(("crore", "cr")) else
+            100_000 if unit.startswith(("lakh", "lac")) else
+            1_000 if unit == "k" else 1
+        )
+
+    # Preserve both ends when customers naturally state a range such as
+    # “15-90 lakhs”, “15 lakh to 90 lakh”, or “between 15 and 90 lakhs”.
+    range_budget = re.search(
+        r"(?:\bbetween\s+)?₹?\s*(\d+(?:,\d{2,3})*(?:\.\d+)?)\s*"
+        r"(crores?|cr|lakhs?|lacs?|k)?\s*(?:-|–|—|to|and)\s*₹?\s*"
+        r"(\d+(?:,\d{2,3})*(?:\.\d+)?)\s*(crores?|cr|lakhs?|lacs?|k)\b",
+        query,
+    )
+    if range_budget:
+        low_unit = range_budget.group(2) or range_budget.group(4)
+        low = budget_value(range_budget.group(1), low_unit)
+        high = budget_value(range_budget.group(3), range_budget.group(4) or low_unit)
+        intent.min_budget, intent.max_budget = sorted((low, high))
+    budget = None if range_budget else re.search(r"(?:under|below|within|up to|max(?:imum)?|budget(?: of)?(?:\s+(?:around|about|approximately))?)\s*₹?\s*(\d+(?:,\d{2,3})*(?:\.\d+)?)\s*(crore|crores|cr|lakh|lakhs|lac|lacs|k)?", query)
     # Natural Tanglish often places the amount before the word "budget", for
     # example: "50 lakh budget". Keep this equivalent to "budget 50 lakh".
     if not budget:
         budget = re.search(r"\b(\d+(?:,\d{2,3})*(?:\.\d+)?)\s*(crore|crores|cr|lakh|lakhs|lac|lacs|k)\s+budget\b", query)
     if budget:
-        amount = float(budget.group(1).replace(",", ""))
-        unit = budget.group(2) or ""
-        intent.max_budget = amount * (10_000_000 if unit.startswith(("crore", "cr")) else 100_000 if unit.startswith(("lakh", "lac")) else 1_000 if unit == "k" else 1)
+        intent.max_budget = budget_value(budget.group(1), budget.group(2))
     elif re.search(r"\b(?:instead|actually|make it|stretch|increase|reduce|only|can do|afford)\b", query):
         revised = re.search(r"\b(\d+(?:\.\d+)?)\s*(crores?|cr|lakhs?|lacs?)\b", query)
         if revised:

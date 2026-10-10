@@ -48,6 +48,19 @@ class PropertyFinderTests(unittest.TestCase):
         self.assertEqual(intent.status, "Auction")
         self.assertEqual(intent.max_budget, 5_000_000)
 
+    def test_budget_range_preserves_both_customer_limits(self):
+        intent = parse_request("Show properties from 15-90 lakhs in Chennai", self.data)
+        self.assertEqual(intent.min_budget, 1_500_000)
+        self.assertEqual(intent.max_budget, 9_000_000)
+        found = search_properties(
+            self.data,
+            location="Chennai",
+            min_budget=intent.min_budget,
+            max_budget=intent.max_budget,
+        )
+        prices = pd.to_numeric(found["price_inr"], errors="coerce").dropna()
+        self.assertTrue(prices.between(1_500_000, 9_000_000).all())
+
     def test_filter_location_type_and_budget(self):
         found = search_properties(self.data, location="Chennai", property_type="Flat", max_budget=10_000_000)
         self.assertTrue(all(found["property_type"] == "Flat"))

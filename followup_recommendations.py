@@ -10,7 +10,7 @@ def _text(value, fallback=""):
 def recommendation_snapshot(records, preferences=None):
     preferences = preferences or {}
     criteria = []
-    for key, label in (("location", "Area"), ("property_type", "Type"), ("bedrooms", "BHK"), ("max_budget", "Budget INR")):
+    for key, label in (("location", "Area"), ("property_type", "Type"), ("bedrooms", "BHK"), ("min_budget", "Minimum budget INR"), ("max_budget", "Maximum budget INR")):
         if preferences.get(key) is not None:
             criteria.append(f"{label}: {preferences[key]}")
     lead = "; ".join(criteria)[:220]
@@ -30,5 +30,5 @@ def recommendation_snapshot(records, preferences=None):
             parts.append("More saved recommendations are available in the website search results.")
             break
         parts.append(line)
-    parts.append("Saved snapshots only; confirm price and availability with the source.")
-    return " ".join(" ".join(part.split()) for part in parts)[:800]
+    parts.append("Next steps: confirm price and availability with each source. For finance, use Namma Veedu's Loans panel to compare official lender terms and illustrative EMI; eligibility, fees and rates can vary.")
+    return " ".join(" ".join(part.split()) for part in parts)[:950]
