@@ -100,8 +100,23 @@ def render(rows, *, sessions, deliveries, visits, selections, rules, history_row
         ("Visits completed", f"{complete} / {confirmed}", "Completed / currently confirmed visit requests linked to conversations in this period."),
         ("Confirmed purchases", str(purchased), "Visit outcomes explicitly recorded Purchased by the owner. Customer interest and reports are separate."),
     ]
-    for offset in (0, 4):
-        for column, (label, value, help_text) in zip(st.columns(4), metrics[offset:offset+4]):
+    primary_labels = [metric[0] for metric in metrics]
+    metrics.extend([
+        ("Mira conversations", str(len(summary)), "Saved conversations in the selected reporting period."),
+        ("Mira replies", str(sum(bool(str(r.get("Assistant response") or "").strip()) for r in rows)), "Saved assistant responses in the selected period."),
+        ("Feedback submissions", str(len({r.get("Feedback ID") for r in rows if r.get("Feedback ID")})), "Distinct saved feedback IDs in the selected period."),
+        ("Learning awaiting review", str(sum(r.get("Status") == "Draft" for r in rules)), "Current learning drafts awaiting owner review; not restricted to the report period."),
+        ("Approved learning rules", str(sum(r.get("Status") == "Approved" for r in rules)), "Current approved rules; not restricted to the report period."),
+        ("Visit requests", str(len(visits)), "Visit journey records linked to conversations in the selected period."),
+    ])
+    selected_metrics = st.multiselect(
+        "KPIs to display", [metric[0] for metric in metrics], default=primary_labels,
+        key="owner_visible_kpis", help="Choose the measures useful to you. This selection changes only the cards, not the reports or charts.")
+    visible_metrics = [metric for metric in metrics if metric[0] in selected_metrics]
+    if not visible_metrics:
+        st.info("Choose at least one KPI above to display its card.")
+    for offset in range(0, len(visible_metrics), 4):
+        for column, (label, value, help_text) in zip(st.columns(4), visible_metrics[offset:offset+4]):
             column.metric(label, value, help=help_text)
     st.caption("Actual recorded data only. Sessions and browser timing collection start with this release; older traffic is unavailable. Browser load and Mira server processing are separate measurements; local QA timings are not mixed in.")
     site_data, mira_data = activity(rows, website)

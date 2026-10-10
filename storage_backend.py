@@ -94,6 +94,20 @@ def _ensure_schema(connection) -> None:
             )
             """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS mira_studio_users (
+                email TEXT PRIMARY KEY,
+                display_name TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'Manager',
+                access_code_hash TEXT NOT NULL,
+                access_code_salt TEXT NOT NULL,
+                active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
     connection.commit()
 
 

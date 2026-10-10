@@ -52,6 +52,20 @@ BASELINE_RULES = [
         "Status": "Approved",
         "Source": "Customer-service baseline: Zendesk guidance",
     },
+    {
+        "Rule ID": "baseline-explicit-bhk-only",
+        "Scenario": "Mira records or applies a bedroom preference",
+        "Guidance": "Record BHK only when the customer explicitly states a bedroom count. Never infer BHK from property type, budget, location, household details, or a previously displayed listing. Use Any when no BHK was stated.",
+        "Status": "Approved",
+        "Source": "Owner correction: 10 October 2026",
+    },
+    {
+        "Rule ID": "baseline-no-repeated-replies",
+        "Scenario": "The customer repeats a request or Mira is about to repeat a recent reply",
+        "Guidance": "Do not resend the same answer or question. Confirm what is already recorded, complete the next pending action, or ask one different question that is required to proceed.",
+        "Status": "Approved",
+        "Source": "Owner correction: 10 October 2026",
+    },
 ]
 
 
@@ -77,6 +91,8 @@ def load_learning_rules(path: Path = LIBRARY_PATH) -> list[dict[str, str]]:
     if not isinstance(raw, list):
         return [_clean_rule(rule) for rule in BASELINE_RULES]
     rules = [_clean_rule(rule) for rule in raw if isinstance(rule, dict)]
+    existing_ids = {rule["Rule ID"] for rule in rules}
+    rules.extend(_clean_rule(rule) for rule in BASELINE_RULES if rule["Rule ID"] not in existing_ids)
     return rules or [_clean_rule(rule) for rule in BASELINE_RULES]
 
 

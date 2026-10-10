@@ -64,6 +64,14 @@ class WebsiteJourneyTests(unittest.TestCase):
         self.send("Show me properties around Tambaram")
         self.assertEqual(self.app.session_state["results_page"], 1)
 
+    def test_location_search_never_invents_a_bhk_preference(self):
+        self.send("Show me properties in Chennai")
+        self.app.run()
+        self.assertFalse(self.app.exception)
+        self.assertNotIn("bedrooms", self.app.session_state["search_context"])
+        self.assertEqual(self.app.session_state["filter_preferred_bedrooms"], 0)
+        self.assertFalse(self.app.session_state["applied_property_filters"]["use_bedrooms"])
+
     def test_no_match_explains_blocking_preferences_then_recovers(self):
         reply = self.send("Show me 5BHK flats in Chennai under 1 lakh")
         self.assertEqual(reply.get("count"), 0)

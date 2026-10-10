@@ -91,3 +91,8 @@
 }
 .stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container [data-testid="stMetricLabel"] *,
 .stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container [data-testid="stMetricValue"] * {color:#18334D!important;-webkit-text-fill-color:#18334D!important}
+/* Selected KPI tags need white labels over their navy fill. */
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container [data-testid="stMultiSelectTagsContainer"] [data-tag],
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container [data-testid="stMultiSelectTagsContainer"] [data-tag] * {
+ color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important;opacity:1!important;text-shadow:none!important;
+}

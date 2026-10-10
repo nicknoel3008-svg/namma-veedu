@@ -43,6 +43,7 @@ import storage_backend
 from mira_dialogue_libraries import local_dialogue_reply, local_land_conversation_reply
 from mira_quality import quality_flags
 from mira_learning_library import active_learning_guidance, load_learning_rules as local_load_learning_rules, merge_suggested_drafts, save_learning_rules as local_save_learning_rules, suggested_draft_rules
+from mira_studio_access import generate_access_code, list_managers, save_manager, set_manager_active, verify_manager
 from map_service import map_points
 
 
@@ -274,11 +275,15 @@ if "owner_dashboard_authenticated" not in st.session_state:
     st.session_state.owner_dashboard_authenticated = False
 if "owner_dashboard_login_open" not in st.session_state:
     st.session_state.owner_dashboard_login_open = False
+st.session_state.setdefault("mira_studio_role", "")
+st.session_state.setdefault("mira_studio_identity", "")
 if not owner_console_requested:
     # A public tunnel can serve the customer experience, but never the owner
     # sign-in or the private inquiry dashboard.
     st.session_state.owner_dashboard_authenticated = False
     st.session_state.owner_dashboard_login_open = False
+    st.session_state.mira_studio_role = ""
+    st.session_state.mira_studio_identity = ""
 if "user_id" not in st.session_state:
     st.session_state.user_id = f"NMI-USER-{uuid4().hex[:12].upper()}"
 if not st.session_state.owner_dashboard_authenticated and not st.session_state.get("website_session_recorded") and storage_backend.is_configured():
@@ -1111,7 +1116,7 @@ section[data-testid="stMain"] div[data-testid="stColumn"]:has(.st-key-mira-conte
 st.markdown(_base_styles, unsafe_allow_html=True)
 st.markdown("<style>" + (ROOT / "static" / "coastal-sidebar.css").read_text(encoding="utf-8") + "</style>", unsafe_allow_html=True)
 st.markdown("<style>" + (ROOT / "static" / "coastal-theme.css").read_text(encoding="utf-8") + "</style>", unsafe_allow_html=True)
-st.markdown("<style>" + (ROOT / "static" / "architectural-wash.css").read_text(encoding="utf-8").replace("__ARCHITECTURE_IMAGE__", HERO_IMAGE_URL) + "</style>", unsafe_allow_html=True)
+st.markdown("<style>" + (ROOT / "static" / "architectural-wash.css").read_text(encoding="utf-8").replace("__BRAND_WATERMARK__", WATERMARK_IMAGE_URL) + "</style>", unsafe_allow_html=True)
 
 st.markdown(f'''
 <section class="hero" style="background-image:linear-gradient(90deg,rgba(9,28,37,.84) 0%,rgba(9,28,37,.57) 46%,rgba(9,28,37,.08) 100%),linear-gradient(0deg,rgba(9,28,37,.52),transparent 48%),url('{HERO_IMAGE_URL}');">
@@ -1164,7 +1169,10 @@ def queue_mira_filter_sync(intent) -> None:
     current.setdefault("use_size", False)
     current.setdefault("min_area", 0.0)
     current.setdefault("use_bedrooms", False)
-    current.setdefault("bedrooms", 1)
+    # Zero means "not specified". A default of 1 used to leak into the
+    # visible filters after an unrelated preference update and made it look
+    # as though Mira had invented a 1 BHK requirement.
+    current.setdefault("bedrooms", 0)
     current.setdefault("include_ended", False)
 
     if intent.location:
@@ -1242,7 +1250,7 @@ if pending_mira_sync:
     st.session_state["filter_use_size"] = bool(synced.get("use_size"))
     st.session_state["filter_preferred_size"] = float(synced.get("min_area") or 0.0)
     st.session_state["filter_use_bedrooms"] = bool(synced.get("use_bedrooms"))
-    st.session_state["filter_preferred_bedrooms"] = int(synced.get("bedrooms") or 1)
+    st.session_state["filter_preferred_bedrooms"] = int(synced.get("bedrooms") or 0)
     st.session_state["filter_include_ended"] = bool(synced.get("include_ended"))
     st.session_state["filter_location_query"] = (synced.get("location") or [""])[0]
     st.session_state.applied_property_filters = synced.copy()
@@ -1252,9 +1260,14 @@ def render_owner_dashboard_access() -> None:
     """Keep the owner entry above public filters and gate the dashboard by sign-in."""
     if st.session_state.owner_dashboard_authenticated:
         st.success("Mira Studio access enabled")
+        identity = str(st.session_state.get("mira_studio_identity") or "Owner")
+        role = str(st.session_state.get("mira_studio_role") or "Owner")
+        st.caption(f"Signed in as {identity} · {role}")
         if st.button("Sign out of Mira Studio", use_container_width=True):
             st.session_state.owner_dashboard_authenticated = False
             st.session_state.owner_dashboard_login_open = False
+            st.session_state.mira_studio_role = ""
+            st.session_state.mira_studio_identity = ""
             st.rerun()
         return
 
@@ -1265,17 +1278,39 @@ def render_owner_dashboard_access() -> None:
         return
     if configured_dashboard_password:
         with st.form("owner_dashboard_sign_in"):
-            st.markdown(f"**{tr('Mira Studio sign-in')}**")
-            dashboard_password_attempt = st.text_input(tr("Mira Studio sign-in"), type="password", label_visibility="collapsed")
-            submitted = st.form_submit_button("Sign in", use_container_width=True)
+            st.markdown("**Owner sign-in**")
+            dashboard_password_attempt = st.text_input("Owner password", type="password")
+            submitted = st.form_submit_button("Sign in as owner", use_container_width=True)
         if submitted:
             if hmac.compare_digest(dashboard_password_attempt, configured_dashboard_password):
                 st.session_state.owner_dashboard_authenticated = True
                 st.session_state.owner_dashboard_login_open = False
+                st.session_state.mira_studio_role = "Owner"
+                st.session_state.mira_studio_identity = "Owner"
                 st.rerun()
             st.error("That sign-in did not match.")
     else:
         st.info("Mira Studio access is not configured yet. Set OWNER_DASHBOARD_PASSWORD in Streamlit secrets before signing in.")
+    with st.form("peer_dashboard_sign_in"):
+        st.markdown("**Peer manager sign-in**")
+        peer_email = st.text_input("Work email", key="peer_login_email")
+        peer_code = st.text_input("Individual access code", type="password", key="peer_login_code")
+        peer_submitted = st.form_submit_button("Sign in as manager", use_container_width=True)
+    if peer_submitted:
+        try:
+            peer = verify_manager(peer_email, peer_code)
+        except Exception:
+            logging.exception("Could not verify Mira Studio peer")
+            peer = None
+            st.error("Mira Studio access could not be checked. Please try again.")
+        if peer:
+            st.session_state.owner_dashboard_authenticated = True
+            st.session_state.owner_dashboard_login_open = False
+            st.session_state.mira_studio_role = peer["role"]
+            st.session_state.mira_studio_identity = peer["display_name"]
+            st.rerun()
+        elif not st.session_state.owner_dashboard_authenticated:
+            st.error("That email and access code did not match an active manager.")
 
 
 with st.sidebar:
@@ -1408,6 +1443,49 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
     if st.button("Refresh dashboard", key="refresh_owner_overview"):
         cached_inquiries.clear()
         st.rerun()
+    if st.session_state.get("mira_studio_role") == "Owner":
+        with st.expander("Mira Studio peer access", expanded=False):
+            st.caption("Create individual manager access for a colleague. Codes are stored only as secure hashes. Share the generated code privately; it cannot be displayed again.")
+            generated_code = st.session_state.setdefault("new_peer_access_code", generate_access_code())
+            with st.form("mira_studio_peer_form"):
+                peer_name = st.text_input("Peer name")
+                peer_email = st.text_input("Peer email")
+                peer_access_code = st.text_input("Temporary access code", value=generated_code)
+                create_peer = st.form_submit_button("Create or reset manager access")
+            if create_peer:
+                try:
+                    account = save_manager(peer_email, peer_name, peer_access_code)
+                except ValueError as error:
+                    st.error(str(error))
+                except Exception:
+                    logging.exception("Could not save Mira Studio peer")
+                    st.error("Peer access could not be saved. Please try again.")
+                else:
+                    st.session_state["new_peer_access_code"] = generate_access_code()
+                    st.success(f"Manager access saved for {account['display_name']}. Copy and share the displayed code now; it will not be recoverable after this page refresh.")
+                    st.code(peer_access_code)
+            try:
+                managers = list_managers()
+            except Exception:
+                logging.exception("Could not load Mira Studio peers")
+                st.error("Peer accounts could not be loaded.")
+                managers = []
+            if managers:
+                st.dataframe(pd.DataFrame(managers), hide_index=True, use_container_width=True)
+                selected_peer = st.selectbox("Manager account", [row["Email"] for row in managers])
+                selected_record = next(row for row in managers if row["Email"] == selected_peer)
+                desired_active = not bool(selected_record["Active"])
+                if st.button(("Restore" if desired_active else "Revoke") + " manager access", key="toggle_peer_access"):
+                    try:
+                        set_manager_active(selected_peer, desired_active)
+                    except Exception:
+                        logging.exception("Could not update Mira Studio peer")
+                        st.error("Peer access could not be updated.")
+                    else:
+                        st.success("Manager access restored." if desired_active else "Manager access revoked.")
+                        st.rerun()
+            else:
+                st.info("No peer managers have been added yet.")
     overview_slot = st.container()
     with st.expander("Mira Studio health and readiness", expanded=False):
         health_cols = st.columns(3)

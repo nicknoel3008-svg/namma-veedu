@@ -56,6 +56,16 @@ class OwnerAnalyticsTests(unittest.TestCase):
         self.assertTrue(any(b.label == "Save Learning Library" for b in app.button))
         self.assertTrue(any(b.label == "Save outcome updates" for b in app.button))
         self.assertTrue(any(d.label == "Download four connected record views (.xlsx)" for d in app.get("download_button")))
+        selector = next(m for m in app.multiselect if m.label == "KPIs to display")
+        self.assertEqual(len(selector.options), 14)
+        selector.set_value(["Mira conversations", "Mira replies"]).run()
+        self.assertFalse(app.exception)
+        self.assertEqual(next(m.value for m in app.metric if m.label == "Mira conversations"), "1")
+        self.assertFalse(any(m.label == "Website sessions" for m in app.metric))
+        self.assertEqual([t.label for t in app.tabs], ["Inquiries", "Mira responses & actions", "Feedback", "Learning library"])
+        next(m for m in app.multiselect if m.label == "KPIs to display").set_value([]).run()
+        self.assertFalse(app.exception)
+        self.assertTrue(any("Choose at least one KPI" in item.value for item in app.info))
 
     def test_feedback_draft_is_visible_on_first_render_without_approval(self):
         from streamlit.testing.v1 import AppTest

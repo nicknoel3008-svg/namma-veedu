@@ -1,5 +1,5 @@
 /* Architectural Wash is customer-only; owner surfaces keep Navy & Gold. */
-.stApp:not(:has(.owner-dashboard-hero)) {background:#F3F2EF!important;background-image:linear-gradient(rgba(255,255,255,.93),rgba(255,255,255,.93)),url('__ARCHITECTURE_IMAGE__')!important;background-size:cover!important;background-position:center!important;background-attachment:fixed!important}
+.stApp:not(:has(.owner-dashboard-hero)) {background:#F7FAF8!important;background-image:linear-gradient(rgba(247,250,248,.65),rgba(247,250,248,.65)),url('__BRAND_WATERMARK__'),linear-gradient(135deg,#F7FAF8 0%,#EAF4F1 62%,#F8F1E9 100%)!important;background-size:cover,min(760px,75vw) auto,cover!important;background-position:center,right 5vw bottom 3vh,center!important;background-repeat:no-repeat!important;background-attachment:fixed!important}
 .stApp:not(:has(.owner-dashboard-hero)) [data-testid="stAppViewContainer"],
 .stApp:not(:has(.owner-dashboard-hero)) [data-testid="stMain"],
 .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container {background:transparent!important;background-image:none!important}
