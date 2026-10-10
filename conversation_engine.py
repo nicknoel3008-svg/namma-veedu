@@ -206,6 +206,16 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
         memory["auction_offer_pending"] = True
         memory["auction_offer_asked"] = True
         return answer("auction_explanation", "Auction properties are offered through a bidding process, often by a bank recovering a loan. The notice sets the reserve price, deposit, deadline and inspection terms. Would you like me to include auction listings alongside ordinary sales in your area?", "ஏலச் சொத்துகள் போட்டி ஏல முறையில் விற்கப்படுகின்றன. அறிவிப்பில் ஆரம்ப விலை, முன்பணம், கடைசி நாள் மற்றும் ஆய்வு விதிகள் இருக்கும். உங்கள் பகுதியில் விற்பனைச் சொத்துகளுடன் ஏலங்களையும் சேர்க்கவா?", "Auction properties bidding moolama sell pannuvaanga. Reserve price, deposit, deadline notice-la irukkum. Sales-oda auctions-um include pannalama?")
+    if (re.search(r"commute|travel time", query)
+            and re.search(r"space|parents|larger|bigger", query)
+            and re.search(r"balance|trade.off|prioriti[sz]e|choose between", query)
+            and not re.search(r"\b(show|find|search|list)\b", query)):
+        return answer(
+            "commute_space_tradeoff",
+            "Compare door-to-door travel at your usual commute time with usable room space and access for your parents, keeping your existing budget and bedroom preferences. Saved records do not verify commute times, and shared amenities can add charges, so confirm these details with the source. What is the longest one-way commute you would be comfortable with?",
+            "உங்கள் பட்ஜெட் மற்றும் படுக்கையறை விருப்பங்களை வைத்துக்கொண்டு, வழக்கமான நேரத்தில் பயண நேரத்தையும் பெற்றோருக்கான அறை இடவசதி மற்றும் அணுகலையும் ஒப்பிடுங்கள். பதிவுகள் பயண நேரத்தை உறுதிப்படுத்தவில்லை; பொதுவசதிகளுக்கு கூடுதல் கட்டணம் இருக்கலாம் என்பதால் ஆதாரத்திடம் சரிபார்க்கவும். ஒருவழிப் பயணத்திற்கு அதிகபட்சம் எவ்வளவு நேரம் வசதியாக இருக்கும்?",
+            "Unga budget, bedroom preferences same-a vechuttu, usual travel time-um parents-ku room space/access-um compare pannalaam. Records commute time confirm pannala; shared amenities extra charges add pannalaam, source-kitta verify pannunga. One-way commute maximum evlo neram comfortable?",
+        )
     loan_options = bool(re.search(r"loan|கடன்", query) and re.search(r"options?|optionm|exceed|remaining|this property|with me|அதிக|மீத", query))
     if selected and memory.get("available_funds") is not None and re.search(r"already (?:gave|shared|told)|already.*prefer", query):
         loan_options = True

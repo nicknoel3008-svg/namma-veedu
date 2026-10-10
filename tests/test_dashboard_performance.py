@@ -13,6 +13,19 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class DashboardPerformanceTests(unittest.TestCase):
+    def test_mira_rating_uses_latest_per_conversation_and_excludes_invalid(self):
+        app = AppTest.from_file(str(ROOT / "tests" / "owner_dashboard_sandbox.py"), default_timeout=60).run()
+        app.session_state["qa_inquiry_rows"] = [
+            {"Conversation ID": "a", "Mira performance rating (1-5)": 1},
+            {"Conversation ID": "a", "Mira performance rating (1-5)": 5},
+            {"Conversation ID": "b", "Mira performance rating (1-5)": 3},
+            {"Conversation ID": "invalid", "Mira performance rating (1-5)": 9},
+            {"Conversation ID": "unrated", "User satisfaction rating (1-5)": 1},
+        ]
+        app.run()
+        self.assertFalse(app.exception)
+        self.assertEqual(next(item.value for item in app.metric if item.label == "Mira rating"), "4.0 / 5")
+
     def test_saved_mira_followup_counts_once_in_dashboard(self):
         app = AppTest.from_file(str(ROOT / "tests" / "owner_dashboard_sandbox.py"), default_timeout=60).run()
         today = datetime.now().strftime("%Y-%m-%d")
@@ -20,7 +33,8 @@ class DashboardPerformanceTests(unittest.TestCase):
             {"Inquiry ID": f"test-{i}", "Conversation ID": "qa-followup", "User ID": "qa-user",
              "Timestamp (Asia/Kolkata)": today + "T10:00:00+05:30", "Follow-up method": "In-app reminder",
              "Follow-up schedule status": "Scheduled", "Follow-up summary": "Check parking",
-             "Customer interest (owner)": "Interested", "Matching records": 3, "User satisfaction rating (1-5)": 4,
+             "Customer interest (owner)": "Interested", "Matching records": 3, "User satisfaction rating (1-5)": 2,
+             "Mira performance rating (1-5)": 4,
              "Next follow-up time (Asia/Kolkata)": today + "T18:00:00+05:30"} for i in range(2)]
         app.run()
         self.assertFalse(app.exception)
@@ -28,7 +42,8 @@ class DashboardPerformanceTests(unittest.TestCase):
         self.assertEqual(next(item.value for item in app.metric if item.label == "Conversations"), "1")
         self.assertEqual(next(item.value for item in app.metric if item.label == "Confirmed interested leads"), "1")
         self.assertEqual(next(item.value for item in app.metric if item.label == "Search match rate"), "100%")
-        self.assertEqual(next(item.value for item in app.metric if item.label == "Average satisfaction"), "4.0 / 5")
+        self.assertEqual(next(item.value for item in app.metric if item.label == "Mira rating"), "4.0 / 5")
+        self.assertTrue(any("Customer satisfaction: 2.0 / 5" in item.value for item in app.caption))
         self.assertEqual(next(item.value for item in app.selectbox if item.label == "Automatic snapshot date"), today)
 
     def test_owner_dashboard_flowchart_and_empty_counts(self):
@@ -43,7 +58,7 @@ class DashboardPerformanceTests(unittest.TestCase):
         self.assertEqual(next(item.value for item in app.metric if item.label == "Feedback received"), "0")
         self.assertEqual(next(item.value for item in app.metric if item.label == "Follow-ups completed"), "0")
         self.assertEqual(next(item.value for item in app.metric if item.label == "Search match rate"), "No searches")
-        self.assertEqual(next(item.value for item in app.metric if item.label == "Average satisfaction"), "Not rated")
+        self.assertEqual(next(item.value for item in app.metric if item.label == "Mira rating"), "Not rated")
         self.assertFalse(any(item.label in {"Budget mentions", "Purchase values stated", "Saved follow-ups"} for item in app.metric))
         self.assertEqual(next(item.value for item in app.metric if item.label == "Conversations"), "0")
         self.assertFalse(app.error)

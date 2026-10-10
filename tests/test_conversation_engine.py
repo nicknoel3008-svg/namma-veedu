@@ -9,6 +9,20 @@ from buyer_memory import prepare_inventory
 
 
 class ConversationEngineTests(unittest.TestCase):
+    def test_commute_space_advice_preserves_preferences_and_evidence_limits(self):
+        context = {"location": "Chennai", "bedrooms": 3, "max_budget": 6000000, "property_type": "Flat"}
+        turn = conversational_turn(
+            "How should I balance a shorter commute with extra living space for my parents?",
+            self.data, [], context=context,
+        )
+        self.assertEqual(turn["intent"], "commute_space_tradeoff")
+        self.assertEqual(turn["context"], context)
+        self.assertIn("do not verify commute", turn["reply"])
+        self.assertIn("add charges", turn["reply"])
+        self.assertNotIn("15", turn["reply"])
+        self.assertFalse(turn.get("search"))
+        self.assertEqual(turn["reply"].count("?"), 1)
+
     @classmethod
     def setUpClass(cls):
         cls.data = load_properties()

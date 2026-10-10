@@ -1462,9 +1462,13 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
     blueprint_path = ROOT / "WEBSITE_BLUEPRINT.md"
     with st.expander("Website Blueprint", expanded=False):
         st.caption("Private product and engineering map. It contains no passwords, API keys, or customer conversation text.")
-        st.image(str(ROOT / "static" / "mira-blueprint-flowchart.svg"), caption="Mira blueprint: intent, preferences, safe tools, validated responses and private owner reports", use_container_width=True)
+        flowchart_path = ROOT / "static" / "mira-blueprint-flowchart.svg"
+        st.image(str(flowchart_path), caption="Namma Veedu: idea → implementation → customer options → results → shared owner review → approved Mira learning", use_container_width=True)
+        st.download_button("Download flowchart", data=flowchart_path.read_bytes(), file_name="namma_veedu_complete_blueprint.svg", mime="image/svg+xml", key="download_blueprint_flowchart")
         if blueprint_path.exists():
             blueprint_text = blueprint_path.read_text(encoding="utf-8")
+            with st.expander("Read the complete blueprint", expanded=False):
+                st.markdown(blueprint_text)
             st.download_button("Download blueprint", data=blueprint_text, file_name="namma_veedu_website_blueprint.md", mime="text/markdown", key="download_website_blueprint")
         else:
             st.info("The blueprint file is not available in this deployment yet.")
@@ -1614,7 +1618,7 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
             pd.to_numeric(summary.get("Mira performance rating (1-5)"), errors="coerce")
             for summary in rating_summary
         ]
-        ratings = [float(rating) for rating in ratings if pd.notna(rating)]
+        ratings = [float(rating) for rating in ratings if pd.notna(rating) and 1 <= rating <= 5]
         kpi_cols = st.columns(4)
         kpi_cols[0].metric("Conversations", f"{len(conversations):,}")
         kpi_cols[1].metric("Unique user sessions", f"{len(unique_users):,}")
@@ -1632,7 +1636,9 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
         analysis_cols[0].metric("Confirmed interested leads", f"{interested_conversations:,}", help="Conversations marked Interested by the owner, counted once per conversation.")
         analysis_cols[1].metric("Search match rate", f"{len(matched_conversations) / len(search_conversations):.0%}" if search_conversations else "No searches", help="Share of conversations with recorded search results that found at least one match. A match does not confirm availability or a sale.")
         analysis_cols[2].metric("Follow-ups completed", f"{followups_completed:,}", help="Conversations with a completed schedule or owner-marked completion, counted once per conversation.")
-        analysis_cols[3].metric("Average satisfaction", f"{sum(satisfaction_ratings) / len(satisfaction_ratings):.1f} / 5" if satisfaction_ratings else "Not rated", help=f"Latest customer satisfaction rating per conversation; {len(satisfaction_ratings)} rated conversations in this date range.")
+        analysis_cols[3].metric("Mira rating", f"{sum(ratings) / len(ratings):.1f} / 5" if ratings else "Not rated", help=f"Latest customer rating of Mira's performance per conversation, out of five; {len(ratings)} rated conversations in this date range. Unrated conversations are excluded.")
+        if satisfaction_ratings:
+            st.caption(f"Customer satisfaction: {sum(satisfaction_ratings) / len(satisfaction_ratings):.1f} / 5 from {len(satisfaction_ratings)} rated conversations. Mira rating uses the separate performance-rating field.")
         st.caption("KPIs use the selected date range. Follow-ups are counted once per conversation; user sessions identify browsers, not verified people. Detailed outcomes and ratings remain in the tables and exports.")
 
         if filtered_rows:
