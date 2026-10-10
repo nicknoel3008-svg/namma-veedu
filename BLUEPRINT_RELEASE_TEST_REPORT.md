@@ -2,6 +2,8 @@
 
 Date: 10 October 2026 (India time)
 
+Release: implementation commit `600642c` pushed to GitHub main. Public Streamlit startup and authenticated Mira Studio were verified after deployment: the new flowchart/download controls and Mira rating KPI are present, PostgreSQL storage is active, and the automatic snapshot date is 2026-10-10. Public browser verification was read-only; performance numbers below come from local tests.
+
 ## Changes
 
 - Expanded the private Studio blueprint into a connected flowchart covering the original idea, implementation, customer options, results, shared storage, owner review, approval-controlled learning and release validation. The complete written blueprint and SVG are downloadable in Studio.
