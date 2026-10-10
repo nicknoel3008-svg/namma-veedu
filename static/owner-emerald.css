@@ -1,0 +1,40 @@
+/* Mira Studio: matching Emerald & Coral palette with high contrast. */
+.stApp:has(.owner-dashboard-hero),
+.stApp:has(.owner-dashboard-hero) [data-testid="stMain"],
+.stApp:has(.owner-dashboard-hero) .block-container {background:#F3F8F5!important;background-image:none!important;color:#18332C!important}
+.stApp:has(.owner-dashboard-hero) [data-testid="stHeader"] {background:rgba(243,248,245,.96)!important}
+.stApp:has(.owner-dashboard-hero) [data-testid="stSidebar"],
+.stApp:has(.owner-dashboard-hero) [data-testid="stSidebar"]>div,
+.stApp:has(.owner-dashboard-hero) [data-testid="stSidebarContent"] {background:#FFFFFF!important;border-color:#CFE4DB!important}
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container :is(h1,h2,h3,h4,h5,h6,p,li,label,summary,small,a,span),
+.stApp:has(.owner-dashboard-hero) section[data-testid="stSidebar"] :is(h1,h2,h3,h4,h5,h6,p,li,label,summary,small,a,span),
+.stApp:has(.owner-dashboard-hero) [data-testid="stMetricLabel"] *,
+.stApp:has(.owner-dashboard-hero) [data-testid="stMetricValue"] * {color:#18332C!important;-webkit-text-fill-color:#18332C!important;text-shadow:none!important;opacity:1!important}
+.stApp:has(.owner-dashboard-hero) [data-testid="stCaptionContainer"],
+.stApp:has(.owner-dashboard-hero) [data-testid="stCaptionContainer"] * {color:#4F675F!important;-webkit-text-fill-color:#4F675F!important;opacity:1!important}
+.stApp:has(.owner-dashboard-hero) .owner-dashboard-hero {
+  background:linear-gradient(115deg,#147D64,#20A486)!important;border:0!important;border-radius:16px!important;padding:20px 22px!important;box-shadow:0 14px 32px rgba(20,125,100,.15)!important
+}
+.stApp:has(.owner-dashboard-hero) .owner-dashboard-hero :is(.eyebrow,h2,p,span) {color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important}
+.stApp:has(.owner-dashboard-hero) [data-testid="stMetric"],
+.stApp:has(.owner-dashboard-hero) [data-testid="stVerticalBlockBorderWrapper"],
+.stApp:has(.owner-dashboard-hero) [data-testid="stForm"] {background:#FFFFFF!important;border-color:#CFE4DB!important;box-shadow:0 7px 20px rgba(20,125,100,.07)!important}
+.stApp:has(.owner-dashboard-hero) [data-testid="stMetric"] {border-top:4px solid #20A486!important}
+.stApp:has(.owner-dashboard-hero) [data-testid="stHorizontalBlock"] > div:nth-child(even) [data-testid="stMetric"] {border-top-color:#F06F55!important}
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container button[kind],
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container [data-testid="stDownloadButton"] button {background:#147D64!important;border-color:#147D64!important;color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important}
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container button[kind] :is(p,span),
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container [data-testid="stDownloadButton"] button :is(p,span) {color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important}
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container button[kind]:hover {background:#0F6B55!important;border-color:#0F6B55!important}
+.stApp:has(.owner-dashboard-hero) [data-baseweb="tab-highlight"] {background:#F06F55!important}
+.stApp:has(.owner-dashboard-hero) button[role="tab"],
+.stApp:has(.owner-dashboard-hero) button[role="tab"] :is(p,span) {color:#4F675F!important;-webkit-text-fill-color:#4F675F!important}
+.stApp:has(.owner-dashboard-hero) button[role="tab"][aria-selected="true"],
+.stApp:has(.owner-dashboard-hero) button[role="tab"][aria-selected="true"] :is(p,span) {color:#147D64!important;-webkit-text-fill-color:#147D64!important}
+.stApp:has(.owner-dashboard-hero) :is(input,textarea,[role="combobox"]),
+.stApp:has(.owner-dashboard-hero) [data-baseweb="select"]>div {background:#FFFFFF!important;color:#18332C!important;-webkit-text-fill-color:#18332C!important;border-color:#9FCBBE!important}
+.stApp:has(.owner-dashboard-hero) :is(input,textarea)::placeholder {color:#657970!important;-webkit-text-fill-color:#657970!important;opacity:1!important}
+.stApp:has(.owner-dashboard-hero) [data-testid="stMultiSelectTagsContainer"] [data-tag],
+.stApp:has(.owner-dashboard-hero) [data-testid="stMultiSelectTagsContainer"] [data-tag] * {background:#147D64!important;color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important}
+.stApp:has(.owner-dashboard-hero) [data-testid="stDataFrame"] {background:#FFFFFF!important;border:1px solid #CFE4DB!important;border-radius:12px!important}
+

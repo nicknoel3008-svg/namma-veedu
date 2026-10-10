@@ -1,0 +1,165 @@
+/* Customer experience: Emerald & Coral. Loaded last to keep all text legible. */
+.stApp:not(:has(.owner-dashboard-hero)) {
+  --brand-primary:#147D64;
+  --brand-secondary:#20A486;
+  --brand-accent:#F06F55;
+  --brand-background:#FAFCF8;
+  --brand-soft:#E2F4ED;
+  --brand-ink:#18332C;
+  --brand-muted:#4F675F;
+  background:var(--brand-background)!important;
+  background-image:url('__BRAND_WATERMARK__')!important;
+  background-size:min(680px,55vw) auto!important;
+  background-position:right 3vw bottom 2vh!important;
+  background-repeat:no-repeat!important;
+  background-attachment:fixed!important;
+  color:var(--brand-ink)!important;
+}
+.stApp:not(:has(.owner-dashboard-hero)) [data-testid="stHeader"] {background:rgba(250,252,248,.96)!important}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container {
+  background:rgba(250,252,248,.94)!important;
+  color:var(--brand-ink)!important;
+  border:1px solid rgba(20,125,100,.12)!important;
+  box-shadow:0 16px 40px rgba(24,51,44,.08)!important;
+}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container :is(h1,h2,h3,h4,h5,h6,p,li,label,summary,small,a,span),
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container [data-testid="stMarkdownContainer"] :is(p,li),
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container [data-testid="stCaptionContainer"] * {
+  color:var(--brand-ink)!important;
+  -webkit-text-fill-color:var(--brand-ink)!important;
+  text-shadow:none!important;
+  opacity:1!important;
+}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container [data-testid="stCaptionContainer"] * {color:var(--brand-muted)!important;-webkit-text-fill-color:var(--brand-muted)!important}
+.stApp:not(:has(.owner-dashboard-hero)) .hero {
+  background-image:linear-gradient(112deg,rgba(12,102,80,.96) 0%,rgba(20,125,100,.91) 45%,rgba(32,164,134,.70) 100%),url('__HERO_IMAGE__')!important;
+  border:1px solid rgba(255,255,255,.76)!important;
+  box-shadow:0 18px 38px rgba(20,125,100,.18)!important;
+}
+.stApp:not(:has(.owner-dashboard-hero)) .hero-brand {
+  padding:8px 12px!important;border-radius:13px!important;background:rgba(9,78,62,.72)!important;
+  box-shadow:0 6px 18px rgba(8,53,43,.18)!important
+}
+.stApp:not(:has(.owner-dashboard-hero)) .hero-brand img {width:min(340px,55vw)!important;filter:drop-shadow(0 2px 5px rgba(5,42,33,.35))!important}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .hero :is(h1,h2,h3,h4,p,span,em),
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .hero-panel :is(h1,h2,h3,h4,p,span) {
+  color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important;text-shadow:none!important
+}
+.stApp:not(:has(.owner-dashboard-hero)) .hero h1 em {color:#FFE1D9!important;-webkit-text-fill-color:#FFE1D9!important}
+.stApp:not(:has(.owner-dashboard-hero)) .hero-panel {background:rgba(8,82,64,.70)!important;border-color:rgba(255,255,255,.58)!important;border-top-color:var(--brand-accent)!important}
+.stApp:not(:has(.owner-dashboard-hero)) .hero-cta,
+.stApp:not(:has(.owner-dashboard-hero)) [data-testid="stButton"] button,
+.stApp:not(:has(.owner-dashboard-hero)) [data-testid="stDownloadButton"] button {
+  background:var(--brand-accent)!important;border-color:var(--brand-accent)!important;color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important
+}
+.stApp:not(:has(.owner-dashboard-hero)) [data-testid="stButton"] button :is(p,span),
+.stApp:not(:has(.owner-dashboard-hero)) [data-testid="stDownloadButton"] button :is(p,span) {color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important}
+.stApp:not(:has(.owner-dashboard-hero)) [data-testid="stButton"] button:hover {background:#D95C46!important;border-color:#D95C46!important}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"],
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"]>div,
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {background:#FFFFFF!important;color:var(--brand-ink)!important}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] .st-key-filter-panel-scroll {
+  background:#FFFFFF!important;border:1px solid #CFE4DB!important;box-shadow:0 10px 26px rgba(20,125,100,.08)!important
+}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] :is(h1,h2,h3,h4,p,label,span,small),
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] * {
+  color:var(--brand-ink)!important;-webkit-text-fill-color:var(--brand-ink)!important;text-shadow:none!important;opacity:1!important
+}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] * {color:var(--brand-muted)!important;-webkit-text-fill-color:var(--brand-muted)!important}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] :is(input,textarea,[role="combobox"]),
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] [data-baseweb="select"]>div,
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] :is(input,textarea,[role="combobox"]),
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] [data-baseweb="select"]>div {
+  background:#FFFFFF!important;color:var(--brand-ink)!important;-webkit-text-fill-color:var(--brand-ink)!important;border-color:#9FCBBE!important
+}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] input::placeholder,
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] input::placeholder,
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] textarea::placeholder {color:#61766F!important;-webkit-text-fill-color:#61766F!important;opacity:1!important}
+.stApp:not(:has(.owner-dashboard-hero)) .language-heading {background:var(--brand-soft)!important;border-color:#B9DCCF!important}
+.stApp:not(:has(.owner-dashboard-hero)) .filter-heading {border-color:var(--brand-primary)!important}
+.stApp:not(:has(.owner-dashboard-hero)) .st-key-results-content-wash-active,
+.stApp:not(:has(.owner-dashboard-hero)) .st-key-info-panel-content,
+.stApp:not(:has(.owner-dashboard-hero)) .start-option-help {
+  background:#FFFFFF!important;border:1px solid #CFE4DB!important;color:var(--brand-ink)!important;box-shadow:0 10px 25px rgba(20,125,100,.08)!important
+}
+.stApp:not(:has(.owner-dashboard-hero)) .st-key-mira-content-wash {
+  background:var(--brand-soft)!important;border:1px solid #B7DCCE!important;box-shadow:0 14px 32px rgba(20,125,100,.12)!important
+}
+.stApp:not(:has(.owner-dashboard-hero)) .st-key-mira-content-wash :is(h1,h2,h3,h4,p,li,label,span,small) {
+  color:var(--brand-ink)!important;-webkit-text-fill-color:var(--brand-ink)!important;text-shadow:none!important
+}
+.stApp:not(:has(.owner-dashboard-hero)) .st-key-mira-content-wash [data-testid="stChatMessage"] {
+  background:#FFFFFF!important;border:1px solid #C7DED6!important;color:#172B25!important;box-shadow:0 4px 12px rgba(20,125,100,.08)!important
+}
+.stApp:not(:has(.owner-dashboard-hero)) .st-key-mira-content-wash [data-testid="stChatMessage"]:has([aria-label="Chat message from user"]) {
+  background:#D9F3E9!important;border-color:#93CDBB!important
+}
+.stApp:not(:has(.owner-dashboard-hero)) .st-key-mira-content-wash [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"],
+.stApp:not(:has(.owner-dashboard-hero)) .st-key-mira-content-wash [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] :is(p,li,strong,em,a),
+.stApp:not(:has(.owner-dashboard-hero)) .st-key-mira-content-wash [data-testid="stChatMessage"] [data-testid="stCaptionContainer"] * {
+  color:#172B25!important;-webkit-text-fill-color:#172B25!important;text-shadow:none!important;opacity:1!important
+}
+.stApp:not(:has(.owner-dashboard-hero)) [data-testid="stMetric"] {background:#FFFFFF!important;border:1px solid #CFE4DB!important;border-top:3px solid var(--brand-secondary)!important}
+.stApp:not(:has(.owner-dashboard-hero)) [data-testid="stMetricValue"] {color:var(--brand-primary)!important;-webkit-text-fill-color:var(--brand-primary)!important}
+.stApp:not(:has(.owner-dashboard-hero)) [data-testid="stTabs"] button {color:var(--brand-muted)!important;-webkit-text-fill-color:var(--brand-muted)!important}
+.stApp:not(:has(.owner-dashboard-hero)) [data-testid="stTabs"] button[aria-selected="true"] {color:var(--brand-primary)!important;-webkit-text-fill-color:var(--brand-primary)!important;border-bottom-color:var(--brand-accent)!important}
+
+/* Final consistency layer: supersede legacy customer rules with one palette. */
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .hero .hero-main h1,
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .hero .hero-main h1 em,
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .hero .hero-main p,
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .hero .eyebrow,
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .hero .hero-pill {
+  color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important;opacity:1!important;text-shadow:none!important
+}
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .hero .hero-main h1 em {color:#FFE1D9!important;-webkit-text-fill-color:#FFE1D9!important}
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container [data-testid="stButton"]>button,
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container [data-testid="stDownloadButton"]>button {
+  background:#F06F55!important;border-color:#F06F55!important;color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important
+}
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container [data-testid="stButton"]>button :is(p,span,div),
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container [data-testid="stDownloadButton"]>button :is(p,span,div) {
+  color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important;opacity:1!important
+}
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .explore-heading,
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .explore-heading * {color:#18332C!important;-webkit-text-fill-color:#18332C!important}
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container [data-testid="stCaptionContainer"],
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container [data-testid="stCaptionContainer"] * {color:#4F675F!important;-webkit-text-fill-color:#4F675F!important;opacity:1!important}
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] .language-heading,
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] .filter-heading,
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] {
+  background:#FFFFFF!important;border-color:#B7DCCE!important;color:#18332C!important;box-shadow:none!important
+}
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] [data-testid="stCheckbox"] label:has(input:checked)>div:first-of-type,
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked)>div:first-of-type {background:#147D64!important;border-color:#147D64!important}
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] [data-testid="stNumberInput"] button {background:#147D64!important;border-color:#147D64!important;color:#FFFFFF!important}
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .st-key-mira-content-wash [data-testid="stChatMessage"],
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .st-key-mira-content-wash [data-testid="stChatMessage"] * {
+  color:#172B25!important;-webkit-text-fill-color:#172B25!important;text-shadow:none!important;opacity:1!important
+}
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .st-key-mira-content-wash [data-testid="stChatMessage"] {background:#FFFFFF!important;border-color:#B7DCCE!important}
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .st-key-mira-content-wash [data-testid="stChatMessage"]:has([aria-label="Chat message from user"]) {background:#D9F3E9!important;border-color:#84C5B1!important}
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .hero {
+  height:190px!important;min-height:190px!important;justify-content:flex-start!important;padding:14px 20px!important
+}
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .hero .hero-main {
+  margin:62px 0 0!important;max-width:78%!important;position:relative!important;z-index:2!important
+}
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .hero .hero-main h1 {
+  color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important;font-size:clamp(24px,3vw,34px)!important;line-height:1.08!important
+}
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container [data-testid="stCaptionContainer"],
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container [data-testid="stCaptionContainer"] p,
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container [data-testid="stCaptionContainer"] span {
+  color:#405C53!important;-webkit-text-fill-color:#405C53!important;opacity:1!important;filter:none!important
+}
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .stCaption,
+body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .stCaption * {
+  color:#405C53!important;-webkit-text-fill-color:#405C53!important;opacity:1!important;filter:none!important
+}
+@media(max-width:700px){
+  body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .hero {height:170px!important;min-height:170px!important}
+  body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .hero .hero-main {margin-top:58px!important;max-width:100%!important}
+  body .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .hero .hero-main h1 {font-size:23px!important}
+}
+
