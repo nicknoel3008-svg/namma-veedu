@@ -1,16 +1,22 @@
-/* Architectural Wash is customer-only; owner surfaces keep Navy & Gold. */
-.stApp:not(:has(.owner-dashboard-hero)) {background:#F7FAF8!important;background-image:linear-gradient(rgba(247,250,248,.65),rgba(247,250,248,.65)),url('__BRAND_WATERMARK__'),linear-gradient(135deg,#F7FAF8 0%,#EAF4F1 62%,#F8F1E9 100%)!important;background-size:cover,min(760px,75vw) auto,cover!important;background-position:center,right 5vw bottom 3vh,center!important;background-repeat:no-repeat!important;background-attachment:fixed!important}
+/* Customer-only dark architectural canvas. Mira Studio is themed separately. */
+.stApp:not(:has(.owner-dashboard-hero)) {background:#14242C!important;background-image:linear-gradient(135deg,rgba(10,25,32,.82) 0%,rgba(20,36,44,.70) 58%,rgba(35,49,55,.76) 100%),url('__BRAND_WATERMARK__')!important;background-size:cover,min(920px,78vw) auto!important;background-position:center,right 4vw bottom 2vh!important;background-repeat:no-repeat!important;background-attachment:fixed!important}
 .stApp:not(:has(.owner-dashboard-hero)) [data-testid="stAppViewContainer"],
 .stApp:not(:has(.owner-dashboard-hero)) [data-testid="stMain"],
 .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container {background:transparent!important;background-image:none!important}
-.stApp:not(:has(.owner-dashboard-hero)) [data-testid="stHeader"] {background:rgba(250,249,246,.94)!important}
+.stApp:not(:has(.owner-dashboard-hero)) [data-testid="stHeader"] {background:rgba(20,36,44,.94)!important}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container :is(h1,h2,h3,h4,p,label,span,small) {color:#F4F1EA!important;-webkit-text-fill-color:#F4F1EA!important}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container > [data-testid="stVerticalBlock"] > :is(div,section) :is(h1,h2,h3,h4) {color:#F4F1EA!important;-webkit-text-fill-color:#F4F1EA!important}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container > [data-testid="stVerticalBlock"] > :is(div,section) [data-testid="stCaptionContainer"] * {color:#DCE5E3!important;-webkit-text-fill-color:#DCE5E3!important}
 .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"],
 .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"]>div,
 .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {background:rgba(250,249,246,.97)!important}
 .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container :is(.st-key-mira-content-wash,.st-key-results-content-wash-active,.st-key-info-panel-content,[data-testid="stVerticalBlockBorderWrapper"],[data-testid="stForm"],[data-testid="stMetric"],.start-option-help),
-.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] div[data-testid="stColumn"]:has(.st-key-mira-content-wash) {background:#FFFFFF!important;border-color:#D8D9D7!important}
-.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .st-key-mira-content-wash [data-testid="stChatMessage"] {background:#F2F1EC!important}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] div[data-testid="stColumn"]:has(.st-key-mira-content-wash) {background:#FAF9F6!important;border-color:#AAB8BA!important;color:#18334D!important}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container :is(.st-key-mira-content-wash,.st-key-results-content-wash-active,.st-key-info-panel-content,[data-testid="stVerticalBlockBorderWrapper"],[data-testid="stForm"],[data-testid="stMetric"],.start-option-help) :is(h1,h2,h3,h4,p,li,label,span,small) {color:#18334D!important;-webkit-text-fill-color:#18334D!important}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .hero :is(h1,h2,h3,h4,p,span) {color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .explore-heading {color:#F4F1EA!important;-webkit-text-fill-color:#F4F1EA!important}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .st-key-mira-content-wash [data-testid="stChatMessage"] {background:#F0F2EF!important}
 .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] .st-key-filter-panel-scroll,
 .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"],
 .stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] .language-heading {background:#FFFFFF!important;border-color:#D8D9D7!important}
-.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] .filter-heading {border-color:#B89750!important}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] .filter-heading {border-color:#2E6F95!important}

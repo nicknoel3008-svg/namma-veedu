@@ -96,3 +96,32 @@
 .stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container [data-testid="stMultiSelectTagsContainer"] [data-tag] * {
  color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important;opacity:1!important;text-shadow:none!important;
 }
+
+/* Mira Studio only: Earthy & Sustainable — forest green, stone and taupe. */
+.stApp:has(.owner-dashboard-hero),
+.stApp:has(.owner-dashboard-hero) [data-testid="stMain"],
+.stApp:has(.owner-dashboard-hero) .block-container {background:#E8E7E3!important;background-image:none!important;color:#2C3E2E!important}
+.stApp:has(.owner-dashboard-hero) [data-testid="stSidebar"],
+.stApp:has(.owner-dashboard-hero) [data-testid="stSidebar"]>div,
+.stApp:has(.owner-dashboard-hero) [data-testid="stSidebarContent"] {background:#E8E7E3!important;border-color:#9E8C7C!important}
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container :is(h1,h2,h3,h4,h5,h6,p,li,label,summary,small,a,span),
+.stApp:has(.owner-dashboard-hero) section[data-testid="stSidebar"] :is(h1,h2,h3,h4,h5,h6,p,li,label,summary,a,span),
+.stApp:has(.owner-dashboard-hero) [data-testid="stMetricLabel"] *,
+.stApp:has(.owner-dashboard-hero) [data-testid="stMetricValue"] * {color:#2C3E2E!important;-webkit-text-fill-color:#2C3E2E!important}
+.stApp:has(.owner-dashboard-hero) [data-testid="stCaptionContainer"],
+.stApp:has(.owner-dashboard-hero) [data-testid="stCaptionContainer"] * {color:#41331A!important;-webkit-text-fill-color:#41331A!important}
+.stApp:has(.owner-dashboard-hero) .owner-dashboard-hero {border-bottom-color:#9E8C7C!important}
+.stApp:has(.owner-dashboard-hero) .owner-dashboard-hero .eyebrow,
+.stApp:has(.owner-dashboard-hero) .owner-dashboard-hero h2 {color:#2C3E2E!important;-webkit-text-fill-color:#2C3E2E!important}
+.stApp:has(.owner-dashboard-hero) [data-testid="stMetric"],
+.stApp:has(.owner-dashboard-hero) [data-testid="stVerticalBlockBorderWrapper"],
+.stApp:has(.owner-dashboard-hero) [data-testid="stForm"] {background:#F4F1EA!important;border-color:#C8C1B7!important}
+.stApp:has(.owner-dashboard-hero) [data-testid="stMetric"] {border-top-color:#2C3E2E!important;box-shadow:0 3px 12px #2C3E2E0C!important}
+.stApp:has(.owner-dashboard-hero) [data-testid="stHorizontalBlock"] > div:nth-child(even) [data-testid="stMetric"] {border-top-color:#716341!important}
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container button[kind],
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container [data-testid="stDownloadButton"] button {background:#2C3E2E!important;border-color:#2C3E2E!important;color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important}
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container button[kind] :is(p,span),
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container [data-testid="stDownloadButton"] button :is(p,span) {color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important}
+.stApp:has(.owner-dashboard-hero) [data-baseweb="tab-highlight"] {background:#716341!important}
+.stApp:has(.owner-dashboard-hero) :is(input,textarea,[role="combobox"]),
+.stApp:has(.owner-dashboard-hero) [data-baseweb="select"]>div {background:#F4F1EA!important;color:#2C3E2E!important;-webkit-text-fill-color:#2C3E2E!important;border-color:#9E8C7C!important}

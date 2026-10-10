@@ -4946,7 +4946,12 @@ def render_main_start_choices():
     selected_action = st.session_state.get("main_start_action")
     active_info_panel = st.session_state.active_info_panel
     with control_grid_slot.container(key="explore-controls"):
-        st.markdown("#### 🏡 " + ("எதைப் பார்க்க விரும்புகிறீர்கள்?" if language == "தமிழ்" else "What would you like to explore?"))
+        st.markdown(
+            '<h4 class="explore-heading">🏡 '
+            + ("எதைப் பார்க்க விரும்புகிறீர்கள்?" if language == "தமிழ்" else "What would you like to explore?")
+            + "</h4>",
+            unsafe_allow_html=True,
+        )
         st.caption("ஒரு விருப்பத்தை மீண்டும் தேர்ந்தெடுத்தால் அதன் முடிவு மறையும்." if language == "தமிழ்" else "Select an option to show its result below. Select it again to hide the result.")
         with st.container(key="eight-toggle-grid"):
             grid_columns = [*st.columns(4, gap="small"), *st.columns(4, gap="small")]
