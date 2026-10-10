@@ -233,6 +233,8 @@ FOLLOWUP_EMAIL_CONFIG = {
     )
 }
 FOLLOWUP_EMAIL_READY = email_config_ready(FOLLOWUP_EMAIL_CONFIG)
+from visit_journey_ui import render_visit_response
+render_visit_response()
 FOLLOWUP_WHATSAPP_CONFIG = {key: configured_value(key) for key in WHATSAPP_CONFIG_KEYS}
 FOLLOWUP_WHATSAPP_READY = not whatsapp_config_issues(FOLLOWUP_WHATSAPP_CONFIG)
 
@@ -1484,6 +1486,24 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
                         st.success("Visit decisions saved. Customers can check their request status on this browser.")
                         st.rerun()
                     st.download_button("Download visit requests (.csv)",visit_frame.to_csv(index=False),file_name="namma_veedu_visit_requests.csv",mime="text/csv")
+                    from visit_journey import owner_journeys, set_advisor_status
+                    journey_rows = owner_journeys()
+                    st.markdown("##### Visit responses and advisor requests")
+                    st.caption("Purchase interest reflects engagement only, not a calibrated purchase prediction. Advisor requests require manual contact and recorded consent.")
+                    if journey_rows:
+                        journey_frame = pd.DataFrame(journey_rows)
+                        journey_edited = st.data_editor(journey_frame, key="visit_journey_editor", hide_index=True,
+                            disabled=[column for column in journey_frame.columns if column != "advisor_status"],
+                            column_config={"advisor_status": st.column_config.SelectboxColumn("Advisor status", options=["", "Requested", "Contacting", "Connected", "Closed"])})
+                        if st.button("Save advisor progress", key="save_visit_advisor_progress"):
+                            for original, updated in zip(journey_rows, journey_edited.to_dict("records")):
+                                if original["advisor_status"] != updated["advisor_status"]:
+                                    set_advisor_status(original["visit_id"], updated["advisor_status"])
+                            st.success("Advisor progress saved. No messages sent.")
+                            st.rerun()
+                    else:
+                        st.info("No visit responses yet. The new visit email worker is disabled until approved.")
+
                 else:
                     st.info("No property visit requests yet.")
             except ValueError as error:
@@ -5556,10 +5576,12 @@ def visit_request_dialog():
         contact_method = st.selectbox("Contact for visit confirmation",["Email","WhatsApp"],key="visit_contact_method")
         contact_value = st.text_input("Email address or WhatsApp number with country code",key="visit_contact_value")
         consent = st.checkbox("இந்தப் பார்வைக் கோரிக்கைக்காக என் தொடர்பு விவரங்களை உரிமையாளருடன் பகிர ஒப்புக்கொள்கிறேன்." if language == "தமிழ்" else "I agree to share my contact with the Namma Veedu owner for this property visit request.",key="visit_consent")
+        visit_email_reminders = st.checkbox("Email me a confirmation reminder one hour before my confirmed visit and a feedback request afterward.", key="visit_email_reminders", disabled=contact_method != "Email")
+        st.caption("Visit email automation is not enabled yet. Your consent will be saved; no visit email is currently sent.")
         submit = st.form_submit_button("பார்வைக் கோரிக்கையைச் சேமிக்கவும்" if language == "தமிழ்" else "Request visit")
     if submit:
         try:
-            visit_id = request_visit(record=record,user_id=str(st.session_state.user_id),visit_at=datetime.combine(visit_date,visit_time,tzinfo=INDIA_TZ),slot_kind=slot_kind,customer_name=visit_name,contact_method=contact_method,contact_value=contact_value,consent=consent)
+            visit_id = request_visit(record=record,user_id=str(st.session_state.user_id),visit_at=datetime.combine(visit_date,visit_time,tzinfo=INDIA_TZ),slot_kind=slot_kind,customer_name=visit_name,contact_method=contact_method,contact_value=contact_value,consent=consent,email_reminders=visit_email_reminders)
             st.session_state.visit_saved_notice = f"Visit request {visit_id[:8]} saved — pending owner confirmation."
             dismiss_visit_request()
             st.rerun()

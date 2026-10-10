@@ -56,3 +56,15 @@ Automated tests use temporary SQLite storage and mocked email/Meta transport. Br
 ### Email at chat end
 
 Selecting **End chat** sends the current saved recommendations immediately for active, consented email schedules in that conversation. The immediate email is additional to the selected follow-up count; later messages remain three days apart. A durable queue marker prevents repeated End chat actions from adding duplicate emails. Delivery-off drafts and cancelled requests do not send. Closing a browser tab does not trigger this action. Failed submissions stay queued for the daily worker. Public Streamlit SMTP secrets must be configured as well as local worker secrets.
+
+### Visit journey (local implementation, not activated)
+
+`run_visit_worker.py` is a separate worker. It is disabled unless its environment explicitly sets `VISIT_EMAIL_ENABLED=true`; the existing daily email task does not invoke it. Deployment, enabling the worker and installing a five-minute schedule require owner approval. Do not enable a schedule before changing the booking panel's inactive-service caption. A local schedule requires a running, signed-in computer; use a reliable host for unattended operation.
+
+Only owner-confirmed visits with separate visit-email consent receive messages. Older bookings are not enrolled. The reminder becomes due one hour before the visit and is skipped after the visit time. With a five-minute worker, delivery can be a few minutes later; outages can prevent delivery. A post-visit feedback request becomes due two hours after the scheduled time and expires after one day. It asks whether the customer actually attended; attendance is never assumed. No reply leaves the booking confirmed and marked Awaiting response.
+
+Emails link to a private response page, rather than processing email replies. Opening the link is read-only. The page supports Yes, No with a reason, rescheduling and returning to Mira with permission. Rescheduling checks confirmed slot conflicts, releases the old booking and requests owner confirmation. Old links are invalidated; links expire seven days after the visit. Forwarding a private link permits its holder to respond, so customers should keep it private.
+
+Post-visit feedback collects attendance, preference satisfaction and the requested assistance. Property-agent, loan-advisor or both requests require a description and sharing consent. They enter owner review; this implementation does not contact an advisor automatically. The owner records Contacting, Connected or Closed manually. Existing eight primary KPIs remain unchanged. Purchase interest is a transparent engagement indicator with reasons, not a trained or calibrated purchase probability.
+
+The owner visit panel shows response details, advisor progress, interest evidence and email states. An SMTP failure is held as needs_review, with no automatic retries; a worker interrupted during sending also requires manual review to avoid duplicates. SMTP acceptance does not prove inbox delivery. Tests use temporary SQLite storage and mocked SMTP; hosted PostgreSQL and real visit-email delivery have not been exercised.

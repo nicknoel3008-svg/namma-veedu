@@ -23,6 +23,12 @@ def _schema(connection):
         contact_value TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'Requested',
         consent_at TEXT NOT NULL, updated_at TEXT NOT NULL)""")
     connection.execute("CREATE UNIQUE INDEX IF NOT EXISTS confirmed_property_visit_slot ON property_visit_requests(property_key,visit_at) WHERE status='Confirmed'")
+    if getattr(connection, 'shared', False):
+        connection.execute("ALTER TABLE property_visit_requests ADD COLUMN IF NOT EXISTS visit_email_consent TEXT NOT NULL DEFAULT ''")
+    else:
+        columns = {row[1] for row in connection.execute('PRAGMA table_info(property_visit_requests)')}
+        if 'visit_email_consent' not in columns:
+            connection.execute("ALTER TABLE property_visit_requests ADD COLUMN visit_email_consent TEXT NOT NULL DEFAULT ''")
     if getattr(connection,"shared",False):
         connection.execute("ALTER TABLE property_visit_requests ENABLE ROW LEVEL SECURITY")
 
@@ -34,7 +40,7 @@ def confirmed_visit_times(record, date, db_path=FOLLOWUP_DB):
     return {datetime.fromisoformat(row["visit_at"]).strftime("%H:%M") for row in rows if datetime.fromisoformat(row["visit_at"]).date()==date}
 
 
-def request_visit(*, record, user_id, visit_at, slot_kind, customer_name, contact_method, contact_value, consent, db_path=FOLLOWUP_DB):
+def request_visit(*, record, user_id, visit_at, slot_kind, customer_name, contact_method, contact_value, consent, db_path=FOLLOWUP_DB, email_reminders=False):
     if not consent:
         raise ValueError("Please consent to share your contact for this visit request.")
     if not customer_name.strip():
@@ -57,11 +63,15 @@ def request_visit(*, record, user_id, visit_at, slot_kind, customer_name, contac
             raise ValueError("This property visit time is already confirmed. Please choose another time.")
         existing=connection.execute("SELECT id FROM property_visit_requests WHERE user_id=? AND property_key=? AND visit_at=? AND status='Requested'",(user_id,key,when)).fetchone()
         if existing:
+            if email_reminders and contact_method == 'Email':
+                connection.execute("UPDATE property_visit_requests SET visit_email_consent='Yes' WHERE id=?", (existing['id'],))
             return existing["id"]
         visit_id=uuid4().hex
         connection.execute("""INSERT INTO property_visit_requests
             (id,user_id,property_key,property_title,source_url,visit_at,slot_kind,customer_name,contact_method,contact_value,status,consent_at,updated_at)
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",(visit_id,user_id,key,str(record.get("title") or "Saved property")[:200],str(record.get("source_url") or "")[:1000],when,slot_kind,customer_name.strip()[:100],contact_method,contact_value.strip(),"Requested",now,now))
+        if email_reminders and contact_method == 'Email':
+            connection.execute("UPDATE property_visit_requests SET visit_email_consent='Yes' WHERE id=?", (visit_id,))
     return visit_id
 
 
