@@ -61,7 +61,7 @@ def followup_turn(text, state=None, now=None, tamil=False):
             return result("எந்த மின்னஞ்சல் முகவரிக்கு அனுப்ப வேண்டும்?" if tamil else "Which email address should I use for the follow-up?")
         if state.get("stage") != "consent" or address:
             state["stage"] = "consent"
-            return result((f"{state['email']} முகவரிக்கு உங்கள் தேடல் பரிந்துரைகளுடன் 3 நாட்களில் ஒரு follow-up மின்னஞ்சல் அனுப்ப ஒப்புக்கொள்கிறீர்களா? அனுப்புதல் முடக்கப்பட்டிருந்தால் கோரிக்கை மட்டும் சேமிக்கப்படும்." if tamil else f"May I save one follow-up email to {state['email']} for three days from now, including Mira’s saved recommendations for your search? If email delivery is off, I’ll save the request for review without sending it."))
+            return result((f"{state['email']} முகவரிக்கு End chat தேர்ந்தெடுக்கும்போது Mira பரிந்துரைகளையும், 3 நாட்களுக்குப் பிறகு ஒரு follow-up மின்னஞ்சலையும் அனுப்ப ஒப்புக்கொள்கிறீர்களா? அனுப்புதல் முடக்கப்பட்டிருந்தால் கோரிக்கை மட்டும் சேமிக்கப்படும்." if tamil else f"May I email Mira’s recommendations to {state['email']} when you select End chat, and send one follow-up three days later? If email delivery is off, I’ll save the request for review without sending it."))
         if not re.fullmatch(r"[\W_]*(?:yes|yeah|sure|please|okay|ok|go ahead|ஆம்|ஆமாம்|சரி)[\W_]*", query):
             return result("மின்னஞ்சல் அனுப்ப ஒப்புதல் வேண்டுமா? ஆம் அல்லது வேண்டாம் என்று சொல்லுங்கள்." if tamil else "Please say yes to opt in, or cancel to stop.")
         return result("", dict(state))

@@ -41,7 +41,7 @@ def _connect(db_path: Path = FOLLOWUP_DB):
                 last_error TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL,
                 channel TEXT NOT NULL DEFAULT 'email', recipient_phone TEXT NOT NULL DEFAULT '',
                 provider_message_id TEXT NOT NULL DEFAULT '', recommendations TEXT NOT NULL DEFAULT '')""")
-                for column, default in (("channel", "email"), ("recipient_phone", ""), ("provider_message_id", ""), ("recommendations", "")):
+                for column, default in (("channel", "email"), ("recipient_phone", ""), ("provider_message_id", ""), ("recommendations", ""), ("chat_end_email_at", "")):
                     connection.execute(f"ALTER TABLE email_followups ADD COLUMN IF NOT EXISTS {column} TEXT NOT NULL DEFAULT '{default}'")
                 connection.execute("ALTER TABLE email_followups ENABLE ROW LEVEL SECURITY")
                 connection.commit()
@@ -76,7 +76,7 @@ def _connect(db_path: Path = FOLLOWUP_DB):
         )
     """)
     columns = {row[1] for row in connection.execute("PRAGMA table_info(email_followups)")}
-    for column, default in (("channel", "email"), ("recipient_phone", ""), ("provider_message_id", ""), ("recommendations", "")):
+    for column, default in (("channel", "email"), ("recipient_phone", ""), ("provider_message_id", ""), ("recommendations", ""), ("chat_end_email_at", "")):
         if column not in columns:
             connection.execute(f"ALTER TABLE email_followups ADD COLUMN {column} TEXT NOT NULL DEFAULT '{default}'")
     connection.commit()
@@ -218,7 +218,7 @@ def email_config_issues(config: dict[str, str]) -> list[str]:
     return issues
 
 
-def send_due_followups(config: dict[str, str], db_path: Path = FOLLOWUP_DB) -> tuple[int, int]:
+def send_due_followups(config: dict[str, str], db_path: Path = FOLLOWUP_DB, *, schedule_id: str | None = None) -> tuple[int, int]:
     """Send due opt-in emails. Intended for a once-daily OS/deployment scheduler."""
     if email_config_issues(config):
         raise RuntimeError("Email follow-ups need SMTP settings and FOLLOWUP_PUBLIC_URL.")
@@ -235,16 +235,18 @@ def send_due_followups(config: dict[str, str], db_path: Path = FOLLOWUP_DB) -> t
         ).fetchall()
     sent = failed = 0
     for row in due:
-        schedule_id = row["id"]
+        if schedule_id is not None and row["id"] != schedule_id:
+            continue
+        delivery_id = row["id"]
         with _connect(db_path) as connection:
             claimed = connection.execute(
                 "UPDATE email_followups SET status='sending', updated_at=? WHERE id=? AND status='scheduled'",
-                (now.isoformat(timespec="seconds"), schedule_id),
+                (now.isoformat(timespec="seconds"), delivery_id),
             )
             if claimed.rowcount != 1:
                 continue
         recipient = row["recipient_email"]
-        token = schedule_id
+        token = delivery_id
         unsubscribe_url = f"{config['FOLLOWUP_PUBLIC_URL'].rstrip('/')}?stop_followup={token}"
         name = row["customer_name"].strip()
         greeting = f"Hi {name}," if name else "Hi," 
@@ -278,7 +280,7 @@ def send_due_followups(config: dict[str, str], db_path: Path = FOLLOWUP_DB) -> t
             with _connect(db_path) as connection:
                 connection.execute(
                     "UPDATE email_followups SET sent_count=?, status=?, next_send_at=?, last_error='', updated_at=? WHERE id=? AND status='sending'",
-                    (new_count, status, next_send.isoformat(timespec="seconds"), now.isoformat(timespec="seconds"), schedule_id),
+                    (new_count, status, next_send.isoformat(timespec="seconds"), now.isoformat(timespec="seconds"), delivery_id),
                 )
             from inquiry_log import update_conversation_fields
             update_conversation_fields(str(row["conversation_id"]), {
@@ -290,7 +292,42 @@ def send_due_followups(config: dict[str, str], db_path: Path = FOLLOWUP_DB) -> t
             with _connect(db_path) as connection:
                 connection.execute(
                     "UPDATE email_followups SET status='scheduled', last_error=?, updated_at=? WHERE id=? AND status='sending'",
-                    (str(error)[:500], now.isoformat(timespec="seconds"), schedule_id),
+                    (str(error)[:500], now.isoformat(timespec="seconds"), delivery_id),
                 )
             failed += 1
+    return sent, failed
+
+
+def send_chat_end_recommendations(*, config: dict[str, str], user_id: str,
+                                  conversation_id: str, recommendations: str,
+                                  db_path: Path = FOLLOWUP_DB) -> tuple[int, int]:
+    """Send once at explicit chat end, only for this conversation's active opt-in.
+
+    Add the immediate email to the existing sequence without consuming a future
+    follow-up. The durable marker prevents reruns from adding another email.
+    """
+    if not email_config_ready(config):
+        return (0, 0)
+    now = datetime.now(INDIA_TZ).isoformat(timespec="seconds")
+    with _connect(db_path) as connection:
+        rows = connection.execute(
+            "SELECT id FROM email_followups WHERE user_id=? AND conversation_id=? "
+            "AND channel='email' AND status='scheduled' AND sent_count=0 "
+            "AND chat_end_email_at=''", (user_id, conversation_id),
+        ).fetchall()
+        ids = []
+        for row in rows:
+            changed = connection.execute(
+                "UPDATE email_followups SET chat_end_email_at=?, next_send_at=?, "
+                "max_messages=max_messages+1, recommendations=?, updated_at=? "
+                "WHERE id=? AND status='scheduled' AND chat_end_email_at=''",
+                (now, now, recommendations[:1000], now, row['id']),
+            )
+            if changed.rowcount == 1:
+                ids.append(str(row['id']))
+    sent = failed = 0
+    for identifier in ids:
+        delivered, errors = send_due_followups(config, db_path, schedule_id=identifier)
+        sent += delivered
+        failed += errors
     return sent, failed

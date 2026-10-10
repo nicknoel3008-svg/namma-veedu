@@ -34,7 +34,7 @@ from agent_policy import (
 )
 from agent_runtime import INDIA_TZ, run_openai_agent
 from area_utils import convert_area, price_per_sqm
-from followup_service import cancel_email_followup, cancel_followup_from_link, cancel_user_followups, email_config_ready, list_email_followups, schedule_email_followup
+from followup_service import send_chat_end_recommendations, cancel_email_followup, cancel_followup_from_link, cancel_user_followups, email_config_ready, list_email_followups, schedule_email_followup
 from whatsapp_followup import CONFIG_KEYS as WHATSAPP_CONFIG_KEYS, normalize_phone, schedule_whatsapp_followup, whatsapp_config_issues
 from followup_recommendations import recommendation_snapshot
 from visit_service import request_visit, list_visit_requests, confirmed_visit_times, update_visit_status, STATUSES as VISIT_STATUSES
@@ -4659,6 +4659,19 @@ def close_conversation_from_button() -> None:
     """Close the active conversation and mark every saved turn as complete."""
     if st.session_state.get("conversation_closed"):
         return
+    try:
+        sent, failed = send_chat_end_recommendations(
+            config=FOLLOWUP_EMAIL_CONFIG, user_id=str(st.session_state.user_id),
+            conversation_id=str(st.session_state.get("inquiry_conversation_id") or ""),
+            recommendations=current_followup_recommendations(),
+        )
+        if sent:
+            st.toast("Recommendations emailed. Your follow-up remains scheduled.")
+        if failed:
+            st.warning("Your recommendation email could not be sent now. It remains queued for the email worker.")
+    except Exception:
+        logging.exception("Could not process chat-end recommendation email")
+        st.warning("Could not verify the recommendation email. Please check your saved follow-up status.")
     now = datetime.now(INDIA_TZ).isoformat(timespec="seconds")
     st.session_state.conversation_closed = True
     st.session_state.end_chat_confirmation_pending = False
@@ -5347,7 +5360,7 @@ with st.container(key="info-panel-content"):
                 recipient_email = st.text_input("உங்கள் மின்னஞ்சல் முகவரி" if language == "தமிழ்" else "Your email address", placeholder="name@example.com")
                 st.caption("முகவரி follow-up அனுப்புவதற்காக மட்டும் தனிப்பட்ட சேமிப்பில் வைக்கப்படும். ஆதார், PAN அல்லது வங்கி விவரங்களை குறிப்பில் எழுத வேண்டாம்." if language == "தமிழ்" else "Your address is kept in private follow-up storage for these messages only. Don’t include Aadhaar, PAN, or bank details in your note.")
                 email_cadence = st.selectbox("எத்தனை முறை?" if language == "தமிழ்" else "How often should Mira check in?", ["Every 3 days (up to 3 emails)", "One email after 3 days"], key="followup_email_cadence", format_func=lambda option: {"Every 3 days (up to 3 emails)": "3 நாட்களுக்கு ஒருமுறை (அதிகபட்சம் 3 மின்னஞ்சல்கள்)", "One email after 3 days": "3 நாட்களுக்குப் பிறகு ஒரு மின்னஞ்சல்"}.get(option, option) if language == "தமிழ்" else option)
-                email_opt_in_label = ("இந்த email follow-up கோரிக்கையை சேமிக்க ஒப்புக்கொள்கிறேன். எந்த நேரத்திலும் நிறுத்தலாம்." if language == "தமிழ்" else "I agree to save this email follow-up request. I can remove it at any time.") if not FOLLOWUP_EMAIL_READY else ("என் மின்னஞ்சலுக்கு இந்த follow-up-ஐ அனுப்ப ஒப்புக்கொள்கிறேன். எந்த நேரத்திலும் நிறுத்தலாம்." if language == "தமிழ்" else "I agree to receive these follow-up emails. I can stop them at any time.")
+                email_opt_in_label = ("இந்த email follow-up கோரிக்கையை சேமிக்க ஒப்புக்கொள்கிறேன். எந்த நேரத்திலும் நிறுத்தலாம்." if language == "தமிழ்" else "I agree to save this email follow-up request. I can remove it at any time.") if not FOLLOWUP_EMAIL_READY else ("End chat தேர்ந்தெடுக்கும்போது பரிந்துரைகளையும், பின்னர் திட்டமிட்ட follow-up மின்னஞ்சல்களையும் பெற ஒப்புக்கொள்கிறேன். எந்த நேரத்திலும் நிறுத்தலாம்." if language == "தமிழ்" else "I agree to receive recommendations when I select End chat, plus these scheduled follow-up emails. I can stop them at any time.")
                 email_opt_in = st.checkbox(email_opt_in_label)
             save_manual_reminder = st.form_submit_button("நினைவூட்டலைச் சேமிக்கவும்" if language == "தமிழ்" else "Save follow-up", use_container_width=True)
         if save_manual_reminder:

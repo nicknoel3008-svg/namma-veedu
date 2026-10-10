@@ -35,6 +35,12 @@ Use the project's virtual environment and the same private configuration as the 
 
 Schedule these commands on a reliable host or Windows Task Scheduler. Streamlit does not guarantee a background delivery worker. `--channel all` requires both channels to be configured. No delivery scheduler is installed by this change. Keep all secrets in private Streamlit secrets or environment variables.
 
+### Local test-number schedule
+
+The local Windows task `Namma Veedu WhatsApp Test Followups` runs daily at **10:30 AM India time**, with missed-run recovery when the computer and signed-in Windows session become available. It runs `run_whatsapp_test_worker.py --recipient <verified-number>` using the project virtual environment. The task contains no access token; credentials remain in local secrets.
+
+This worker requires the configured Mira template to be **APPROVED**, restricts the sender to the current Meta test number, and only processes already scheduled, opted-in requests for the single recipient passed to it. Other recipients and delivery-off drafts remain untouched. `--check` validates Meta template approval without sending. Private results are written to `data/private/whatsapp_test_worker.jsonl`. An expired token stops delivery and records `meta_access_failed`; it must be renewed privately. Public Streamlit delivery remains off until separately configured and enabled.
+
 ## Property visits
 
 Every property card provides **Book a slot**. Customers can select a predefined time or request a custom date and time in IST. The default times are `10:00,12:00,15:00,17:00`; override them with `VISIT_SLOT_TIMES` using comma-separated 24-hour times. These are suggested request slots, not verified owner availability.
@@ -46,3 +52,7 @@ Owner decisions do not automatically email or WhatsApp customers. Contact them u
 ## Verification
 
 Automated tests use temporary SQLite storage and mocked email/Meta transport. Browser QA fixtures disable real messaging and simulate visit writes. Production message delivery requires provider setup and a separately authorized recipient test.
+
+### Email at chat end
+
+Selecting **End chat** sends the current saved recommendations immediately for active, consented email schedules in that conversation. The immediate email is additional to the selected follow-up count; later messages remain three days apart. A durable queue marker prevents repeated End chat actions from adding duplicate emails. Delivery-off drafts and cancelled requests do not send. Closing a browser tab does not trigger this action. Failed submissions stay queued for the daily worker. Public Streamlit SMTP secrets must be configured as well as local worker secrets.
