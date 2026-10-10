@@ -1,0 +1,42 @@
+/* Final shared contrast rules. The ID specificity in :is intentionally outranks legacy
+   page selectors without requiring an ID in the DOM. Exceptions add two classes. */
+body :is(.stApp,#portal-readability) :is([data-testid="stMain"],[data-testid="stSidebar"]) :is(h1,h2,h3,h4,h5,h6,p,li,label,summary,small,span,strong,em,code,[data-testid="stMetricValue"],[data-testid="stMetricLabel"],[data-testid="stMarkdownContainer"]) {
+  color:#18332C!important;-webkit-text-fill-color:#18332C!important;text-shadow:none!important;
+}
+body :is(.stApp,#portal-readability).stApp.stApp :is([data-testid="stCaptionContainer"],.stCaption),
+body :is(.stApp,#portal-readability).stApp.stApp :is([data-testid="stCaptionContainer"],.stCaption) * {
+  color:#405C53!important;-webkit-text-fill-color:#405C53!important;opacity:1!important;filter:none!important;
+}
+body :is(.stApp,#portal-readability).stApp.stApp :is(input,textarea,[role="combobox"],[data-baseweb="select"]>div) {
+  background:#FFFFFF!important;color:#18332C!important;-webkit-text-fill-color:#18332C!important;
+}
+body :is(.stApp,#portal-readability).stApp.stApp :is(input,textarea)::placeholder {
+  color:#4F675F!important;-webkit-text-fill-color:#4F675F!important;opacity:1!important;
+}
+body :is(.stApp,#portal-readability).stApp.stApp :is([data-testid="stMain"],[data-testid="stSidebar"]) a,
+body :is(.stApp,#portal-readability).stApp.stApp :is([data-testid="stMain"],[data-testid="stSidebar"]) a * {
+  color:#0B6651!important;-webkit-text-fill-color:#0B6651!important;text-decoration:underline;text-underline-offset:3px;
+}
+/* Filled actions use a darker brand color for readable white labels. */
+body :is(.stApp,#portal-readability).stApp.stApp :is([data-testid="stButton"],[data-testid="stDownloadButton"],[data-testid="stLinkButton"],[data-testid="stFormSubmitButton"]) :is(button,a) {
+  background:#116B56!important;border-color:#116B56!important;color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important;
+}
+body :is(.stApp,#portal-readability).stApp.stApp :is([data-testid="stButton"],[data-testid="stDownloadButton"],[data-testid="stLinkButton"],[data-testid="stFormSubmitButton"]) :is(button,a) *,
+body :is(.stApp,#portal-readability).stApp.stApp [data-testid="stMultiSelectTagsContainer"] [data-tag] * {
+  color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important;
+}
+body :is(.stApp,#portal-readability).stApp.stApp [data-testid="stMultiSelectTagsContainer"] [data-tag] {background:#116B56!important}
+body :is(.stApp,#portal-readability).stApp.stApp :is(.hero,.hero-panel,.owner-dashboard-hero) :is(h1,h2,h3,h4,p,span,em,strong,a),
+body :is(.stApp,#portal-readability).stApp.stApp :is(.hero,.hero-panel,.owner-dashboard-hero) .eyebrow {
+  color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important;opacity:1!important;
+}
+body :is(.stApp,#portal-readability).stApp.stApp .owner-dashboard-hero {background:#116B56!important}
+body :is(.stApp,#portal-readability).stApp.stApp [data-testid="stTabs"] button[role="tab"][aria-selected="true"] :is(p,span) {color:#0B6651!important;-webkit-text-fill-color:#0B6651!important}
+/* Menus render outside stApp; keep their options readable on white. */
+body :is([data-baseweb="popover"],[data-baseweb="menu"]) :is([role="option"],[role="listbox"],li),
+body :is([data-baseweb="popover"],[data-baseweb="menu"]) :is([role="option"],li) * {
+  background:#FFFFFF!important;color:#18332C!important;-webkit-text-fill-color:#18332C!important;
+}
+body :is(.stApp,#portal-readability).stApp.stApp :is(pre,code) {background:#E2F4ED!important;color:#18332C!important;-webkit-text-fill-color:#18332C!important}
+body :is(.stApp,#portal-readability).stApp.stApp [data-testid="stChatInput"] button {background:#116B56!important;color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important}
+body :is(.stApp,#portal-readability).stApp.stApp :is([data-testid="stButton"],[data-testid="stFormSubmitButton"]) button:disabled {background:#405C53!important;opacity:1!important}

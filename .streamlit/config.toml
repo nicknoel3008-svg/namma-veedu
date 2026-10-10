@@ -2,11 +2,11 @@
 enableStaticServing = true
 
 [theme]
-primaryColor = "#18334D"
-backgroundColor = "#D9D3C7"
-secondaryBackgroundColor = "#F5F2EA"
-textColor = "#18334D"
+primaryColor = "#116B56"
+backgroundColor = "#FAFCF8"
+secondaryBackgroundColor = "#E2F4ED"
+textColor = "#18332C"
 font = "sans serif"
 
-dataframeHeaderTextColor = "#18334D"
-dataframeHeaderBackgroundColor = "#F5F2EA"
+dataframeHeaderTextColor = "#18332C"
+dataframeHeaderBackgroundColor = "#E2F4ED"
