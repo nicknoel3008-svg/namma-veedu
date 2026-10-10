@@ -31,6 +31,7 @@ HEADERS = (
     "User inquiry",
     "Assistant response",
     "Response type",
+    "Mira response seconds",
     "Matching records",
     "Search criteria",
     "Property details / tool results",

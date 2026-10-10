@@ -1,0 +1,24 @@
+.stApp:has(.owner-dashboard-hero), .stApp:has(.owner-dashboard-hero) [data-testid="stMain"] {background:#F4F1EA!important;color:#17394D!important}
+.stApp:has(.owner-dashboard-hero) * {text-shadow:none!important}
+.stApp:has(.owner-dashboard-hero) .hero {display:none!important}
+.stApp:has(.owner-dashboard-hero) [data-testid="stSidebar"] p,.stApp:has(.owner-dashboard-hero) [data-testid="stSidebar"] label {color:#456477!important}
+.stApp:has(.owner-dashboard-hero) .block-container h1 {font-size:20px!important;margin-bottom:0!important}
+.stApp:has(.owner-dashboard-hero) [data-testid="stSidebar"] {background:#ECE9E1!important;border-right:1px solid #DEDAD0}
+.stApp:has(.owner-dashboard-hero) .block-container {background:#F4F1EA!important;border:0!important;box-shadow:none!important;padding-top:2rem;max-width:1500px}
+.stApp:has(.owner-dashboard-hero) h1,.stApp:has(.owner-dashboard-hero) h2,.stApp:has(.owner-dashboard-hero) h3,.stApp:has(.owner-dashboard-hero) h4 {color:#17394D!important}
+.stApp:has(.owner-dashboard-hero) p,.stApp:has(.owner-dashboard-hero) label,.stApp:has(.owner-dashboard-hero) [data-testid="stCaptionContainer"] {color:#456477!important}
+.owner-dashboard-hero {padding:12px 0 20px;border-bottom:1px solid #DEDAD0;margin-bottom:20px}
+.owner-dashboard-hero .eyebrow {color:#2E6F95;font-size:12px;letter-spacing:.14em;font-weight:700}
+.owner-dashboard-hero h2 {font-family:Georgia,serif!important;font-size:36px;margin:8px 0}
+.stApp:has(.owner-dashboard-hero) [data-testid="stMetric"] {background:#FFF!important;border:1px solid #E5E2DA!important;border-top:3px solid #2E6F95!important;border-radius:14px;padding:16px 18px;box-shadow:0 3px 12px #17394D08;min-height:130px;margin-bottom:14px}
+.stApp:has(.owner-dashboard-hero) [data-testid="stMetricValue"] {color:#17394D!important;font-size:1.9rem!important}
+.stApp:has(.owner-dashboard-hero) [data-testid="stMetricLabel"] {color:#2E6F95!important}
+.stApp:has(.owner-dashboard-hero) [data-testid="stHorizontalBlock"] > div:nth-child(even) [data-testid="stMetric"] {border-top-color:#E07A5F!important}
+.stApp:has(.owner-dashboard-hero) [data-testid="stVerticalBlockBorderWrapper"] {background:#FFF;border-radius:14px}
+.stApp:has(.owner-dashboard-hero) button {border-radius:9px!important}
+.stApp:has(.owner-dashboard-hero) button[kind="secondary"] {background:#FFF!important;color:#2E6F95!important;border:1px solid #D9E1E5!important;box-shadow:none!important}
+.stApp:has(.owner-dashboard-hero) button[kind="primary"],.stApp:has(.owner-dashboard-hero) [data-testid="stDownloadButton"] button {background:#2E6F95!important;color:#FFF!important;border-color:#2E6F95!important}
+.stApp:has(.owner-dashboard-hero) button[role="tab"][aria-selected="true"] {color:#2E6F95!important;font-weight:700}
+.stApp:has(.owner-dashboard-hero) [data-baseweb="tab-highlight"] {background:#E07A5F!important}
+.stApp:has(.owner-dashboard-hero) input,.stApp:has(.owner-dashboard-hero) textarea,.stApp:has(.owner-dashboard-hero) [role="combobox"] {color:#17394D!important;background:#FFF!important}
+@media(max-width:700px){.owner-dashboard-hero h2{font-size:28px}.stApp:has(.owner-dashboard-hero) [data-testid="stMetricValue"]{font-size:1.5rem!important}}
