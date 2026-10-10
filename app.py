@@ -1104,6 +1104,8 @@ section[data-testid="stMain"] div[data-testid="stColumn"]:has(.st-key-mira-conte
   .st-key-main-start-options .start-option-help{height:auto!important;min-height:0!important;margin-top:4px!important}
   .st-key-mira-composer-row [data-testid="stHorizontalBlock"]{grid-template-columns:minmax(0,1fr)!important}
 }
+/* Solid contrast behind customer text over the property photograph. */
+.stApp:not(:has(.owner-dashboard-hero)) .block-container{background:rgba(9,28,37,.90)!important;padding:1.4rem;border-radius:22px!important}
 </style>
 """.replace("__HERO_IMAGE__", HERO_IMAGE_URL).replace("__WATERMARK_IMAGE__", WATERMARK_IMAGE_URL)
 st.markdown(_base_styles, unsafe_allow_html=True)
