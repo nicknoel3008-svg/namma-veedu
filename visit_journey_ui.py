@@ -13,7 +13,9 @@ def render_visit_response():
     try:
         context = response_context(token)
         if not context:
-            st.info('This visit link is invalid, expired or replaced by a newer booking.')
+            st.warning('We could not find an active booking for this link. It may be an expired link, a replaced booking, or an email delivery test rather than a real visit.')
+            st.write('For a real booking, use the newest confirmation email. You can also return to Mira, select the property and request a visit. The owner must confirm the date and time before you travel.')
+            st.link_button('Return to Mira', '/')
             st.stop()
         st.subheader(context['property_title'])
         st.write('Visit time: '+datetime.fromisoformat(context['visit_at']).strftime('%d %b %Y, %I:%M %p IST'))

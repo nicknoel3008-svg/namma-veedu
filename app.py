@@ -2263,6 +2263,12 @@ def render_property_card(row, number=None):
         try:
             from customer_journey import select_property
             select_property(user_id=str(st.session_state.user_id), conversation_id=str(st.session_state.setdefault("inquiry_conversation_id", str(uuid4()))), record=record, preferences=st.session_state.get("search_context", {}))
+            memory = dict(st.session_state.get('buyer_memory') or {})
+            selected = list(memory.get('selected_properties') or [])
+            selected = [item for item in selected if item.get('property_id') != record.get('property_id') or item.get('title') != record.get('title')]
+            memory['selected_properties'] = selected + [record]
+            memory['selected'] = record
+            st.session_state.buyer_memory = memory
             st.success("Preferred property saved. You can select more properties or request a visit.")
         except Exception:
             st.error("Could not save your property selection. Please try again.")
@@ -3297,7 +3303,7 @@ def _respond_without_logging(text: str):
     # soon as a conversational preference update is accepted. The old flow
     # only queued this for a later interaction, which could leave stale type
     # checkboxes (for example House) visible while Mira said Flat.
-    preference_filter_sync_needed = conversation.get("intent") == "preference_update"
+    preference_filter_sync_needed = conversation.get("intent") in {"preference_update", "location_correction"}
     if preference_filter_sync_needed:
         sync_intent = parse_request("", properties)
         for key, value in conversation.get("context", {}).items():
@@ -3337,6 +3343,9 @@ def _respond_without_logging(text: str):
             st.session_state.filters_applied = False
         st.session_state.chat.extend([{"role": "user", "content": text},
             {"role": "assistant", "content": conversation["reply"], "mode": conversation["intent"]}])
+        if conversation.get('open_visit'):
+            st.session_state.visit_property = conversation['open_visit']
+            st.rerun()
         if conversation.get("removed_suggestions") is not None:
             # The sidebar rendered before the chat turn was handled. Rerun once
             # so clear_filter_widgets_on_next_run is applied immediately.
@@ -4496,6 +4505,12 @@ def capture_customer_address(text: str) -> bool:
     """Remember only an address preference the user voluntarily provides."""
     current_name = str(st.session_state.get("customer_name", "") or "")
     current_address = str(st.session_state.get("preferred_form_of_address", "") or "")
+    if re.search(r'\b(?:property|properties|budget|purchase|visit)\b', current_name, re.I):
+        st.session_state.customer_name = ''
+        if current_address == current_name:
+            st.session_state.preferred_form_of_address = ''
+        current_name = ''
+        current_address = str(st.session_state.get('preferred_form_of_address', '') or '')
     normalized = " ".join(text.casefold().split())
     title_match = re.search(r"\b(?:call me|address me as|use|i prefer|prefer to be called)\s+(sir|ma['’]?am|madam|madame)\b|\b(?:sir|ma['’]?am|madam|madame)\s+is fine\b", text, re.IGNORECASE)
     tamil_title = re.search(r"(?:சார்|சர்|மேடம்)\s*(?:என்று|னு)?\s*(?:அழைக்கவும்|சரி|பரவாயில்லை)?", text) if language == "தமிழ்" else None
@@ -4529,7 +4544,7 @@ def capture_customer_address(text: str) -> bool:
         name_match = re.search(r"(?:என் பெயர்|என்னை)\s+([\u0B80-\u0BFF]+(?:\s+[\u0B80-\u0BFF]+){0,2})", text)
     name = name_match.group(1).strip(" .,!?'\"-") if name_match else ""
     task_request = bool(re.search(
-        r"\b(?:set|show|find|search|browse|remind|reminder|follow[- ]?up|email|send|help|explain|convert|calculate|cancel|english|tamil)\b|நினைவூட்ட|தேடு|காட்டு|பின்தொடர்|தமிழ்|ஆங்கிலம்",
+        r"\b(?:property|properties|purchase|buy|visit|budget|lakhs?|location|amenities|set|show|find|search|browse|remind|reminder|follow[- ]?up|email|send|help|explain|convert|calculate|cancel|english|tamil)\b|நினைவூட்ட|தேடு|காட்டு|பின்தொடர்|தமிழ்|ஆங்கிலம்",
         normalized,
     ))
     if not name and st.session_state.get("awaiting_address_preference") and not task_request:

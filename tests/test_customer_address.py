@@ -22,7 +22,7 @@ class CustomerAddressTests(unittest.TestCase):
         return state
 
     def test_task_commands_are_not_names(self):
-        for text in ("Set a followup", "Show auctions", "Find a house", "Email me later", "Help me", "cancel"):
+        for text in ("Set a followup", "Show auctions", "Find a house", "Email me later", "Help me", "cancel", "property in madurai", "Im interested to purchase"):
             with self.subTest(text=text):
                 self.assertEqual(self.capture(text)["customer_name"], "")
 

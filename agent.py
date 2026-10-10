@@ -29,8 +29,27 @@ TYPE_TERMS = {
 }
 
 
+def normalize_intent_text(text):
+    """Normalize observed spelling variants for routing, not displayed messages."""
+    query = " ".join(text.casefold().replace("’", "'").split())
+    for wrong, right in (("intrested", "interested"), ("preferances", "preferences"),
+                         ("preferance", "preference"), ("vist", "visit"),
+                         ("visiting", "visit"), ("sight", "site")):
+        query = re.sub(rf"\b{wrong}\b", right, query)
+    return query
+
+
+def resets_preferences(text):
+    if re.search(r"\b(?:don't|do not|never)\s+(?:want to\s+)?(?:remove|clear|forget|delete|reset|start)\b", normalize_intent_text(text)):
+        return False
+    return bool(re.search(
+        r"\b(?:start (?:over|again)|reset (?:my )?(?:search|preferences?)|"
+        r"(?:remove|clear|forget|delete) (?:all )?(?:my |the )?(?:previous |old |existing )?preferences?)\b",
+        normalize_intent_text(text)))
+
+
 def parse_request(text: str, data: pd.DataFrame) -> SearchIntent:
-    query = text.strip().lower()
+    query = normalize_intent_text(text)
     query = re.sub(r"([\d,.]+)\s*லட்ச(?:த்திற்குள்|க்குள்)", r"under \1 lakh", query)
     # A small local phrase map supports common Tamil and Tanglish searches.
     for source, target in {
@@ -147,12 +166,12 @@ def parse_request(text: str, data: pd.DataFrame) -> SearchIntent:
                 intent.location = candidate.title()
     if not intent.location:
         replacement_area = re.search(
-            r"\b(?:near|around|to|towards)\s+([a-z][a-z-]{2,})\b",
+            r"\b(?:near|around|towards|switch to|move to)\s+([a-z][a-z-]{2,})\b",
             query,
         )
         if replacement_area:
             candidate = replacement_area.group(1).strip()
-            if candidate not in {"the", "same", "my", "this", "that", "home", "property", "area", "budget"}:
+            if candidate not in {"the", "same", "my", "this", "that", "home", "property", "area", "budget", "purchase", "visit", "change", "buy", "selected", "existing"}:
                 intent.location = candidate.title()
     return intent
 

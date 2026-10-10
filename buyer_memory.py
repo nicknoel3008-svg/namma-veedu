@@ -131,6 +131,9 @@ def no_match_reply(data, memory, tamil=False, filters=None):
         details.append(translated("No saved record matches this combination: ", "இந்த விருப்பங்களின் சேர்க்கைக்குப் பொருத்தமான பதிவு இல்லை: ") + "; ".join(labels) + "." if labels
                        else translated("There are no eligible saved records in this search category.", "இந்தத் தேடல் வகையில் தகுதியான பதிவு இல்லை."))
     evidence = " Budget, BHK, area and required details can only be checked when the source reports them; missing values are unverified."
+    if memory.get('retain_preferences'):
+        return ("உங்கள் விருப்பங்களை மாற்றவில்லை. அனைத்துக்கும் பொருந்தும் சேமித்த பதிவு இல்லை; பொருந்தாத சொத்துகளைப் பொருத்தமாகக் காட்ட மாட்டேன்." if tamil else
+                "I’ve kept all your preferences unchanged. No saved record confirms all of them, so I won’t present other properties as exact matches.")
     if tamil:
         return "உங்கள் அனைத்து விருப்பங்களுக்கும் பொருந்தும் பதிவு இல்லை.\n\n" + "\n\n".join(details) + "\n\nவிடுபட்ட விவரங்களை உறுதிப்படுத்த முடியாது. எந்த விருப்பத்தை மாற்ற விரும்புகிறீர்கள்? நீங்கள் சொல்லும் வரை உங்கள் விருப்பங்களை மாற்ற மாட்டேன்."
     if tanglish:

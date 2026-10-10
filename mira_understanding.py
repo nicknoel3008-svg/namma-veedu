@@ -42,6 +42,10 @@ def understand_request(text, data, chat, context=None, memory=None, tamil=False)
                 "context": context, "memory": memory, "greeting": True}
     reply = None
     search = False
+    retain_preferences = bool(re.search(r"(?:don't|do not) want to change|(?:keep|with) my (?:existing |current )?preferences?", query))
+    memory['retain_preferences'] = retain_preferences
+    if retain_preferences and re.search(r'\b(?:show|search|find|details)\b', query):
+        search = True
     exclusions = list(memory.get("excluded_terms", []))
     cheapest = bool(re.search(r"cheapest|lowest (?:price|value)|minimum (?:price|value)|least expensive", query))
     if cheapest and re.search(r"(?:your|the) website|across (?:the )?(?:website|inventory)|all (?:the )?listings", query):
@@ -77,6 +81,13 @@ def understand_request(text, data, chat, context=None, memory=None, tamil=False)
         if not re.search(r"show|find|search|list|do you have|is there|cheapest|minimum", query):
             reply = "சரி, பகுதி மற்றும் சொத்து வகைக்கான விருப்பங்களை நீக்குகிறேன். பட்டியல்களைக் காட்டவா?" if tamil else "Got it—I’ll clear the area and property-type preferences and keep any budget you gave me. Would you like to see the saved options?"
     parsed = parse_request(text, data)
+    if context and re.fullmatch(r'\s*(?:search|show|find)\s+(?:with\s+)?(?:my\s+)?(?:existing budget|current preferences?|existing preferences?|these(?: now)?|properties now)\s*[?.!]*\s*', query):
+        search = True
+    if (parsed.location or context.get('location')) and re.search(r'\blooking for\b.*\b(?:regular sale|ordinary sale|property|properties)\b', query):
+        search = True
+    if context.get('location') and parsed.max_budget is not None and re.fullmatch(
+        r"\s*(?:₹\s*)?\d[\d,.]*\s*(?:lakhs?|lacs?|crores?|cr)?\s*(?:(?:-|–|—|to)\s*\d[\d,.]*\s*)?(?:lakhs?|lacs?|crores?|cr)\s*[.!]?\s*", query):
+        search = True
     # "No, just Porur" is a correction: search that area alone instead of
     # carrying a previous BHK, budget, or property type into a zero-result
     # search.

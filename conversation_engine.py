@@ -4,8 +4,9 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import re
 
-from conversation_memory import update_preferences
+from conversation_memory import update_preferences, preference_summary
 from buyer_memory import shown_records, resolve_reference
+from agent import normalize_intent_text, resets_preferences
 
 TZ = ZoneInfo("Asia/Kolkata")
 
@@ -132,7 +133,7 @@ def response_language(text, previous="English"):
 
 def conversational_turn(text, data, chat, context=None, memory=None, language="English", now=None):
     """Interpret current intent first; retain state independently of provider availability."""
-    query = " ".join(text.casefold().replace("’", "'").split())
+    query = normalize_intent_text(text)
     query = re.sub(r"\bauctiom\b", "auction", query)
     previous_context = dict(context or {})
     replacement_property_type = bool(re.search(
@@ -169,6 +170,14 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
         memory["last_intent"] = intent
         memory["requirements"] = dict(context)
         return {"reply": say(english, tamil, tanglish), "context": context, "memory": memory, "intent": intent, **actions}
+    if resets_preferences(text):
+        context = {}
+        for key in ('selected', 'selected_properties', 'preferences', 'requirements', 'excluded_terms', 'rejected', 'purchase_help_pending', 'visit_help_pending'):
+            memory.pop(key, None)
+        return answer('preference_reset', 'I’ve cleared your previous search preferences. Which city or area would you like to start with?', 'முந்தைய தேடல் விருப்பங்களை நீக்கிவிட்டேன். எந்த நகரம் அல்லது பகுதியில் தொடங்கலாம்?', 'Previous preferences clear pannitten. Endha city illa area-la start pannalaam?', removed_suggestions=0)
+    if re.search(r"\bi (?:did not|didn't|never) (?:mention|give|specify|say) (?:a |the )?location\b", query):
+        context.pop('location', None)
+        return answer('location_correction', 'You’re right—you did not give a location. I’ve cleared the incorrect location and kept your other preferences. Which city or area should I use?', 'நீங்கள் பகுதியைக் குறிப்பிடவில்லை. தவறான பகுதியை நீக்கி மற்ற விருப்பங்களை வைத்துள்ளேன். எந்தப் பகுதியில் தேடலாம்?', 'Neenga location sollalai. Wrong location remove pannitten; other preferences irukku. Endha area use pannalaam?')
     amount = re.search(r"(?:budget|around|under|within|maximum|up to).*?(\d+(?:\.\d+)?)\s*(lakhs?|lacs?|crores?|cr)\b", query)
     if not amount:
         # Tanglish customers often put the amount before the noun: “50 lakh
@@ -197,14 +206,35 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
     if workplace:
         memory["workplace"] = workplace.group(1).strip().title()
     records = shown_records(chat)
+    selected_records = memory.get('selected_properties') or []
+    if selected_records and (re.search(r'\bselected\b', query) or memory.get('visit_help_pending')):
+        records = selected_records
     selected = resolve_reference(text, records, memory.get("selected"))
     if selected:
         memory["selected"] = selected
     selected = memory.get("selected")
+    visit_request = bool(re.search(r"\b(?:visit|view|inspect)\b.{0,60}\b(?:property|properties|site|listing|person|directly)\b|\b(?:property|site)\b.{0,35}\bvisit\b|\b(?:book|schedule|arrange|request)\b.{0,25}\b(?:visit|slot|appointment)\b", query))
+    visit_request = visit_request or bool(selected and re.fullmatch(r'(?:a |property )?visit(?: please)?[.! ]*', query))
+    visit_request = visit_request and not re.search(r"\b(?:don't|do not|not now|cancel|completed|attended|already visited)\b", query)
+    if visit_request or (memory.get('visit_help_pending') and selected):
+        if visit_request and len(selected_records) > 1 and re.search(r'\bselected properties\b', query):
+            selected = None
+        if not selected:
+            memory['visit_help_pending'] = True
+            memory['selected'] = None
+            names = '; '.join(str(row.get('title', '')) for row in (selected_records or records))
+            prompt = 'Which property would you like to visit first? Tell me its name or number.' + (' Options: ' + names if names else '')
+            return answer('visit_property_selection', prompt, 'முதலில் எந்தச் சொத்தைப் பார்க்க விரும்புகிறீர்கள்? பெயர் அல்லது எண்ணைச் சொல்லுங்கள்.', prompt)
+        memory.pop('visit_help_pending', None)
+        memory.pop('purchase_help_pending', None)
+        return answer('purchase_visit_help', f"I’ll open the visit request for **{selected.get('title', 'this property')}**. Choose a date and time and provide your contact and consent. The owner must confirm availability before you travel; this is not a confirmed appointment.", 'பார்வைக் கோரிக்கையைத் திறக்கிறேன். தேதி, நேரம், தொடர்பு மற்றும் ஒப்புதலை வழங்குங்கள். பயணிக்கும் முன் உரிமையாளர் உறுதிப்படுத்த வேண்டும்.', 'Visit request open panren. Date, time, contact and consent kudunga. Travel panna munna owner confirm pannanum.', open_visit=selected)
     # Interest starts purchase assistance; it never records a completed sale.
-    interested = bool(re.search(r"\b(?:i(?:'m| am)?\s+)?interested\s+in\s+(?:this|that|the|first|second|third|selected)\b|\bi like (?:this|that|the (?:first|second|third))\b|இந்த\s+சொத்[^\s]*.*விருப்பம்", query)) or bool(re.fullmatch(r"(?:i'm |i am )?interested[.! ]*",query))
+    interested = bool(re.search(r"\b(?:i(?:'m| am)?\s+)?interested\s+in\s+(?:this|that|the|first|second|third|selected|two|these)\b|\binterested\s+(?:in|to)\s+(?:purchase|buy)\b|\bi like (?:this|that|the (?:first|second|third))\b|இந்த\s+சொத்[^\s]*.*விருப்பம்", query)) or bool(re.fullmatch(r"(?:i'm |i am )?interested[.! ]*",query))
     negative_interest=bool(re.search(r"\b(?:not|no longer|isn't|aren't)\s+interested\b|விருப்பமில்லை",query))
     if interested and not negative_interest:
+        if len(selected_records) > 1 and re.search(r'\b(?:two|these|selected properties)\b', query):
+            selected = None
+            memory['selected'] = None
         if not selected:
             memory['purchase_help_pending']='property'
             return answer('purchase_interest_property',"Which property are you interested in—the listing name or its number?","எந்தச் சொத்தில் விருப்பம்—அதன் பெயர் அல்லது பட்டியல் எண்ணைச் சொல்லுங்கள்?","Endha property-la interest—listing name illa number sollunga?")
@@ -229,7 +259,7 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
         elif re.search(r"\b(?:visit|view|slot|appointment)\b|பார்வை",query):
             memory.pop('purchase_help_pending',None)
             return answer('purchase_visit_help',"Use Book a slot on this property to choose a predefined time or request your own. The owner will confirm availability.","இந்தச் சொத்தின் Book a slot மூலம் நேரத்தைத் தேர்ந்தெடுக்கலாம் அல்லது விருப்ப நேரத்தைக் கோரலாம். உரிமையாளர் கிடைப்பதை உறுதிப்படுத்துவார்.","Indha property Book a slot-la time choose pannunga illa custom time request pannunga. Owner availability confirm pannuvaar.")
-    if re.fullmatch(r"(?:what (?:is|are) )?auction(?: properties)?\?+", query):
+    if re.fullmatch(r"(?:what (?:is|are) )?auction(?: properties)?\?+", query) or re.search(r"\b(?:why|what|how)\b.*\bauction\b|\bauction\b.*\b(?:symbol|icon|mean)\b", query):
         context.clear()
         context.update(previous_context)
         memory["auction_offer_pending"] = True
@@ -248,6 +278,12 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
     loan_options = bool(re.search(r"loan|கடன்", query) and re.search(r"options?|optionm|exceed|remaining|this property|with me|அதிக|மீத", query))
     if selected and memory.get("available_funds") is not None and re.search(r"already (?:gave|shared|told)|already.*prefer", query):
         loan_options = True
+    if not loan_options and re.search(r'\bwhat (?:are|were) my (?:previous |current |existing )?preferences?\b|\balready.*(?:gave|shared|told).*preferences?\b', query):
+        summary = preference_summary(context)
+        reply = ('Your current preferences are: ' + summary + '.' if summary else 'You haven’t set any search preferences yet.')
+        if not context.get('location'):
+            reply += ' You haven’t specified a location.'
+        return answer('preference_recap', reply, 'உங்கள் தற்போதைய விருப்பங்கள்: ' + (summary or 'இன்னும் குறிப்பிடப்படவில்லை'), reply)
     if loan_options:
         funds = re.search(r"([\d,.]+)\s*(lakhs?|lacs?|crores?|cr)\b", query)
         if funds and re.search(r"with me|cash|down payment|available|i have", query):

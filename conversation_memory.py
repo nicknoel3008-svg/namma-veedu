@@ -2,16 +2,27 @@
 from __future__ import annotations
 
 import re
-from agent import parse_request
+from agent import parse_request, normalize_intent_text, resets_preferences
 
 
 def update_preferences(text, data, previous=None):
     """Merge only stated preferences; questions never erase existing constraints."""
     previous_context = dict(previous or {})
     remembered = dict(previous_context)
-    normalized = text.casefold()
-    if re.search(r"\b(?:start (?:over|again)|reset (?:my )?(?:search|preferences)|forget my preferences)\b", normalized):
+    normalized = normalize_intent_text(text)
+    if re.search(r"\b(?:don't|do not|never)\s+(?:want to\s+)?(?:remove|clear|forget|delete|reset)\b", normalized):
+        return remembered
+    if resets_preferences(text):
+        previous_context = {}
         remembered = {}
+    # Repair stale state created by older versions of the location parser.
+    if str(remembered.get('location', '')).casefold() in {'purchase', 'visit', 'vist', 'change'}:
+        remembered.pop('location', None)
+    if re.search(r"\b(?:i (?:did not|didn't|never) (?:mention|give|specify|say) (?:a |the )?location|(?:remove|clear) (?:my |the )?location)\b", normalized):
+        remembered.pop('location', None)
+        return remembered
+    if re.search(r"\b(?:why|what|how)\b.*\bauction\b|\bauction\b.*\b(?:symbol|icon|mean)\b", normalized):
+        return remembered
     intent = parse_request(text, data)
     if re.search(r"(?:remove|ignore|forget|drop|don't need|not needed).*lift|lift.*(?:don't need|not needed|venam|venaam|vendam|வேண்டாம்)", normalized):
         remembered.pop("lift", None)
@@ -130,6 +141,9 @@ def update_preferences(text, data, previous=None):
     if re.search(r"\b(?:no|exclude|remove|cancel|skip|don't want|do not want)\s+(?:the\s+)?auctions?\b", normalized):
         remembered["status"] = "Any"
         remembered["listing_statuses"] = ["Existing sale", "Project reference"]
+    elif re.search(r'\b(?:regular|ordinary|normal|non-auction) sale\b', normalized):
+        remembered['status'] = 'Any'
+        remembered['listing_statuses'] = ['Existing sale', 'Project reference']
     elif re.search(r"\bauctions?\b", normalized):
         both = bool(re.search(r"\b(?:as well|also|too|both|include)\b", normalized)) and not re.search(r"\bonly\b", normalized)
         remembered["status"] = "Any" if both else "Auction"

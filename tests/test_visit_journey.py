@@ -44,6 +44,17 @@ class VisitJourneyTests(unittest.TestCase):
             c.execute("UPDATE property_visit_requests SET visit_email_consent='' WHERE id=?",(self.id,))
         self.assertEqual(self.remind(),(0,0));self.smtp.assert_not_called()
 
+    def test_delivery_test_has_no_dead_live_booking_link(self):
+        self.assertEqual(run_visit_worker(self.config,self.db,now=self.at-timedelta(hours=1),delivery_test=True),(1,0))
+        message=self.smtp.return_value.__enter__.return_value.send_message.call_args.args[0]
+        self.assertEqual(message['Subject'],'Namma Veedu email delivery test')
+        self.assertNotIn('visit_response=',message.get_content())
+        self.assertIn('not a property visit booking',message.get_content())
+
+    def test_delivery_test_refuses_live_queue(self):
+        with self.assertRaisesRegex(ValueError,'isolated'):
+            run_visit_worker(self.config,delivery_test=True)
+
     def test_yes_welcome_and_no_reply_does_not_cancel(self):
         self.remind();self.assertEqual(list_visit_requests('u',self.db)[0]['status'],'Confirmed')
         reply=record_response(self.token(),action='yes',db_path=self.db,now=self.at-timedelta(minutes=30))

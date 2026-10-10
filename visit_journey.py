@@ -212,7 +212,11 @@ def resume_preferences(token, db_path=FOLLOWUP_DB):
     return {'preferences':json.loads(context['preferences']), 'changes':context['revised_preferences']}
 
 
-def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None):
+def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None, delivery_test=False):
+    if delivery_test:
+        from pathlib import Path
+        if Path(db_path) == FOLLOWUP_DB:
+            raise ValueError('Delivery tests must use an isolated temporary database.')
     """Explicit enable flag required. Invoke every five minutes on a reliable host."""
     if str(config.get('VISIT_EMAIL_ENABLED','')).lower() != 'true':
         return (0,0)
@@ -253,6 +257,9 @@ def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None):
         prompt='Will you attend? Choose Yes, No or Reschedule on the secure response page.' if mail['kind']=='reminder' else 'Did you attend, and did the property match your preferences? Tell us if you need property or loan assistance.'
         url=config['FOLLOWUP_PUBLIC_URL'].rstrip('/')+'/?visit_response='+j['token']
         message.set_content(f"Hello {visit['customer_name']},\n\n{visit['property_title']}\nVisit: {at.strftime('%d %b %Y, %I:%M %p IST')}\n\n{prompt}\n{url}\n\nIf you no longer want visit emails, cancel the visit through this page or contact the owner.\nNamma Veedu")
+        if delivery_test:
+            message.replace_header('Subject', 'Namma Veedu email delivery test')
+            message.set_content(f"Hello,\n\n{visit['property_title']}\n\nThis is an email delivery test, not a property visit booking. No appointment was created on the live portal, and no response is required.\n\nTo request a real visit, open Namma Veedu and select Book a slot on a property.\n{config['FOLLOWUP_PUBLIC_URL'].rstrip('/')}\n\nNamma Veedu")
         state='sent'
         try:
             port=int(config.get('FOLLOWUP_SMTP_PORT') or 587)

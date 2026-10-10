@@ -50,7 +50,7 @@ def received_after(config: dict[str, str], after_uid: int, property_title: str) 
                         body += part.get_payload(decode=True).decode(part.get_content_charset() or "utf-8", errors="replace")
             else:
                 body = message.get_payload(decode=True).decode(message.get_content_charset() or "utf-8", errors="replace")
-            if message.get("Subject") == "Please confirm your property visit" and property_title in body:
+            if message.get("Subject") == "Namma Veedu email delivery test" and property_title in body:
                 return True
     return False
 
@@ -97,7 +97,7 @@ def main(argv=None) -> int:
             db_path=database,
         )
         update_visit_status(visit_id, "Confirmed", db_path=database)
-        submitted, failed = run_visit_worker(config, database, now=now)
+        submitted, failed = run_visit_worker(config, database, now=now, delivery_test=True)
         with _connect(database) as connection:
             schema(connection)
             state = connection.execute(
@@ -113,7 +113,7 @@ def main(argv=None) -> int:
             if received_after(config, baseline_uid, property_title):
                 receipt = True
                 break
-    print(f"SMTP accepted one visit reminder for {recipient}.")
+    print(f"SMTP accepted one clearly labelled delivery test for {recipient}; no live booking link was sent.")
     print("Inbox receipt confirmed through Gmail IMAP." if receipt else "Inbox receipt could not be independently confirmed; check the recipient inbox.")
     return 0 if receipt or not can_check_receipt else 1
 
