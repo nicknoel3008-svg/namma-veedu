@@ -1,0 +1,39 @@
+/* Midnight Navy: dark page, gold controls, ivory working surfaces. */
+.stApp,.stApp [data-testid="stAppViewContainer"],.stApp [data-testid="stMain"],.stApp [data-testid="stHeader"],
+.stApp:has(.owner-dashboard-hero) [data-testid="stMain"],
+.stApp:has(.owner-dashboard-hero) .block-container,
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container,
+.stApp section[data-testid="stSidebar"],.stApp section[data-testid="stSidebar"]>div,
+.stApp section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {background:#102536!important;background-image:none!important;color:#F5F2EA!important}
+.stApp section[data-testid="stMain"] .block-container :is(h1,h2,h3,h4,h5,h6,p,li,label,span,small,a),
+.stApp section[data-testid="stMain"] .block-container [data-testid="stMarkdownContainer"] :is(p,li),
+.stApp section[data-testid="stMain"] .block-container [data-testid="stWidgetLabel"] p,
+.stApp section[data-testid="stMain"] .block-container [data-testid="stCaptionContainer"],
+.stApp section[data-testid="stMain"] .block-container [data-testid="stCaptionContainer"] * {color:#F5F2EA!important;-webkit-text-fill-color:#F5F2EA!important;text-shadow:none!important}
+/* Text inside light cards stays navy, including nested markdown. */
+.stApp section[data-testid="stMain"] .block-container :is(.st-key-mira-content-wash,.st-key-results-content-wash-active,.st-key-info-panel-content,[data-testid="stVerticalBlockBorderWrapper"],[data-testid="stForm"],[data-testid="stMetric"],.start-option-help) :is(h1,h2,h3,h4,h5,h6,p,li,label,span,small,a,[data-testid="stCaptionContainer"]),
+.stApp section[data-testid="stMain"] .block-container .st-key-mira-content-wash [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] :is(p,li),
+.stApp section[data-testid="stMain"] .block-container .start-option-help {color:#18334D!important;-webkit-text-fill-color:#18334D!important}
+.stApp section[data-testid="stMain"] .block-container button[kind],
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container button[kind] {background:#18334D!important;border:1px solid #B89750!important;color:#F5F2EA!important;-webkit-text-fill-color:#F5F2EA!important}
+.stApp section[data-testid="stMain"] .block-container button[kind] :is(p,span),
+.stApp section[data-testid="stMain"] .block-container :is(.st-key-mira-content-wash,.st-key-info-panel-content,[data-testid="stVerticalBlockBorderWrapper"]) button[kind] :is(p,span) {color:#F5F2EA!important;-webkit-text-fill-color:#F5F2EA!important}
+.stApp section[data-testid="stMain"] .block-container button[role="tab"],
+.stApp section[data-testid="stMain"] .block-container button[role="tab"] :is(p,span) {color:#E7D7AE!important;-webkit-text-fill-color:#E7D7AE!important}
+.stApp section[data-testid="stMain"] .block-container :is(.st-key-mira-content-wash,.st-key-info-panel-content,[data-testid="stVerticalBlockBorderWrapper"]) button[role="tab"] :is(p,span) {color:#18334D!important;-webkit-text-fill-color:#18334D!important}
+.stApp section[data-testid="stSidebar"] .st-key-filter-panel-scroll,
+.stApp section[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"],
+.stApp section[data-testid="stSidebar"] .language-heading {background:#18334D!important;border-color:#B8975070!important}
+.stApp section[data-testid="stSidebar"] :is(p,span,label,h1,h2,h3,h4,small,a),
+.stApp section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
+.stApp section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p,
+.stApp section[data-testid="stSidebar"] :is(.language-heading,.language-heading span,.filter-heading-title,.filter-heading-subtitle,.filter-heading-icon) {color:#F5F2EA!important;-webkit-text-fill-color:#F5F2EA!important;text-shadow:none!important}
+.stApp section[data-testid="stSidebar"] svg {color:#E7D7AE!important}
+.stApp section[data-testid="stSidebar"] button[kind] {background:#B89750!important;border-color:#B89750!important;color:#102536!important;-webkit-text-fill-color:#102536!important}
+.stApp section[data-testid="stSidebar"] button[kind] :is(p,span) {color:#102536!important;-webkit-text-fill-color:#102536!important}
+.stApp section[data-testid="stSidebar"] [data-testid="stSelectbox"] [role="combobox"],
+.stApp section[data-testid="stSidebar"] [data-testid="stSelectbox"] [role="combobox"] * {color:#18334D!important;-webkit-text-fill-color:#18334D!important}
+.stApp section[data-testid="stMain"] .block-container .st-key-mira-composer-row button {background:#B89750!important;color:#102536!important;-webkit-text-fill-color:#102536!important}
+.stApp section[data-testid="stMain"] .block-container .st-key-mira-composer-row button :is(p,span) {color:#102536!important;-webkit-text-fill-color:#102536!important}
+.stApp section[data-testid="stMain"] .block-container [data-testid="stMetricValue"] {color:#18334D!important;-webkit-text-fill-color:#18334D!important}
+.stApp section[data-testid="stSidebar"] .filter-heading {border-color:#B89750!important}

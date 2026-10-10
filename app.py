@@ -1111,6 +1111,7 @@ section[data-testid="stMain"] div[data-testid="stColumn"]:has(.st-key-mira-conte
 st.markdown(_base_styles, unsafe_allow_html=True)
 st.markdown("<style>" + (ROOT / "static" / "coastal-sidebar.css").read_text(encoding="utf-8") + "</style>", unsafe_allow_html=True)
 st.markdown("<style>" + (ROOT / "static" / "coastal-theme.css").read_text(encoding="utf-8") + "</style>", unsafe_allow_html=True)
+st.markdown("<style>" + (ROOT / "static" / "midnight-theme.css").read_text(encoding="utf-8") + "</style>", unsafe_allow_html=True)
 
 st.markdown(f'''
 <section class="hero" style="background-image:linear-gradient(90deg,rgba(9,28,37,.84) 0%,rgba(9,28,37,.57) 46%,rgba(9,28,37,.08) 100%),linear-gradient(0deg,rgba(9,28,37,.52),transparent 48%),url('{HERO_IMAGE_URL}');">
@@ -1403,6 +1404,7 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
     # this out of dynamically inserted tabs makes the export easy to find.
     st.title("Mira Studio")
     st.markdown('<style>' + (ROOT / 'static' / 'owner-coastal.css').read_text(encoding='utf-8') + '</style>', unsafe_allow_html=True)
+    st.markdown("<style>" + (ROOT / "static" / "midnight-theme.css").read_text(encoding="utf-8") + "</style>", unsafe_allow_html=True)
     st.markdown("""<div class="owner-dashboard-hero"><div class="eyebrow">NAMMA VEEDU · PRIVATE OWNER WORKSPACE</div><h2>Performance overview</h2><p>Website health, Mira contribution and the customer journey</p></div>""", unsafe_allow_html=True)
     if st.button("Refresh dashboard", key="refresh_owner_overview"):
         cached_inquiries.clear()
