@@ -68,3 +68,26 @@
 .stApp:has(.owner-dashboard-hero) [data-baseweb="select"] svg {
   color:#40516A!important;-webkit-text-fill-color:#40516A!important;opacity:1!important;
 }
+/* Owner-only contrast: explicit colors prevent customer styles leaking in. */
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container :is(h1,h2,h3,h4,h5,h6,p,li,label,summary,small,a),
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container [data-testid="stMarkdownContainer"] :is(p,li),
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container [data-testid="stWidgetLabel"] p,
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container [data-testid="stCaptionContainer"],
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container [data-testid="stCaptionContainer"] * {
+ color:#18334D!important;-webkit-text-fill-color:#18334D!important;opacity:1!important;
+}
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container button[kind],
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container [data-testid="stDownloadButton"] button {
+ background:#18334D!important;color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important;
+}
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container button[kind] :is(p,span),
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container [data-testid="stDownloadButton"] button :is(p,span) {
+ color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important;opacity:1!important;
+}
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container button[role="tab"] :is(p,span),
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container [data-testid="stExpander"] summary :is(p,span),
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container [data-testid="stSelectbox"] [role="combobox"] * {
+ color:#18334D!important;-webkit-text-fill-color:#18334D!important;opacity:1!important;
+}
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container [data-testid="stMetricLabel"] *,
+.stApp:has(.owner-dashboard-hero) section[data-testid="stMain"] .block-container [data-testid="stMetricValue"] * {color:#18334D!important;-webkit-text-fill-color:#18334D!important}

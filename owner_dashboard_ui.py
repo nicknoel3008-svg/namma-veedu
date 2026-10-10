@@ -119,7 +119,7 @@ def render(rows, *, sessions, deliveries, visits, selections, rules, history_row
                 mark = {"type": "bar", "cornerRadiusTopLeft": 4, "cornerRadiusTopRight": 4}
                 encoding.update({"xOffset": {"field": "Series"}, "color": {"field": "Series", "scale": {"domain": ["Conversations", "Replies"], "range": [NAVY, GOLD]}, "legend": {"orient": "top", "title": None}}})
             encoding["tooltip"] = [{"field": "Date", "type": "temporal"}, {"field": "Sessions" if kind == "website" else "Count", "type": "quantitative"}]
-            st.vega_lite_chart(pd.DataFrame(data), {"height": 240, "background": "transparent", "mark": mark, "encoding": encoding, "config": {"view": {"stroke": None}, "axis": {"labelColor": "#456477", "gridColor": "#E8EDF0", "domain": False, "labelFontSize": 11}}}, use_container_width=True)
+            st.vega_lite_chart(pd.DataFrame(data), {"height": 240, "background": "#F5F2EA", "mark": mark, "encoding": encoding, "config": {"view": {"stroke": None}, "legend": {"labelColor": "#18334D", "titleColor": "#18334D"}, "axis": {"titleColor": "#18334D", "labelColor": "#18334D", "gridColor": "#E8EDF0", "domain": False, "labelFontSize": 11}}}, use_container_width=True)
     st.subheader("Owner records")
     st.caption(f"{len(summary):,} conversations · linked responses, actions and feedback")
     st.caption("Four connected views. Every saved conversation is included; customer feedback and learning changes keep the existing owner approval workflow.")
@@ -157,7 +157,7 @@ def render(rows, *, sessions, deliveries, visits, selections, rules, history_row
         st.subheader("Customer journey")
         selected = {r.get("conversation_id") for r in selections if str(r.get("conversation_id") or "") in relevant and r.get("status") == "Selected"}
         journey_data = pd.DataFrame({"Stage": ["Conversations", "Active shortlists", "Visits completed", "Verified purchases"], "Count": [len(summary), len(selected), complete, purchased]})
-        st.vega_lite_chart(journey_data, {"height": 150, "background": "transparent", "mark": {"type": "bar", "color": NAVY, "cornerRadiusEnd": 5}, "encoding": {"y": {"field": "Stage", "type": "nominal", "sort": None, "axis": {"title": None, "domain": False, "ticks": False, "labelColor": "#456477"}}, "x": {"field": "Count", "type": "quantitative", "axis": {"title": None, "tickMinStep": 1, "gridColor": "#E8EDF0"}}, "tooltip": [{"field": "Stage"}, {"field": "Count"}]}, "config": {"view": {"stroke": None}}}, use_container_width=True)
+        st.vega_lite_chart(journey_data, {"height": 150, "background": "#F5F2EA", "mark": {"type": "bar", "color": NAVY, "cornerRadiusEnd": 5}, "encoding": {"y": {"field": "Stage", "type": "nominal", "sort": None, "axis": {"title": None, "domain": False, "ticks": False, "labelColor": "#18334D"}}, "x": {"field": "Count", "type": "quantitative", "axis": {"title": None, "tickMinStep": 1, "gridColor": "#E8EDF0"}}, "tooltip": [{"field": "Stage"}, {"field": "Count"}]}, "config": {"view": {"stroke": None}}}, use_container_width=True)
         st.caption("Recorded stages use different units; this is not a purchase conversion forecast.")
     with left, st.container(border=True):
         st.subheader("Action queue")
