@@ -3,11 +3,13 @@ from datetime import datetime
 import re
 from uuid import uuid4
 import requests
+from urllib.parse import urlsplit, urlencode
 from agent_runtime import INDIA_TZ
 from followup_service import FOLLOWUP_DB, _connect, next_three_day_boundary
 
 CONFIG_KEYS = ("FOLLOWUP_WHATSAPP_ENABLED", "WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID",
-               "WHATSAPP_API_VERSION", "WHATSAPP_TEMPLATE_NAME", "WHATSAPP_TEMPLATE_LANGUAGE", "FOLLOWUP_PUBLIC_URL")
+               "WHATSAPP_API_VERSION", "WHATSAPP_TEMPLATE_NAME", "WHATSAPP_TEMPLATE_LANGUAGE", "FOLLOWUP_PUBLIC_URL",
+               "WHATSAPP_PROVIDER", "WATI_API_BASE_URL", "WATI_ACCESS_TOKEN", "WATI_TEMPLATE_NAME", "WATI_CHANNEL_NUMBER")
 
 
 def normalize_phone(value):
@@ -22,15 +24,59 @@ def whatsapp_config_issues(config):
     issues = []
     if str(config.get("FOLLOWUP_WHATSAPP_ENABLED", "")).lower() != "true":
         issues.append("WhatsApp delivery is disabled (FOLLOWUP_WHATSAPP_ENABLED)")
-    for key in CONFIG_KEYS[1:]:
+    provider = str(config.get("WHATSAPP_PROVIDER") or "meta").lower()
+    if provider not in {"meta", "wati"}:
+        issues.append("WHATSAPP_PROVIDER must be meta or wati")
+    required = (("WATI_API_BASE_URL", "WATI_ACCESS_TOKEN", "WATI_TEMPLATE_NAME", "WATI_CHANNEL_NUMBER", "FOLLOWUP_PUBLIC_URL")
+                if provider == "wati" else CONFIG_KEYS[1:7])
+    for key in required:
         if not str(config.get(key, "")).strip():
             issues.append(f"Missing {key}")
-    if config.get("WHATSAPP_API_VERSION") and not re.fullmatch(r"v\d+\.\d+", config["WHATSAPP_API_VERSION"]):
+    if provider == "wati":
+        try:
+            url = urlsplit(str(config.get("WATI_API_BASE_URL", "")))
+            valid_url = (url.scheme == "https" and (url.hostname or "").endswith(".wati.io")
+                         and not (url.username or url.password or url.query or url.fragment)
+                         and url.port in (None, 443) and re.fullmatch(r"/\d+/?", url.path))
+        except ValueError:
+            valid_url = False
+        if not valid_url:
+            issues.append("WATI_API_BASE_URL must be your HTTPS wati.io tenant URL ending in /tenantId")
+        if config.get("WATI_CHANNEL_NUMBER") and not re.fullmatch(r"[1-9]\d{7,14}", config["WATI_CHANNEL_NUMBER"]):
+            issues.append("WATI_CHANNEL_NUMBER must include country code and digits only")
+    if provider == "meta" and config.get("WHATSAPP_API_VERSION") and not re.fullmatch(r"v\d+\.\d+", config["WHATSAPP_API_VERSION"]):
         issues.append("WHATSAPP_API_VERSION must look like vXX.0")
-    if config.get("WHATSAPP_PHONE_NUMBER_ID") and not config["WHATSAPP_PHONE_NUMBER_ID"].isdigit():
+    if provider == "meta" and config.get("WHATSAPP_PHONE_NUMBER_ID") and not config["WHATSAPP_PHONE_NUMBER_ID"].isdigit():
         issues.append("WHATSAPP_PHONE_NUMBER_ID must contain digits only")
     issues.extend(issue for issue in email_config_issues(config) if issue.startswith("FOLLOWUP_PUBLIC_URL"))
     return issues
+
+
+def _send_wati(config, row):
+    """Submit one approved template. Acceptance never means delivery."""
+    public_url = config["FOLLOWUP_PUBLIC_URL"].rstrip("/")
+    payload = {"template_name": config["WATI_TEMPLATE_NAME"],
+               "broadcast_name": "namma_veedu_followups",
+               "channel_number": config["WATI_CHANNEL_NUMBER"],
+               "parameters": [
+                   {"name": "recommendations", "value": row["recommendations"] or "No matching saved recommendations. Please resume your search."},
+                   {"name": "resume_url", "value": public_url},
+                   {"name": "stop_url", "value": public_url + "/?" + urlencode({"stop_followup": row["id"]})}]}
+    token = config["WATI_ACCESS_TOKEN"].removeprefix("Bearer ").strip()
+    response = requests.post(config["WATI_API_BASE_URL"].rstrip("/") + "/api/v1/sendTemplateMessage",
+                             params={"whatsappNumber": row["recipient_phone"].lstrip("+")},
+                             headers={"Authorization": "Bearer " + token}, json=payload,
+                             timeout=30, allow_redirects=False)
+    response.raise_for_status()
+    if response.status_code != 200:
+        raise ValueError("Unexpected Wati response")
+    body = response.json()
+    if body.get("result") is False:
+        raise ValueError("Wati rejected submission")
+    message_id = body.get("localMessageId") or body.get("messageId")
+    if not isinstance(message_id, str) or not message_id.strip():
+        raise ValueError("Wati acceptance could not be correlated")
+    return "wati:" + message_id
 
 
 def schedule_whatsapp_followup(*, user_id, conversation_id, recipient_phone, customer_name,
@@ -63,7 +109,7 @@ def send_due_whatsapp_followups(config, db_path=FOLLOWUP_DB, *, recipient_allowl
         raise RuntimeError("WhatsApp setup is incomplete; no message sent.")
     now = datetime.now(INDIA_TZ)
     with _connect(db_path) as connection:
-        due = connection.execute("SELECT * FROM email_followups WHERE channel='whatsapp' AND status='scheduled' AND next_send_at<=? ORDER BY next_send_at", (now.isoformat(timespec="seconds"),)).fetchall()
+        due = connection.execute("SELECT * FROM email_followups WHERE channel='whatsapp' AND status='scheduled' AND opted_in_at<>'' AND next_send_at<=? ORDER BY next_send_at", (now.isoformat(timespec="seconds"),)).fetchall()
     accepted = failed = 0
     for row in due:
         if recipient_allowlist is not None and row["recipient_phone"] not in recipient_allowlist:
@@ -73,16 +119,11 @@ def send_due_whatsapp_followups(config, db_path=FOLLOWUP_DB, *, recipient_allowl
             if claimed.rowcount != 1:
                 continue
         try:
-            payload = {"messaging_product":"whatsapp", "to":row["recipient_phone"].lstrip("+"), "type":"template",
-                "template":{"name":config["WHATSAPP_TEMPLATE_NAME"], "language":{"code":config["WHATSAPP_TEMPLATE_LANGUAGE"]},
-                    "components":[{"type":"body","parameters":[{"type":"text","text":row["recommendations"] or "No saved matching recommendations. Please resume your search on Namma Veedu."}]},
-                                  {"type":"button","sub_type":"url","index":"0","parameters":[{"type":"text","text":row["id"]}]}]}}
-            response = requests.post(f"https://graph.facebook.com/{config['WHATSAPP_API_VERSION']}/{config['WHATSAPP_PHONE_NUMBER_ID']}/messages",
-                headers={"Authorization":"Bearer "+config["WHATSAPP_ACCESS_TOKEN"]}, json=payload,timeout=30)
-            response.raise_for_status()
-            message_id = response.json()["messages"][0]["id"]
-            # Accepted by Meta is distinct from handset delivery. No blind
-            # retry on timeouts: acceptance can be ambiguous and duplicate texts hurt users.
+            if str(config.get("WHATSAPP_PROVIDER") or "meta").lower() == "wati":
+                message_id = _send_wati(config, row)
+            else:
+                message_id = _send_meta(config, row)
+            # Provider acceptance is not handset delivery.
             with _connect(db_path) as connection:
                 connection.execute("UPDATE email_followups SET status='accepted', sent_count=sent_count+1, provider_message_id=?, last_error='', updated_at=? WHERE id=? AND status='sending'", (message_id,now.isoformat(timespec="seconds"),row["id"]))
             accepted += 1
@@ -90,7 +131,7 @@ def send_due_whatsapp_followups(config, db_path=FOLLOWUP_DB, *, recipient_allowl
             with _connect(db_path) as connection:
                 connection.execute("UPDATE email_followups SET status='needs_review', last_error=?, updated_at=? WHERE id=? AND status='sending'", ("WhatsApp request failed or acceptance is uncertain: "+type(error).__name__,now.isoformat(timespec="seconds"),row["id"]))
             failed += 1
-        # A reporting failure must not turn an accepted message into a retry.
+        # Reporting errors must never cause a duplicate send.
         from inquiry_log import update_conversation_fields
         try:
             with _connect(db_path) as connection:
@@ -99,3 +140,15 @@ def send_due_whatsapp_followups(config, db_path=FOLLOWUP_DB, *, recipient_allowl
         except Exception:
             pass
     return accepted, failed
+
+
+def _send_meta(config, row):
+    payload = {"messaging_product":"whatsapp", "to":row["recipient_phone"].lstrip("+"), "type":"template",
+        "template":{"name":config["WHATSAPP_TEMPLATE_NAME"], "language":{"code":config["WHATSAPP_TEMPLATE_LANGUAGE"]},
+            "components":[{"type":"body","parameters":[{"type":"text","text":row["recommendations"] or "No saved matching recommendations. Please resume your search on Namma Veedu."}]},
+                          {"type":"button","sub_type":"url","index":"0","parameters":[{"type":"text","text":row["id"]}]}]}}
+    response = requests.post(f"https://graph.facebook.com/{config['WHATSAPP_API_VERSION']}/{config['WHATSAPP_PHONE_NUMBER_ID']}/messages",
+        headers={"Authorization":"Bearer "+config["WHATSAPP_ACCESS_TOKEN"]}, json=payload,timeout=30)
+    response.raise_for_status()
+    message_id = response.json()["messages"][0]["id"]
+    return message_id
