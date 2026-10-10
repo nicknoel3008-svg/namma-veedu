@@ -406,6 +406,7 @@ def read_inquiries(path: Path = INQUIRY_LOG_PATH) -> list[dict[str, Any]]:
 
 
 CUSTOMER_SUMMARY_HEADERS = (
+    "Purchase likelihood", "Supporting evidence", "Prediction status", "Prediction last updated", "Actual purchase outcome",
     "User ID", "Customer name", "Conversation ID", "Inquiry ID", "Timestamp (Asia/Kolkata)",
     "Language", "Conversation status", "Email follow-ups", "WhatsApp follow-ups", "Interested in property",
     "Not interested in property", "Interest stated", "Follow-up requested", "Human advisor requested",
@@ -461,6 +462,8 @@ def customer_summary_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         amount = re.search(r"(?:₹|rs\.?\s*)?\d[\d,.]*\s*(?:lakh|lakhs|lac|crore|cr|k)\b|(?:₹|rs\.?\s*)\s*\d[\d,.]*", budget, re.I)
         summary["Budget"] = amount.group(0) if amount else ""
         summaries.append(summary)
+        from purchase_assessment import assess
+        summary.update(assess(latest.get("_assessment_history") or turns, latest.get("_assessment_journeys", ()), latest.get("_assessment_choices", ())))
     return summaries
 
 

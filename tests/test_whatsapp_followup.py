@@ -114,6 +114,13 @@ class WhatsAppFollowupTests(unittest.TestCase):
             self.assertTrue(cancel_followup_from_link(key, self.db))
         self.assertEqual(list_email_followups("qa", self.db)[0]["status"], "cancelled")
 
+    def test_test_worker_skips_other_recipients_without_changing_their_queue(self):
+        self.due()
+        with patch("whatsapp_followup.requests.post") as post:
+            self.assertEqual(send_due_whatsapp_followups(CONFIG,self.db,recipient_allowlist={"+919999999999"}),(0,0))
+            post.assert_not_called()
+        self.assertEqual(list_email_followups("qa",self.db)[0]["status"],"scheduled")
+
     def test_chat_and_manual_ui_persist_recommendations_and_popup(self):
         from streamlit.testing.v1 import AppTest
         import pandas as pd

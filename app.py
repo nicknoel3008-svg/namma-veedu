@@ -1676,6 +1676,22 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
             inquiry_stat.st_size if inquiry_stat else 0,
         )
         today = datetime.now(INDIA_TZ).date()
+        # Refresh journey evidence independently of the cached inquiry history.
+        # Assessments describe current evidence even in date-filtered exports.
+        try:
+            from customer_journey import choices as assessment_choices
+            from visit_journey import owner_journeys as assessment_journeys
+            linked_choices, linked_journeys = assessment_choices(), assessment_journeys()
+            history_by_user = {}
+            for row in sorted(inquiry_rows, key=lambda r: str(r.get("Timestamp (Asia/Kolkata)") or "")):
+                if row.get("User ID"):
+                    history_by_user.setdefault(row["User ID"], []).append(row)
+            inquiry_rows = [dict(row, _assessment_choices=linked_choices,
+                                 _assessment_history=history_by_user.get(row.get("User ID"), ()),
+                                 _assessment_journeys=linked_journeys) for row in inquiry_rows]
+        except Exception:
+            st.warning("Journey evidence could not be loaded. Purchase assessments use chat evidence only.")
+        st.caption("Purchase likelihood is a current, provisional interest assessment, not a validated probability. Date-filtered downloads include current linked visit evidence. Unknown outcomes and silence are not rejection.")
 
         def inquiry_date(row):
             value = pd.to_datetime(row.get("Timestamp (Asia/Calcutta)") or row.get("Timestamp (Asia/Kolkata)"), errors="coerce")
@@ -2022,6 +2038,12 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
 
             preview_columns = ["User ID", "Customer name", "Preferred form of address", "Details shared by customer", "Inquiry ID", "Conversation ID", "Conversation status", "Chat ended at (Asia/Kolkata)", "Conversation close reason", "Final conversation transcript", "Timestamp (Asia/Kolkata)", "Language", "Conversation topic", "Customer tone signal", "Customer satisfaction signal", "Customer interest signal", "Budget mentioned signal", "Customer budget / price stated", "Purchase value / offer stated", "Property type mentioned", "Location mentioned", "Preferred size stated", "Follow-up requested signal", "Follow-up method", "Follow-up summary", "Follow-up schedule status", "Follow-up cadence", "Follow-up consent timestamp (Asia/Kolkata)", "Next follow-up time (Asia/Kolkata)", "Human handoff requested signal", "Listing status asked signal", "Sale outcome mentioned signal", "User inquiry", "Assistant response", "Response type", "Matching records", *owner_fields]
             preview = pd.DataFrame(customer_summary_rows(filtered_rows)).tail(10).iloc[::-1]
+            with st.expander("Purchase assessments and recorded outcomes", expanded=False):
+                from purchase_assessment import HEADERS as assessment_headers
+                assessment_table = pd.DataFrame(customer_summary_rows(filtered_rows)).reindex(
+                    columns=["User ID", "Customer name", "Conversation ID", *assessment_headers])
+                st.caption("One row per conversation; evidence includes this customer's linked chat and visit history. Owner-recorded outcomes are kept separate from customer reports. No validated purchase probability is available yet.")
+                st.dataframe(assessment_table, hide_index=True, use_container_width=True)
             with st.expander("Customer response summaries", expanded=False):
                 st.dataframe(preview, hide_index=True, use_container_width=True)
             response_preview_columns = ["Inquiry ID", "Conversation ID", "Timestamp (Asia/Kolkata)", "Language", "Response type", "Assistant response"]

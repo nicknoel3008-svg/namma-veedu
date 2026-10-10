@@ -58,7 +58,7 @@ def schedule_whatsapp_followup(*, user_id, conversation_id, recipient_phone, cus
     return schedule_id
 
 
-def send_due_whatsapp_followups(config, db_path=FOLLOWUP_DB):
+def send_due_whatsapp_followups(config, db_path=FOLLOWUP_DB, *, recipient_allowlist=None):
     if whatsapp_config_issues(config):
         raise RuntimeError("WhatsApp setup is incomplete; no message sent.")
     now = datetime.now(INDIA_TZ)
@@ -66,6 +66,8 @@ def send_due_whatsapp_followups(config, db_path=FOLLOWUP_DB):
         due = connection.execute("SELECT * FROM email_followups WHERE channel='whatsapp' AND status='scheduled' AND next_send_at<=? ORDER BY next_send_at", (now.isoformat(timespec="seconds"),)).fetchall()
     accepted = failed = 0
     for row in due:
+        if recipient_allowlist is not None and row["recipient_phone"] not in recipient_allowlist:
+            continue
         with _connect(db_path) as connection:
             claimed = connection.execute("UPDATE email_followups SET status='sending', updated_at=? WHERE id=? AND status='scheduled'", (now.isoformat(timespec="seconds"),row["id"]))
             if claimed.rowcount != 1:
