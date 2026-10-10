@@ -23,6 +23,7 @@ with patch("ai_config.select_ai_config", return_value=("offline", "", "")), \
      patch("customer_journey.timeline", side_effect=lambda *args,**kwargs: st.session_state.get("qa_events", [])), \
      patch("visit_journey.owner_journeys", side_effect=lambda *args,**kwargs: st.session_state.get("qa_journeys", [])), \
      patch("advisor_directory.advisors", return_value=[]), \
+     patch("purchase_confirmation.reports", return_value=[]), \
      patch("advisor_directory.save_advisor"), \
      patch("advisor_directory.prepare_handoff"), \
      patch("visit_journey.record_purchase_outcome"):

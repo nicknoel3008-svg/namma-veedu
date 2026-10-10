@@ -24,7 +24,7 @@ def schema(c):
         id TEXT PRIMARY KEY, visit_id TEXT NOT NULL, visit_at TEXT NOT NULL,
         kind TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'queued', updated_at TEXT NOT NULL,
         UNIQUE(visit_id,visit_at,kind))""")
-    for column,default in (('purchase_intent',''),('revised_preferences',''),('purchase_outcome','Unknown'),('outcome_note','')):
+    for column,default in (('purchase_intent',''),('revised_preferences',''),('purchase_outcome','Unknown'),('outcome_note',''),('customer_purchase_confirmed_at',''),('customer_purchase_note','')):
         if getattr(c,'shared',False):
             c.execute(f"ALTER TABLE visit_journeys ADD COLUMN IF NOT EXISTS {column} TEXT NOT NULL DEFAULT '{default}'")
         elif column not in {row[1] for row in c.execute('PRAGMA table_info(visit_journeys)')}:
@@ -146,6 +146,8 @@ def interest(row):
         return 'Purchased (owner recorded)',row.get('outcome_note') or 'Owner recorded a completed purchase'
     if row.get('purchase_outcome')=='Did not purchase':
         return 'Did not purchase (owner recorded)',row.get('outcome_note') or 'Owner recorded the outcome'
+    if row.get('customer_purchase_confirmed_at'):
+        return 'Purchased (customer reported; owner review pending)',row.get('customer_purchase_note') or 'Customer explicitly reported a completed purchase'
     if row.get('purchase_intent')=='Not interested':
         return 'Not interested in this property',row.get('reason') or 'Customer declined this property'
     if row.get('purchase_intent')=='Interested': reasons.append('Customer explicitly interested in purchasing')
@@ -163,7 +165,7 @@ def owner_journeys(db_path=FOLLOWUP_DB):
         schema(c)
         rows = c.execute("""SELECT j.visit_id,j.visit_at,j.attendance,j.reason,j.attended,j.satisfied,
             j.assistance,j.assistance_details,j.advisor_consent,j.advisor_status,j.explore_consent,
-            j.purchase_intent,j.revised_preferences,j.purchase_outcome,j.outcome_note,
+            j.purchase_intent,j.revised_preferences,j.purchase_outcome,j.outcome_note,j.customer_purchase_confirmed_at,j.customer_purchase_note,
             v.property_title,v.customer_name,v.contact_method,v.contact_value,v.status,v.conversation_id,v.preferences,v.user_id
             FROM visit_journeys j JOIN property_visit_requests v ON v.id=j.visit_id""").fetchall()
         all_emails=c.execute('SELECT visit_id,visit_at,kind,status FROM visit_email_outbox').fetchall()
@@ -225,6 +227,7 @@ def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None):
             at = datetime.fromisoformat(visit['visit_at'])
             journey = ensure_journey(c,visit,stamp)
             kind = None
+            if journey['customer_purchase_confirmed_at']: continue
             if at-timedelta(hours=1) <= now < at and journey['attendance']=='Awaiting response': kind='reminder'
             if at+timedelta(hours=2) <= now < at+timedelta(days=1) and not journey['attended']: kind='review'
             if kind:
@@ -237,7 +240,7 @@ def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None):
             visit = c.execute('SELECT * FROM property_visit_requests WHERE id=?', (mail['visit_id'],)).fetchone()
             j = c.execute('SELECT * FROM visit_journeys WHERE visit_id=?',(mail['visit_id'],)).fetchone()
             at = datetime.fromisoformat(mail['visit_at'])
-            valid = visit and j and visit['status']=='Confirmed' and visit['visit_at']==mail['visit_at'] and visit['visit_email_consent']=='Yes'
+            valid = visit and j and not j['customer_purchase_confirmed_at'] and visit['status']=='Confirmed' and visit['visit_at']==mail['visit_at'] and visit['visit_email_consent']=='Yes'
             valid = valid and ((mail['kind']=='reminder' and at-timedelta(hours=1)<=now<at and j['attendance']=='Awaiting response') or (mail['kind']=='review' and at+timedelta(hours=2)<=now<at+timedelta(days=1) and not j['attended']))
             if not valid:
                 c.execute("UPDATE visit_email_outbox SET status='skipped',updated_at=? WHERE id=? AND status='queued'",(stamp,mail['id']))

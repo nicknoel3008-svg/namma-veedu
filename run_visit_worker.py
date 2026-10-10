@@ -32,6 +32,9 @@ def main(argv=None):
             print('Visit worker settings are complete. No connection or messages attempted.')
             return 0
         sent,failed=run_visit_worker(config)
+        from purchase_confirmation import run_purchase_worker
+        purchase_sent,purchase_failed=run_purchase_worker(config)
+        sent+=purchase_sent;failed+=purchase_failed
         print(f'Visit emails: {sent} submitted, {failed} need review. SMTP acceptance is not delivery confirmation.')
         return 1 if failed else 0
     except Exception as error:

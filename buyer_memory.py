@@ -25,19 +25,24 @@ def shown_records(chat):
         if message.get("role") != "assistant":
             continue
         if message.get("mode") == "results":
-            return message.get("records", [])[:3]
+            return message.get("records", [])[:5]
         for tool in reversed(message.get("tool_results", [])):
             if tool.get("kind") in ("properties", "auctions"):
-                return tool.get("data", {}).get("records", [])[:3]
+                return tool.get("data", {}).get("records", [])[:5]
     return []
 
 
 def resolve_reference(text, records, selected=None):
     query = text.casefold()
-    ordinal = re.search(r"\b(first|1st|second|2nd|third|3rd)\b|முதலாவது|இரண்டாவது|மூன்றாவது", query)
+    number=re.fullmatch(r"(?:property|listing|number|option)?\s*#?\s*([1-5])[.! ]*",query)
+    if number:
+        index=int(number.group(1))-1
+        return records[index] if index<len(records) else None
+    ordinal = re.search(r"\b(first|1st|second|2nd|third|3rd|fourth|4th|fifth|5th)\b|முதலாவது|இரண்டாவது|மூன்றாவது|நான்காவது|ஐந்தாவது", query)
     if ordinal:
         index = {"first": 0, "1st": 0, "second": 1, "2nd": 1, "third": 2, "3rd": 2,
-                 "முதலாவது": 0, "இரண்டாவது": 1, "மூன்றாவது": 2}[ordinal.group()]
+                 "fourth":3,"4th":3,"fifth":4,"5th":4,
+                 "முதலாவது": 0, "இரண்டாவது": 1, "மூன்றாவது": 2,"நான்காவது":3,"ஐந்தாவது":4}[ordinal.group()]
         return records[index] if index < len(records) else None
     for record in records:
         if record.get("title") and str(record["title"]).casefold() in query:

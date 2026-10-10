@@ -200,6 +200,34 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
     if selected:
         memory["selected"] = selected
     selected = memory.get("selected")
+    # Interest starts purchase assistance; it never records a completed sale.
+    interested = bool(re.search(r"\b(?:i(?:'m| am)?\s+)?interested\s+in\s+(?:this|that|the|first|second|third|selected)\b|\bi like (?:this|that|the (?:first|second|third))\b|இந்த\s+சொத்[^\s]*.*விருப்பம்", query)) or bool(re.fullmatch(r"(?:i'm |i am )?interested[.! ]*",query))
+    negative_interest=bool(re.search(r"\b(?:not|no longer|isn't|aren't)\s+interested\b|விருப்பமில்லை",query))
+    if interested and not negative_interest:
+        if not selected:
+            memory['purchase_help_pending']='property'
+            return answer('purchase_interest_property',"Which property are you interested in—the listing name or its number?","எந்தச் சொத்தில் விருப்பம்—அதன் பெயர் அல்லது பட்டியல் எண்ணைச் சொல்லுங்கள்?","Endha property-la interest—listing name illa number sollunga?")
+        memory['purchase_help_pending']='assistance'
+        memory['purchase_interest']='Interested'
+        return answer('purchase_assistance_offer',f"You’re interested in {selected.get('title','this property')}. Would you like help with a visit, property-agent support, documents or loan guidance?","இந்தச் சொத்தில் உங்களுக்கு விருப்பம் உள்ளது. பார்வை, சொத்து முகவர், ஆவணங்கள் அல்லது கடன் வழிகாட்டுதலில் உதவி வேண்டுமா?","Indha property-la interest irukku. Visit, property agent, documents illa loan guidance help venuma?")
+    pending_help=memory.get('purchase_help_pending')
+    if pending_help=='property' and selected:
+        memory['purchase_help_pending']='assistance';memory['purchase_interest']='Interested'
+        return answer('purchase_assistance_offer',f"Would you like help with a visit, property-agent support, documents or loan guidance for {selected.get('title','this property')}?","இந்தச் சொத்துக்குப் பார்வை, சொத்து முகவர், ஆவணங்கள் அல்லது கடன் வழிகாட்டுதலில் உதவி வேண்டுமா?","Indha property-ku visit, property agent, documents illa loan help venuma?")
+    if pending_help=='assistance':
+        if re.fullmatch(r"(?:no|no thanks|not now|cancel|வேண்டாம்|இப்போது வேண்டாம்)[.! ]*",query) or negative_interest:
+            memory.pop('purchase_help_pending',None)
+            if not negative_interest:
+                return answer('purchase_assistance_declined',"Of course. Your interest is not a purchase commitment. Let me know whenever you need help.","சரி. உங்கள் விருப்பம் வாங்குவதற்கான உறுதி அல்ல. உதவி தேவைப்பட்டால் சொல்லுங்கள்.","Sari. Interest purchase commitment illai. Help venumna sollunga.")
+        elif re.fullmatch(r"(?:yes|sure|okay|ok|ஆம்|சரி)[.! ]*",query):
+            return answer('purchase_assistance_type',"What would help most: a property visit, a property agent, document guidance or a loan advisor?","எந்த உதவி வேண்டும்—சொத்தைப் பார்வையிடுவது, சொத்து முகவர், ஆவண வழிகாட்டுதல் அல்லது கடன் ஆலோசகர்?","Enna help venum—visit, property agent, documents illa loan advisor?")
+        elif re.search(r"\b(?:loan advisor|finance advisor|property agent|property advisor|both)\b|கடன் ஆலோசகர்|சொத்து முகவர்",query):
+            role='Both' if 'both' in query else 'Loan advisor' if re.search(r'loan|finance|கடன்',query) else 'Property agent'
+            memory.pop('purchase_help_pending',None)
+            return answer('purchase_advisor_request',"I can save a callback request for Nick after your consent. Would you prefer phone or email?","உங்கள் ஒப்புதலுடன் நிக்கிற்குத் தொடர்பு கோரிக்கையைச் சேமிக்கலாம். தொலைபேசியா மின்னஞ்சலா?","Consent-oda Nick-ku callback request save pannalaam. Phone illa email?",advisor_role=role)
+        elif re.search(r"\b(?:visit|view|slot|appointment)\b|பார்வை",query):
+            memory.pop('purchase_help_pending',None)
+            return answer('purchase_visit_help',"Use Book a slot on this property to choose a predefined time or request your own. The owner will confirm availability.","இந்தச் சொத்தின் Book a slot மூலம் நேரத்தைத் தேர்ந்தெடுக்கலாம் அல்லது விருப்ப நேரத்தைக் கோரலாம். உரிமையாளர் கிடைப்பதை உறுதிப்படுத்துவார்.","Indha property Book a slot-la time choose pannunga illa custom time request pannunga. Owner availability confirm pannuvaar.")
     if re.fullmatch(r"(?:what (?:is|are) )?auction(?: properties)?\?+", query):
         context.clear()
         context.update(previous_context)

@@ -233,7 +233,8 @@ FOLLOWUP_EMAIL_CONFIG = {
     )
 }
 FOLLOWUP_EMAIL_READY = email_config_ready(FOLLOWUP_EMAIL_CONFIG)
-from visit_journey_ui import render_visit_response
+from visit_journey_ui import render_visit_response, render_purchase_rating
+render_purchase_rating()
 render_visit_response()
 FOLLOWUP_WHATSAPP_CONFIG = {key: configured_value(key) for key in WHATSAPP_CONFIG_KEYS}
 FOLLOWUP_WHATSAPP_READY = not whatsapp_config_issues(FOLLOWUP_WHATSAPP_CONFIG)
@@ -1522,6 +1523,11 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
                 selections = choices()
                 journeys = owner_journeys()
                 events = timeline()
+                from purchase_confirmation import reports
+                purchase_reports=reports()
+                if purchase_reports:
+                    st.markdown("##### Customer-reported purchases, final ratings and email status")
+                    st.dataframe(pd.DataFrame(purchase_reports),hide_index=True)
                 if selections:
                     st.markdown("##### Preferred properties and search preferences")
                     st.dataframe(pd.DataFrame(selections), hide_index=True)
@@ -3316,6 +3322,14 @@ def _respond_without_logging(text: str):
             sync_intent.property_type = "Any"
         queue_mira_filter_sync(sync_intent)
     if conversation.get("reply"):
+        if conversation.get("intent")=="purchase_assistance_offer" and conversation["memory"].get("selected"):
+            try:
+                from customer_journey import select_property
+                select_property(user_id=str(st.session_state.user_id),conversation_id=str(st.session_state.setdefault("inquiry_conversation_id",str(uuid4()))),record=conversation["memory"]["selected"],preferences=conversation["context"])
+            except Exception:
+                logging.exception("Could not persist interested property selection")
+        if conversation.get("advisor_role"):
+            st.session_state.advisor_request={"stage":"method","role":conversation["advisor_role"]}
         st.session_state.pending_area_source_check = False
         st.session_state.pending_contact_source = None
         st.session_state.property_inquiry_active = False
@@ -4731,7 +4745,8 @@ def respond(text: str):
         if assistant_message and assistant_message.get("mode") == "callback_request_confirmed":
             record.update({"Advisor callback status": "Awaiting owner review", "Advisor callback method": callback_request.get("method", ""),
                 "Advisor callback contact": callback_request.get("contact", ""), "Advisor callback preferred time": callback_request.get("preferred_time", ""),
-                "Advisor callback consent timestamp": timestamp.isoformat(timespec="seconds")})
+                "Advisor callback consent timestamp": timestamp.isoformat(timespec="seconds"),
+                "Advisor callback role": callback_request.get("role", "Support")})
         try:
             append_inquiry(record)
             if callback_request.get("stage") == "confirmed":
@@ -5714,12 +5729,23 @@ if st.session_state.get("visit_property"):
     visit_request_dialog()
 if st.session_state.get("visit_saved_notice"):
     st.success(st.session_state.visit_saved_notice)
+with st.expander("My visit requests and purchase confirmations",expanded=False):
     if st.button("View my visit requests",key="view_my_visits"):
         st.session_state.show_visit_requests = not st.session_state.get("show_visit_requests",False)
     if st.session_state.get("show_visit_requests"):
         try:
             for visit in list_visit_requests(str(st.session_state.user_id)):
                 st.write(f"{visit['property_title']} · {visit['visit_at']} · {visit['status']}")
+                with st.form("purchase_confirmation_"+visit['id']):
+                    purchased=st.checkbox("I confirm that I completed the purchase of this property.")
+                    purchase_note=st.text_input("Purchase note (optional; no payment or identity details)")
+                    receipt_consent=st.checkbox("Email me a thank-you message and optional final-rating link.",disabled=visit['contact_method']!='Email')
+                    if st.form_submit_button("Confirm completed purchase"):
+                        from purchase_confirmation import confirm_purchase
+                        try:
+                            st.success(confirm_purchase(visit['id'],user_id=str(st.session_state.user_id),confirmed=purchased,note=purchase_note,email_receipt=receipt_consent))
+                        except ValueError as error:
+                            st.error(str(error))
                 if visit["status"] in {"Requested","Confirmed"} and st.button("Cancel visit request",key=f"cancel_visit_{visit['id']}"):
                     update_visit_status(visit["id"],"Cancelled",user_id=str(st.session_state.user_id))
                     st.rerun()

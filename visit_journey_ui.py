@@ -22,11 +22,16 @@ def render_visit_response():
             st.info('Please contact the owner about this request. Rescheduled times need owner confirmation.')
             st.stop()
         past = datetime.now(INDIA_TZ)>=datetime.fromisoformat(context['visit_at'])
-        choices = ['Visit feedback','Reschedule','Explore other properties','Cancel visit'] if past else ['Yes, I will attend','No, I cannot attend','Reschedule','Explore other properties']
+        choices = ['Visit feedback','I purchased this property','Reschedule','Explore other properties','Cancel visit'] if past else ['Yes, I will attend','I purchased this property','No, I cannot attend','Reschedule','Explore other properties']
         choice=st.radio('How can we help?',choices)
         with st.form('visit_response_form'):
             reason=st.text_area('Reason or visit comments (no financial account details)')
             when=None;attended='';satisfied='';assistance='None';details='';consent=False;explore=False;intent='Undecided';changes=''
+            purchase_confirmed=False;receipt_consent=False
+            if choice=='I purchased this property':
+                purchase_confirmed=st.checkbox('I confirm that I completed the purchase of this property.')
+                receipt_consent=st.checkbox('Email me a thank-you message and optional final-rating link.',disabled=context['contact_method']!='Email')
+                st.caption('This records your reported purchase for owner review and stops visit reminders for this property. Do not enter payment or identity document details.')
             if choice=='Reschedule':
                 day=st.date_input('New visit date',value=datetime.now(INDIA_TZ).date()+timedelta(days=1),min_value=datetime.now(INDIA_TZ).date())
                 time=st.time_input('Requested time (IST)',value=datetime.strptime('10:00','%H:%M').time())
@@ -48,6 +53,10 @@ def render_visit_response():
                     explore=st.checkbox('I would like Mira to help me explore other properties using my saved preferences and these changes.')
             submitted=st.form_submit_button('Save response')
         if submitted:
+            if choice=='I purchased this property':
+                from purchase_confirmation import confirm_purchase
+                st.success(confirm_purchase(context['visit_id'],token=token,confirmed=purchase_confirmed,note=reason,email_receipt=receipt_consent))
+                st.stop()
             action={'Yes, I will attend':'yes','No, I cannot attend':'no','Cancel visit':'no','Reschedule':'reschedule','Explore other properties':'explore','Visit feedback':'feedback'}[choice]
             reply=record_response(token,action=action,reason=reason,visit_at=when,attended=attended,satisfied=satisfied,assistance=assistance,details=details,advisor_consent=consent,explore_consent=explore,purchase_intent=intent,revised_preferences=changes)
             st.success(reply)
@@ -58,4 +67,23 @@ def render_visit_response():
         st.error(str(error))
     except Exception:
         st.error('Your visit response could not be loaded or saved. Please contact the owner or try again.')
+    st.stop()
+
+
+def render_purchase_rating():
+    token=str(st.query_params.get('purchase_rating','') or '')
+    if not token:return
+    from purchase_confirmation import rating_context,save_rating
+    st.title('Namma Veedu · Your experience')
+    try:
+        context=rating_context(token)
+        if not context:
+            st.info('This private rating link is invalid or expired.');st.stop()
+        st.write(context['property_title'])
+        with st.form('final_purchase_rating'):
+            rating=st.radio('How would you rate your overall experience with Mira?',[1,2,3,4,5],index=None)
+            if st.form_submit_button('Save final rating'):
+                save_rating(token,rating);st.success('Thank you! Your final rating is saved.')
+    except ValueError as error:st.error(str(error))
+    except Exception:st.error('Could not load or save the rating. Please try again.')
     st.stop()

@@ -116,3 +116,5 @@ These are delivered behaviors and verification points, not a claim of real-world
 Welcome/language; searches and corrections; multiple types; auction inclusion/removal; no-match recovery; pagination; listing details, calculations and loan continuity; follow-up save/popup/failure/cancellation; feedback and linked learning draft; approval/rejection and reports; eight KPIs, snapshots and exports; privacy redaction; storage errors; provider fallback; dashboard performance; and public startup/chat after deployment.
 
 Update this document and its connected flowchart when behavior changes. Studio displays both and provides this complete blueprint for download.
+
+Interest starts assistance before a sale: clarify the property, ask what help is needed, then offer visit booking, document guidance or consented property/loan callback intake. Completed purchase confirmation is a separate, explicit customer report. It stops this property's visit messaging and queues owner review plus an optional thank-you/final-rating email. Owner verification remains distinct from customer reports and is required before treating a purchase as a verified training outcome.
