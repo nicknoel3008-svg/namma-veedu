@@ -9,6 +9,7 @@ from pathlib import Path
 import smtplib
 import sqlite3
 import ssl
+import re
 from typing import Any
 from uuid import uuid4
 from urllib.parse import urlparse
@@ -18,10 +19,39 @@ from agent_runtime import INDIA_TZ
 
 ROOT = Path(__file__).resolve().parent
 FOLLOWUP_DB = ROOT / "data" / "private" / "followups.sqlite3"
+_shared_schema_ready = set()
 
 
 @contextmanager
 def _connect(db_path: Path = FOLLOWUP_DB):
+    # The deployed website and its worker must use the same queue. Explicit
+    # temporary paths continue to use SQLite for isolated tests.
+    from storage_backend import _database_url
+    if Path(db_path) == FOLLOWUP_DB and _database_url():
+        import psycopg
+        from psycopg.rows import dict_row
+        with psycopg.connect(_database_url(), row_factory=dict_row, connect_timeout=8) as connection:
+            if _database_url() not in _shared_schema_ready:
+                connection.execute("""CREATE TABLE IF NOT EXISTS email_followups (
+                id TEXT PRIMARY KEY, user_id TEXT NOT NULL, conversation_id TEXT NOT NULL,
+                recipient_email TEXT NOT NULL, customer_name TEXT NOT NULL DEFAULT '',
+                preference_summary TEXT NOT NULL, started_at TEXT NOT NULL, next_send_at TEXT NOT NULL,
+                cadence_days INTEGER NOT NULL, max_messages INTEGER NOT NULL, sent_count INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'scheduled', opted_in_at TEXT NOT NULL,
+                last_error TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL,
+                channel TEXT NOT NULL DEFAULT 'email', recipient_phone TEXT NOT NULL DEFAULT '',
+                provider_message_id TEXT NOT NULL DEFAULT '', recommendations TEXT NOT NULL DEFAULT '')""")
+                for column, default in (("channel", "email"), ("recipient_phone", ""), ("provider_message_id", ""), ("recommendations", "")):
+                    connection.execute(f"ALTER TABLE email_followups ADD COLUMN IF NOT EXISTS {column} TEXT NOT NULL DEFAULT '{default}'")
+                connection.execute("ALTER TABLE email_followups ENABLE ROW LEVEL SECURITY")
+                connection.commit()
+                _shared_schema_ready.add(_database_url())
+            class SharedQueue:
+                shared = True
+                def execute(self, sql, params=()):
+                    return connection.execute(sql.replace("?", "%s"), params)
+            yield SharedQueue()
+        return
     db_path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(db_path, timeout=15)
     connection.row_factory = sqlite3.Row
@@ -45,6 +75,10 @@ def _connect(db_path: Path = FOLLOWUP_DB):
             updated_at TEXT NOT NULL
         )
     """)
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(email_followups)")}
+    for column, default in (("channel", "email"), ("recipient_phone", ""), ("provider_message_id", ""), ("recommendations", "")):
+        if column not in columns:
+            connection.execute(f"ALTER TABLE email_followups ADD COLUMN {column} TEXT NOT NULL DEFAULT '{default}'")
     connection.commit()
     try:
         with connection:
@@ -67,6 +101,7 @@ def schedule_email_followup(
     customer_name: str, preference_summary: str, started_at: datetime,
     max_messages: int = 3, db_path: Path = FOLLOWUP_DB,
     initial_status: str = "scheduled",
+    recommendations: str = "",
 ) -> str:
     """Save a user-opted-in sequence, optionally as a non-delivery draft."""
     if initial_status not in {"scheduled", "saved_pending_activation"}:
@@ -76,8 +111,8 @@ def schedule_email_followup(
     next_send = next_three_day_boundary(started_at, now)
     with _connect(db_path) as connection:
         existing = connection.execute(
-            "SELECT id FROM email_followups WHERE user_id=? AND conversation_id=? AND recipient_email=? AND preference_summary=? AND max_messages=? AND status IN ('scheduled','sending','saved_pending_activation') ORDER BY updated_at DESC LIMIT 1",
-            (user_id, conversation_id, recipient_email.strip().lower(), preference_summary.strip()[:500], max_messages),
+            "SELECT id FROM email_followups WHERE channel='email' AND user_id=? AND conversation_id=? AND recipient_email=? AND preference_summary=? AND recommendations=? AND max_messages=? AND status IN ('scheduled','sending','saved_pending_activation') ORDER BY updated_at DESC LIMIT 1",
+            (user_id, conversation_id, recipient_email.strip().lower(), preference_summary.strip()[:500], recommendations[:1000], max_messages),
         ).fetchone()
         if existing:
             return str(existing["id"])
@@ -98,13 +133,14 @@ def schedule_email_followup(
                 "UPDATE email_followups SET status=?, updated_at=? WHERE id=?",
                 (initial_status, now.isoformat(timespec="seconds"), schedule_id),
             )
+        connection.execute("UPDATE email_followups SET recommendations=? WHERE id=?", (recommendations[:1000], schedule_id))
     return schedule_id
 
 
 def list_email_followups(user_id: str, db_path: Path = FOLLOWUP_DB) -> list[dict[str, Any]]:
     with _connect(db_path) as connection:
         rows = connection.execute(
-            "SELECT id, recipient_email, preference_summary, next_send_at, sent_count, max_messages, status FROM email_followups WHERE user_id=? ORDER BY updated_at DESC",
+            "SELECT id, recipient_email, recipient_phone, channel, preference_summary, recommendations, next_send_at, sent_count, max_messages, status, provider_message_id FROM email_followups WHERE user_id=? ORDER BY updated_at DESC",
             (user_id,),
         ).fetchall()
     return [dict(row) for row in rows]
@@ -115,7 +151,7 @@ def cancel_email_followup(schedule_id: str, user_id: str, db_path: Path = FOLLOW
     with _connect(db_path) as connection:
         row = connection.execute("SELECT conversation_id FROM email_followups WHERE id=? AND user_id=?", (schedule_id, user_id)).fetchone()
         cursor = connection.execute(
-            "UPDATE email_followups SET status='cancelled', updated_at=? WHERE id=? AND user_id=? AND status IN ('scheduled','sending','saved_pending_activation')",
+            "UPDATE email_followups SET status='cancelled', updated_at=? WHERE id=? AND user_id=? AND status IN ('scheduled','sending','saved_pending_activation','needs_review')",
             (now, schedule_id, user_id),
         )
         cancelled = cursor.rowcount > 0
@@ -149,13 +185,13 @@ def cancel_followup_from_link(token: str, db_path: Path = FOLLOWUP_DB) -> bool:
     with _connect(db_path) as connection:
         row = connection.execute("SELECT conversation_id FROM email_followups WHERE id=?", (token,)).fetchone()
         cursor = connection.execute(
-            "UPDATE email_followups SET status='cancelled', updated_at=? WHERE id=? AND status IN ('scheduled','sending','saved_pending_activation')",
+            "UPDATE email_followups SET status='cancelled', updated_at=? WHERE id=? AND status IN ('scheduled','sending','saved_pending_activation','needs_review','accepted')",
             (now, token),
         )
         cancelled = cursor.rowcount > 0
     if cancelled and row:
         from inquiry_log import update_conversation_fields
-        update_conversation_fields(str(row["conversation_id"]), {"Follow-up schedule status": "Stopped from email link", "Next follow-up time (Asia/Kolkata)": ""})
+        update_conversation_fields(str(row["conversation_id"]), {"Follow-up schedule status": "Stopped from message link", "Next follow-up time (Asia/Kolkata)": ""})
     return cancelled
 
 
@@ -190,11 +226,11 @@ def send_due_followups(config: dict[str, str], db_path: Path = FOLLOWUP_DB) -> t
     with _connect(db_path) as connection:
         stale_before = (now - timedelta(hours=1)).isoformat(timespec="seconds")
         connection.execute(
-            "UPDATE email_followups SET status='scheduled', updated_at=? WHERE status='sending' AND updated_at<?",
+            "UPDATE email_followups SET status='scheduled', updated_at=? WHERE channel='email' AND status='sending' AND updated_at<?",
             (now.isoformat(timespec="seconds"), stale_before),
         )
         due = connection.execute(
-            "SELECT * FROM email_followups WHERE status='scheduled' AND next_send_at<=? ORDER BY next_send_at",
+            "SELECT * FROM email_followups WHERE channel='email' AND status='scheduled' AND next_send_at<=? ORDER BY next_send_at",
             (now.isoformat(timespec="seconds"),),
         ).fetchall()
     sent = failed = 0
@@ -214,12 +250,13 @@ def send_due_followups(config: dict[str, str], db_path: Path = FOLLOWUP_DB) -> t
         greeting = f"Hi {name}," if name else "Hi," 
         summary = row["preference_summary"].strip()
         summary_text = f"\nYou asked us to follow up about: {summary}\n" if summary else ""
+        recommendation_text = row["recommendations"] or "No saved matching recommendations were captured. Please resume your search on Namma Veedu."
         message = EmailMessage()
         message["Subject"] = "A quick check-in from Namma Veedu"
         message["From"] = config["FOLLOWUP_SMTP_FROM"]
         message["To"] = recipient
         message.set_content(
-            f"{greeting}\n\nJust checking in from Namma Veedu. Would you like to continue exploring your property options?{summary_text}\nThere is no pressure to reply. This is an AI-guided property portal, and this message does not confirm listing availability or loan terms.\n\nTo stop these follow-up emails, use this link: {unsubscribe_url}\n\nNamma Veedu"
+            f"{greeting}\n\nHere are Mira's saved recommendations for your search.{summary_text}\n{recommendation_text}\n\nThese are saved source snapshots, not live availability or verified loan terms. Check the source before acting.\n\nTo stop these follow-up emails, use this link: {unsubscribe_url}\n\nNamma Veedu"
         )
         try:
             port = int(config.get("FOLLOWUP_SMTP_PORT") or "587")

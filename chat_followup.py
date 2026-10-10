@@ -11,25 +11,48 @@ def followup_turn(text, state=None, now=None, tamil=False):
     state = dict(state or {})
     requested = re.search(r"\b(?:follow[- ]?ups?|remind(?:ers?)?|check back with me|email me later)\b|நினைவூட்ட|நினைவுபடுத்து|பின்னர் தொடர்பு", query)
     email_request = re.search(r"\b(?:email|e-mail|mail)\b.{0,80}\b(?:me|send|share|suggestions|properties|results)\b|\b(?:send|share)\b.{0,80}\b(?:email|e-mail|mail)\b", query)
-    if not state and not (requested or email_request):
+    whatsapp_request = re.search(r"\b(?:whatsapp|whats app)\b.{0,80}\b(?:me|send|share|follow|remind)\b|\b(?:send|share|text|message|ping|follow[- ]?up|follow|remind|cancel|stop)\b.{0,80}\b(?:whatsapp|whats app)\b|வாட்ஸ்அப்", query)
+    if not state and not (requested or email_request or whatsapp_request):
         return None
     if state and not (requested or email_request) and re.search(r"\b(?:show|find|search|browse)\b.{0,60}\b(?:flats?|houses?|plots?|homes?|properties|auctions?)\b", query):
         return {"state": {}, "reply": "", "action": None, "resume": True}
     def result(reply, action=None):
         return {"state": state, "reply": reply, "action": action}
-    if re.search(r"\b(?:cancel|never mind|don't|do not|no thanks)\b|\bno\s+(?:(?:more|further|another|any)\s+)?(?:follow[- ]?ups?|reminders?|emails?)\b|வேண்டாம்", query) or query.strip() in {"no", "இல்லை"}:
-        cancel_saved = bool(requested and not state and re.search(r"\bcancel\b", query))
+    if re.search(r"\b(?:cancel|stop|never mind|don't|do not|no thanks)\b|\bno\s+(?:(?:more|further|another|any)\s+)?(?:follow[- ]?ups?|reminders?|emails?)\b|வேண்டாம்", query) or query.strip() in {"no", "இல்லை"}:
+        cancel_saved = bool((requested or whatsapp_request) and not state and re.search(r"\b(?:cancel|stop)\b", query))
         state.clear()
         value = result("சரி, follow-up சேமிக்கவில்லை." if tamil else "Okay, I haven’t saved a follow-up.")
         value["cancel_saved"] = cancel_saved
         return value
     if not state:
-        state = {"summary": text[:500], "method": "email" if re.search(r"\b(?:email|e-mail|mail)\b|மின்னஞ்சல்", query) else "in_app"}
+        state = {"summary": text[:500], "method": "whatsapp" if re.search(r"\b(?:whatsapp|whats app)\b|வாட்ஸ்அப்", query) else "email" if re.search(r"\b(?:email|e-mail|mail)\b|மின்னஞ்சல்", query) else "in_app"}
     elif re.search(r"\b(?:in[- ]app|browser)\b", query):
         state["method"] = "in_app"
         state.pop("timing", None)
     elif re.search(r"\b(?:email|e-mail)\b|[^\s@]+@[^\s@]+\.[^\s@]+", query):
+        if state.get("method") != "email":
+            state.pop("stage", None)
         state["method"] = "email"
+    elif re.search(r"\b(?:whatsapp|whats app)\b|வாட்ஸ்அப்", query):
+        if state.get("method") != "whatsapp":
+            state.pop("stage", None)
+        state["method"] = "whatsapp"
+    if state["method"] == "whatsapp":
+        from whatsapp_followup import normalize_phone
+        number = re.search(r"\+[1-9][\d ().-]{7,24}\d", text)
+        if number:
+            try:
+                state["phone"] = normalize_phone(number.group())
+            except ValueError:
+                return result("நாட்டுக் குறியீட்டுடன் சரியான WhatsApp எண்ணைக் கூறுங்கள் (+91…)." if tamil else "Please give a valid WhatsApp number with + and country code, for example +91 followed by your number.")
+        if not state.get("phone"):
+            return result("நாட்டுக் குறியீட்டுடன் உங்கள் WhatsApp எண் என்ன? (+91…)" if tamil else "Which WhatsApp number should I use? Include + and the country code, for example +91 followed by your number.")
+        if state.get("stage") != "consent" or number:
+            state["stage"] = "consent"
+            return result(f"{state['phone']} எண்ணுக்கு உங்கள் தேடல் பரிந்துரைகளுடன் 3 நாட்களில் ஒரு WhatsApp follow-up அனுப்ப ஒப்புக்கொள்கிறீர்களா? அனுப்புதல் முடக்கப்பட்டிருந்தால் கோரிக்கை மட்டும் சேமிக்கப்படும்." if tamil else f"May I save one WhatsApp follow-up to {state['phone']} for three days from now, including Mira’s saved recommendations for your search? If delivery is off, I’ll save it for review without sending. You can stop it anytime.")
+        if not re.fullmatch(r"[\W_]*(?:yes|yeah|sure|please|okay|ok|go ahead|ஆம்|ஆமாம்|சரி)[\W_]*", query):
+            return result("ஒப்புதலுக்கு ஆம் அல்லது நிறுத்த வேண்டாம் என்று கூறுங்கள்." if tamil else "Please say yes to opt in, or cancel to stop.")
+        return result("", {**state, "consent": True})
     if state["method"] == "email":
         address = re.search(r"[^\s<>@]+@[^\s<>@]+\.[^\s<>@.,!?]+", text)
         if address:
@@ -38,7 +61,7 @@ def followup_turn(text, state=None, now=None, tamil=False):
             return result("எந்த மின்னஞ்சல் முகவரிக்கு அனுப்ப வேண்டும்?" if tamil else "Which email address should I use for the follow-up?")
         if state.get("stage") != "consent" or address:
             state["stage"] = "consent"
-            return result((f"{state['email']} முகவரிக்கு 3 நாட்களில் ஒரு follow-up மின்னஞ்சல் அனுப்ப ஒப்புக்கொள்கிறீர்களா? அனுப்புதல் முடக்கப்பட்டிருந்தால் கோரிக்கை மட்டும் சேமிக்கப்படும்." if tamil else f"May I save one follow-up email to {state['email']} for three days from now? If email delivery is off, I’ll save the request for review without sending it."))
+            return result((f"{state['email']} முகவரிக்கு உங்கள் தேடல் பரிந்துரைகளுடன் 3 நாட்களில் ஒரு follow-up மின்னஞ்சல் அனுப்ப ஒப்புக்கொள்கிறீர்களா? அனுப்புதல் முடக்கப்பட்டிருந்தால் கோரிக்கை மட்டும் சேமிக்கப்படும்." if tamil else f"May I save one follow-up email to {state['email']} for three days from now, including Mira’s saved recommendations for your search? If email delivery is off, I’ll save the request for review without sending it."))
         if not re.fullmatch(r"[\W_]*(?:yes|yeah|sure|please|okay|ok|go ahead|ஆம்|ஆமாம்|சரி)[\W_]*", query):
             return result("மின்னஞ்சல் அனுப்ப ஒப்புதல் வேண்டுமா? ஆம் அல்லது வேண்டாம் என்று சொல்லுங்கள்." if tamil else "Please say yes to opt in, or cancel to stop.")
         return result("", dict(state))

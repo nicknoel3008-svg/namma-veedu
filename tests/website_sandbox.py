@@ -20,5 +20,9 @@ with patch("ai_config.select_ai_config", return_value=("offline", "", "")), \
      patch("mira_learning_library.save_learning_rules"), \
      patch("followup_service.cancel_user_followups", return_value=0), \
      patch("followup_service.list_email_followups", return_value=[]), \
-     patch("followup_service.schedule_email_followup", side_effect=RuntimeError("Email sending is disabled in browser QA")):
+     patch("followup_service.schedule_email_followup", side_effect=RuntimeError("Email sending is disabled in browser QA")), \
+     patch("whatsapp_followup.schedule_whatsapp_followup", side_effect=RuntimeError("WhatsApp sending is disabled in browser QA")), \
+     patch("visit_service.confirmed_visit_times", return_value=set()), \
+     patch("visit_service.request_visit", return_value="qa-visit-request"), \
+     patch("visit_service.list_visit_requests", return_value=[]):
     runpy.run_path(str(ROOT / "app.py"), run_name="__main__")

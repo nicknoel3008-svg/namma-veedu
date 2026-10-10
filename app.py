@@ -35,6 +35,9 @@ from agent_policy import (
 from agent_runtime import INDIA_TZ, run_openai_agent
 from area_utils import convert_area, price_per_sqm
 from followup_service import cancel_email_followup, cancel_followup_from_link, cancel_user_followups, email_config_ready, list_email_followups, schedule_email_followup
+from whatsapp_followup import CONFIG_KEYS as WHATSAPP_CONFIG_KEYS, normalize_phone, schedule_whatsapp_followup, whatsapp_config_issues
+from followup_recommendations import recommendation_snapshot
+from visit_service import request_visit, list_visit_requests, confirmed_visit_times, update_visit_status, STATUSES as VISIT_STATUSES
 from inquiry_log import INQUIRY_ARCHIVE_DIR, INQUIRY_LOG_PATH, append_inquiry as local_append_inquiry, archive_inquiry_export, build_conversation_transcript_export, build_inquiry_export, customer_summary_rows, structured_archive_export, read_inquiries as local_read_inquiries, update_conversation_fields as local_update_conversation_fields, update_inquiry_fields as local_update_inquiry_fields
 import storage_backend
 from mira_dialogue_libraries import local_dialogue_reply, local_land_conversation_reply
@@ -230,6 +233,8 @@ FOLLOWUP_EMAIL_CONFIG = {
     )
 }
 FOLLOWUP_EMAIL_READY = email_config_ready(FOLLOWUP_EMAIL_CONFIG)
+FOLLOWUP_WHATSAPP_CONFIG = {key: configured_value(key) for key in WHATSAPP_CONFIG_KEYS}
+FOLLOWUP_WHATSAPP_READY = not whatsapp_config_issues(FOLLOWUP_WHATSAPP_CONFIG)
 
 
 def owner_dashboard_password() -> str:
@@ -1460,6 +1465,31 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
             st.info("Add DATABASE_URL in Streamlit Secrets to keep hosted chat records and approved Learning Library rules across restarts.")
         st.caption("Email follow-ups are intentionally excluded from this readiness view.")
     blueprint_path = ROOT / "WEBSITE_BLUEPRINT.md"
+    with st.expander("Property visit requests", expanded=False):
+        st.caption("Confirm a visit only after checking access with the listing source. Changing a status does not send a customer message.")
+        if st.button("Load visit requests", key="load_visit_requests"):
+            st.session_state.visit_requests_loaded = True
+        if st.session_state.get("visit_requests_loaded"):
+            try:
+                visits = list_visit_requests()
+                if visits:
+                    visit_frame = pd.DataFrame(visits)
+                    edited_visits = st.data_editor(visit_frame, key="visit_requests_editor", hide_index=True,
+                        disabled=[column for column in visit_frame.columns if column != "status"],
+                        column_config={"status":st.column_config.SelectboxColumn("Visit status",options=list(VISIT_STATUSES),required=True)})
+                    if st.button("Save visit decisions",key="save_visit_decisions"):
+                        for original, updated in zip(visits,edited_visits.to_dict("records")):
+                            if original["status"] != updated["status"]:
+                                update_visit_status(original["id"],updated["status"])
+                        st.success("Visit decisions saved. Customers can check their request status on this browser.")
+                        st.rerun()
+                    st.download_button("Download visit requests (.csv)",visit_frame.to_csv(index=False),file_name="namma_veedu_visit_requests.csv",mime="text/csv")
+                else:
+                    st.info("No property visit requests yet.")
+            except ValueError as error:
+                st.error(str(error))
+            except Exception:
+                st.error("Visit requests could not be loaded or saved. Please retry.")
     with st.expander("Website Blueprint", expanded=False):
         st.caption("Private product and engineering map. It contains no passwords, API keys, or customer conversation text.")
         flowchart_path = ROOT / "static" / "mira-blueprint-flowchart.svg"
@@ -2071,7 +2101,12 @@ def property_source_lookup(record):
     return source_url, hint, reference_label, reference_value
 
 
+visit_card_counter = 0
+
+
 def render_property_card(row, number=None):
+    global visit_card_counter
+    visit_card_counter += 1
     record = row.to_dict()
     status = record.get("listing_status", "Saved listing")
     css_status = "auction" if status == "Auction" else "expired" if status == "Auction ended" else "sale" if status == "Existing sale" else "undated" if status == "Auction date not listed" else ""
@@ -2139,6 +2174,9 @@ def render_property_card(row, number=None):
         '</div>'
     )
     st.markdown(card_html, unsafe_allow_html=True)
+    if st.button("பார்வையிட நேரம் கோருங்கள்" if language == "தமிழ்" else "Book a slot", key=f"book_visit_{visit_card_counter}"):
+        st.session_state.visit_property = record
+        st.rerun()
     source_url, source_hint, reference_label, reference_value = property_source_lookup(record)
     if source_url:
         with st.expander("விவரங்களைச் சரிபார்க்கவும் அல்லது ஆதாரத்தைப் பார்க்கவும்" if language == "தமிழ்" else "Verify details or view source"):
@@ -2975,6 +3013,21 @@ def local_loan_response(text: str, chat_history: list[dict]) -> tuple[str, str] 
     return None
 
 
+def current_followup_recommendations():
+    frame = st.session_state.get("main_results")
+    preferences = st.session_state.get("search_context", {})
+    if st.session_state.get("main_results_mode") == "filters" and st.session_state.get("filters_applied"):
+        frame = apply_filters()
+        applied = st.session_state.get("applied_property_filters") or {}
+        preferences = {"location": applied.get("location"), "property_type": applied.get("property_type")}
+        if applied.get("use_budget"):
+            preferences["max_budget"] = float(applied.get("max_budget_lakh") or 0) * 100_000
+        if applied.get("use_bedrooms"):
+            preferences["bedrooms"] = applied.get("bedrooms")
+    records = frame.head(3).to_dict("records") if isinstance(frame, pd.DataFrame) else []
+    return recommendation_snapshot(records, preferences)
+
+
 def _respond_without_logging(text: str):
     # Keep recurring reviewed patterns discoverable without making customer
     # messages wait on or alter the approved guidance set.
@@ -3042,7 +3095,11 @@ def _respond_without_logging(text: str):
             schedule = st.session_state.get("followup_schedule", {})
             reminder = next((item for item in reversed(st.session_state.in_app_reminders)
                              if item["status"] == "saved" and (not schedule.get("reminder_id") or item["id"] == schedule["reminder_id"])), None)
-            if schedule.get("method") == "Email":
+            if schedule.get("method") == "WhatsApp":
+                cancelled = schedule.get("status") == "Stopped after user returned" or cancel_email_followup(schedule.get("schedule_id", ""), str(st.session_state.user_id))
+                st.session_state.followup_schedule = {**schedule, "status": "Stopped by user", "next_at": ""}
+                reply = ("WhatsApp follow-up நிறுத்தப்பட்டது." if language == "தமிழ்" else "Your WhatsApp follow-up has been stopped.") if cancelled else ("No active WhatsApp follow-up remains to cancel.")
+            elif schedule.get("method") == "Email":
                 reply = "மின்னஞ்சல் follow-up நிறுத்தப்பட்டது." if language == "தமிழ்" else "Your email follow-up has been stopped."
             elif reminder:
                 update_in_app_followup_status(reminder, "Removed")
@@ -3053,7 +3110,22 @@ def _respond_without_logging(text: str):
         if action:
             try:
                 now = datetime.now(INDIA_TZ)
-                if action["method"] == "email":
+                if action["method"] == "whatsapp":
+                    schedule_id = schedule_whatsapp_followup(
+                        user_id=str(st.session_state.user_id),
+                        conversation_id=str(st.session_state.setdefault("inquiry_conversation_id", str(uuid4()))),
+                        recipient_phone=action["phone"], customer_name=str(st.session_state.get("customer_name", "")),
+                        preference_summary=action["summary"], started_at=now, consent=action["consent"],
+                        recommendations=current_followup_recommendations(),
+                        initial_status="scheduled" if FOLLOWUP_WHATSAPP_READY else "saved_pending_activation",
+                    )
+                    record = next(item for item in list_email_followups(str(st.session_state.user_id)) if item["id"] == schedule_id)
+                    next_at = record["next_send_at"] if FOLLOWUP_WHATSAPP_READY else ""
+                    method, cadence = "WhatsApp", "One WhatsApp message after 3 days"
+                    status = "Scheduled" if FOLLOWUP_WHATSAPP_READY else "Saved (WhatsApp delivery off)"
+                    reply = "Mira பரிந்துரைகளுடன் WhatsApp follow-up சேமிக்கப்பட்டது." if language == "தமிழ்" else "I’ve saved your WhatsApp follow-up with Mira’s recommendations for your search."
+                    reply += (" " + next_at if FOLLOWUP_WHATSAPP_READY else (" அனுப்புதல் முடக்கப்பட்டுள்ளது; எதுவும் அனுப்பப்படாது." if language == "தமிழ்" else " Delivery is off, so nothing will be sent until the service is activated."))
+                elif action["method"] == "email":
                     schedule_id = schedule_email_followup(
                         user_id=str(st.session_state.user_id),
                         conversation_id=str(st.session_state.setdefault("inquiry_conversation_id", str(uuid4()))),
@@ -3061,6 +3133,7 @@ def _respond_without_logging(text: str):
                         customer_name=str(st.session_state.get("customer_name", "")),
                         preference_summary=action["summary"], started_at=now,
                         max_messages=1,
+                        recommendations=current_followup_recommendations(),
                         initial_status="scheduled" if FOLLOWUP_EMAIL_READY else "saved_pending_activation",
                     )
                     record = next(item for item in list_email_followups(str(st.session_state.user_id)) if item["id"] == schedule_id)
@@ -3082,6 +3155,9 @@ def _respond_without_logging(text: str):
                 st.session_state.followup_schedule = {"method": method, "summary": action["summary"], "status": status, "cadence": cadence, "consent_at": now.isoformat(timespec="seconds"), "next_at": next_at}
                 if action["method"] == "in_app":
                     st.session_state.followup_schedule["reminder_id"] = reminder_id
+                else:
+                    st.session_state.followup_schedule["schedule_id"] = schedule_id
+                    st.session_state.followup_schedule["recommendations"] = current_followup_recommendations()
                 st.session_state.chat_followup = {}
                 saved = True
                 st.session_state.followup_saved_toast = True
@@ -4294,6 +4370,7 @@ def inquiry_analytics_fields(text: str, chat: list[dict]) -> dict[str, str]:
         "Customer interest (owner)": "Not recorded",
             "Follow-up method": st.session_state.get("followup_schedule", {}).get("method", ""),
             "Follow-up summary": st.session_state.get("followup_schedule", {}).get("summary", ""),
+            "Follow-up recommendations": st.session_state.get("followup_schedule", {}).get("recommendations", ""),
             "Follow-up schedule status": st.session_state.get("followup_schedule", {}).get("status", ""),
             "Follow-up cadence": st.session_state.get("followup_schedule", {}).get("cadence", ""),
             "Follow-up consent timestamp (Asia/Kolkata)": st.session_state.get("followup_schedule", {}).get("consent_at", ""),
@@ -4448,6 +4525,7 @@ def add_followup_confirmation_to_chat(method: str, summary: str, schedule_text: 
         try:
             update_conversation_fields(conversation_id, {
                 "Follow-up summary": summary,
+                "Follow-up recommendations": current_followup_recommendations() if method in {"email", "WhatsApp"} else "",
                 "Recent conversation context": conversation_transcript(st.session_state.chat),
                 "Final conversation transcript": conversation_transcript(st.session_state.chat) if st.session_state.get("conversation_closed") else "",
             })
@@ -5245,7 +5323,10 @@ with st.container(key="info-panel-content"):
     if active_info_panel == "followups":
         st.markdown("#### 🔔 உங்கள் தொடர் நினைவூட்டல்கள்" if language == "தமிழ்" else "#### 🔔 Your follow-up reminders")
         st.caption("உங்களுக்கு ஏற்ற முறையைத் தேர்வு செய்யுங்கள். In-app நினைவூட்டல்கள் இந்த உலாவி அமர்வில், இந்தப் பகுதியில் மட்டும் தெரியும்; Email தேர்வுக்கு உங்கள் முகவரி மற்றும் வெளிப்படையான ஒப்புதல் தேவை." if language == "தமிழ்" else "Choose how you’d like Mira to follow up. In-app reminders stay in this browser session and appear in this panel; email follow-ups require your address and explicit opt-in.")
-        followup_method = st.radio("Follow-up method" if language != "தமிழ்" else "தொடர்பு முறை", ["In-app reminder", "Email follow-up"], horizontal=True, key="followup_delivery_method", format_func=lambda option: {"In-app reminder": "இந்த உலாவியில்", "Email follow-up": "மின்னஞ்சல்"}.get(option, option) if language == "தமிழ்" else option)
+        followup_method = st.radio("Follow-up method" if language != "தமிழ்" else "தொடர்பு முறை", ["In-app reminder", "Email follow-up", "WhatsApp follow-up"], horizontal=True, key="followup_delivery_method", format_func=lambda option: {"In-app reminder": "இந்த உலாவியில்", "Email follow-up": "மின்னஞ்சல்", "WhatsApp follow-up": "WhatsApp செய்தி"}.get(option, option) if language == "தமிழ்" else option)
+        st.caption("Mira பரிந்துரைகள் சேமித்த தேடலின் அடிப்படையில் சேர்க்கப்படும்; தற்போதைய கிடைப்பை ஆதாரத்தில் சரிபார்க்கவும்." if language == "தமிழ்" else "Email and WhatsApp follow-ups include Mira’s saved recommendations for your search. Confirm current availability with the source.")
+        if followup_method == "WhatsApp follow-up":
+            st.info(("WhatsApp அனுப்புதல் இயக்கப்படவில்லை; கோரிக்கையும் ஒப்புதலும் மட்டும் சேமிக்கப்படும்." if language == "தமிழ்" else "WhatsApp delivery is off. Your request and consent will be saved; no message will be sent.") if not FOLLOWUP_WHATSAPP_READY else ("ஒப்புதலுடன் சேமித்த பிறகு worker இயங்கும்போது செய்தி அனுப்பப்படும்." if language == "தமிழ்" else "After you opt in, one message is scheduled for three days from now and submitted when the delivery worker runs."))
         if followup_method == "Email follow-up" and not FOLLOWUP_EMAIL_READY:
             st.info("மின்னஞ்சல் அனுப்புதல் இப்போது இயக்கப்படவில்லை. உங்கள் follow-up கோரிக்கை மற்றும் ஒப்புதல் மட்டும் சேமிக்கப்படும்; எந்த மின்னஞ்சலும் அனுப்பப்படாது." if language == "தமிழ்" else "Email delivery is currently off. Mira will save your follow-up request and consent for review, but no email will be sent.")
         elif followup_method == "Email follow-up":
@@ -5258,9 +5339,13 @@ with st.container(key="info-panel-content"):
                 proposed_due = datetime.fromisoformat(proposed_due) if proposed_due else None
                 reminder_date = reminder_cols[0].date_input("நினைவூட்டும் தேதி" if language == "தமிழ்" else "Remind me on", value=proposed_due.date() if proposed_due else datetime.now(INDIA_TZ).date() + timedelta(days=7), min_value=datetime.now(INDIA_TZ).date())
                 reminder_time = reminder_cols[1].time_input("நேரம் (IST)" if language == "தமிழ்" else "Time (IST)", value=proposed_due.time() if proposed_due else datetime.strptime("10:00", "%H:%M").time())
+            elif followup_method == "WhatsApp follow-up":
+                recipient_phone = st.text_input("WhatsApp எண் (நாட்டுக் குறியீட்டுடன்)" if language == "தமிழ்" else "Your WhatsApp number (with country code)", placeholder="+91…")
+                st.caption("3 நாட்களில் ஒரு WhatsApp செய்தி. எண்ணும் பரிந்துரைகளும் தனிப்பட்ட follow-up சேமிப்பில் வைக்கப்படும்." if language == "தமிழ்" else "One WhatsApp message after three days. Your number and recommendations are kept in private follow-up storage.")
+                whatsapp_opt_in = st.checkbox("எனது தேடல் பரிந்துரைகளுடன் WhatsApp follow-up பெற ஒப்புக்கொள்கிறேன். எப்போது வேண்டுமானாலும் நிறுத்தலாம்." if language == "தமிழ்" else "I agree to receive a WhatsApp follow-up containing Mira’s recommendations for my search. I can stop it at any time.")
             else:
                 recipient_email = st.text_input("உங்கள் மின்னஞ்சல் முகவரி" if language == "தமிழ்" else "Your email address", placeholder="name@example.com")
-                st.caption("முகவரி follow-up அனுப்புவதற்காக மட்டும் தனிப்பட்ட உள்ளூர் பதிவில் வைக்கப்படும். ஆதார், PAN அல்லது வங்கி விவரங்களை follow-up குறிப்பில் எழுத வேண்டாம்." if language == "தமிழ்" else "Your address is kept in a private local follow-up queue for these messages only. Don’t include Aadhaar, PAN, or bank details in your note.")
+                st.caption("முகவரி follow-up அனுப்புவதற்காக மட்டும் தனிப்பட்ட சேமிப்பில் வைக்கப்படும். ஆதார், PAN அல்லது வங்கி விவரங்களை குறிப்பில் எழுத வேண்டாம்." if language == "தமிழ்" else "Your address is kept in private follow-up storage for these messages only. Don’t include Aadhaar, PAN, or bank details in your note.")
                 email_cadence = st.selectbox("எத்தனை முறை?" if language == "தமிழ்" else "How often should Mira check in?", ["Every 3 days (up to 3 emails)", "One email after 3 days"], key="followup_email_cadence", format_func=lambda option: {"Every 3 days (up to 3 emails)": "3 நாட்களுக்கு ஒருமுறை (அதிகபட்சம் 3 மின்னஞ்சல்கள்)", "One email after 3 days": "3 நாட்களுக்குப் பிறகு ஒரு மின்னஞ்சல்"}.get(option, option) if language == "தமிழ்" else option)
                 email_opt_in_label = ("இந்த email follow-up கோரிக்கையை சேமிக்க ஒப்புக்கொள்கிறேன். எந்த நேரத்திலும் நிறுத்தலாம்." if language == "தமிழ்" else "I agree to save this email follow-up request. I can remove it at any time.") if not FOLLOWUP_EMAIL_READY else ("என் மின்னஞ்சலுக்கு இந்த follow-up-ஐ அனுப்ப ஒப்புக்கொள்கிறேன். எந்த நேரத்திலும் நிறுத்தலாம்." if language == "தமிழ்" else "I agree to receive these follow-up emails. I can stop them at any time.")
                 email_opt_in = st.checkbox(email_opt_in_label)
@@ -5272,6 +5357,8 @@ with st.container(key="info-panel-content"):
                 st.error("சரியான மின்னஞ்சல் முகவரியை உள்ளிடுங்கள்." if language == "தமிழ்" else "Enter a valid email address.")
             elif followup_method == "Email follow-up" and not email_opt_in:
                 st.error("மின்னஞ்சல் அனுப்புவதற்கு உங்கள் ஒப்புதல் தேவை." if language == "தமிழ்" else "Please opt in before scheduling email follow-ups.")
+            elif followup_method == "WhatsApp follow-up" and not whatsapp_opt_in:
+                st.error("WhatsApp அனுப்புவதற்கு உங்கள் ஒப்புதல் தேவை." if language == "தமிழ்" else "Please opt in before saving a WhatsApp follow-up.")
             else:
                 if followup_method == "In-app reminder":
                     due = datetime.combine(reminder_date, reminder_time, tzinfo=INDIA_TZ)
@@ -5308,6 +5395,30 @@ with st.container(key="info-panel-content"):
                             f"{due.strftime('%d %b %Y, %I:%M %p')} IST",
                         )
                         st.success("இந்த உலாவிக்கான நினைவூட்டல் சேமிக்கப்பட்டது." if language == "தமிழ்" else "In-app reminder saved for this browser session.")
+                elif followup_method == "WhatsApp follow-up":
+                    try:
+                        phone = normalize_phone(recipient_phone)
+                        conversation_id = st.session_state.setdefault("inquiry_conversation_id", str(uuid4()))
+                        schedule_id = schedule_whatsapp_followup(
+                            user_id=str(st.session_state.user_id), conversation_id=str(conversation_id),
+                            recipient_phone=phone, customer_name=str(st.session_state.get("customer_name", "")),
+                            preference_summary=preference_summary.strip(), started_at=datetime.now(INDIA_TZ),
+                            recommendations=current_followup_recommendations(), consent=whatsapp_opt_in,
+                            initial_status="scheduled" if FOLLOWUP_WHATSAPP_READY else "saved_pending_activation",
+                        )
+                        record = next(item for item in list_email_followups(str(st.session_state.user_id)) if item["id"] == schedule_id)
+                        status = "Scheduled" if FOLLOWUP_WHATSAPP_READY else "Saved (WhatsApp delivery off)"
+                        consent_at = datetime.now(INDIA_TZ).isoformat(timespec="seconds")
+                        next_at = record["next_send_at"] if FOLLOWUP_WHATSAPP_READY else ""
+                        st.session_state.followup_schedule = {"schedule_id":schedule_id,"method":"WhatsApp","status":status,"cadence":"One WhatsApp message after 3 days","consent_at":consent_at,"next_at":next_at}
+                        update_conversation_fields(conversation_id, {"Follow-up method":"WhatsApp","Follow-up schedule status":status,"Follow-up cadence":"One WhatsApp message after 3 days","Follow-up consent timestamp (Asia/Kolkata)":consent_at,"Next follow-up time (Asia/Kolkata)":next_at})
+                        add_followup_confirmation_to_chat("WhatsApp", preference_summary.strip()[:500], next_at or "saved for review; delivery off")
+                        st.success("WhatsApp follow-up saved with Mira’s search recommendations." if language != "தமிழ்" else "Mira பரிந்துரைகளுடன் WhatsApp follow-up சேமிக்கப்பட்டது.")
+                    except ValueError as error:
+                        st.error(str(error))
+                    except Exception:
+                        logging.exception("Could not save WhatsApp follow-up")
+                        st.error("Couldn’t save the WhatsApp follow-up. Please try again.")
                 else:
                     conversation_id = st.session_state.setdefault("inquiry_conversation_id", str(uuid4()))
                     started_at = datetime.fromisoformat(st.session_state["conversation_started_at"])
@@ -5321,6 +5432,7 @@ with st.container(key="info-panel-content"):
                             preference_summary=preference_summary.strip(),
                             started_at=started_at,
                             max_messages=max_messages,
+                            recommendations=current_followup_recommendations(),
                             initial_status="scheduled" if FOLLOWUP_EMAIL_READY else "saved_pending_activation",
                         )
                         scheduled = next((item for item in list_email_followups(str(st.session_state.user_id)) if item["id"] == schedule_id), None)
@@ -5330,7 +5442,7 @@ with st.container(key="info-panel-content"):
                         cadence_label = "Every 3 days · up to 3 emails" if max_messages == 3 else "One email after 3 days"
                         delivery_status = "Scheduled" if FOLLOWUP_EMAIL_READY else "Saved (email delivery off)"
                         st.session_state.followup_schedule = {
-                            "method": "Email",
+                            "method": "Email", "schedule_id": schedule_id,
                             "status": delivery_status,
                             "cadence": cadence_label,
                             "consent_at": consent_at,
@@ -5372,18 +5484,25 @@ with st.container(key="info-panel-content"):
     
             scheduled_email = list_email_followups(str(st.session_state.user_id))
             if scheduled_email:
-                st.markdown("##### திட்டமிட்ட மின்னஞ்சல்கள்" if language == "தமிழ்" else "##### Scheduled email follow-ups")
+                st.markdown("##### சேமித்த மின்னஞ்சல் / WhatsApp follow-ups" if language == "தமிழ்" else "##### Saved email and WhatsApp follow-ups")
                 for item in scheduled_email:
                     with st.container(border=True):
                         state_label = ("திட்டமிடப்பட்டுள்ளது" if item["status"] == "scheduled" else "சேமிக்கப்பட்டது; அனுப்புதல் நிறுத்தம்" if item["status"] == "saved_pending_activation" else "நிறுத்தப்பட்டது" if item["status"] == "cancelled" else "முடிந்தது") if language == "தமிழ்" else ("Saved; delivery off" if item["status"] == "saved_pending_activation" else item["status"].title())
                         next_time = datetime.fromisoformat(item["next_send_at"]).astimezone(INDIA_TZ).strftime("%d %b %Y, %I:%M %p IST")
-                        masked_email = item["recipient_email"]
+                        masked_email = ("WhatsApp · ***" + item.get("recipient_phone", "")[-4:]) if item.get("channel") == "whatsapp" else item["recipient_email"]
                         if "@" in masked_email:
                             name_part, domain_part = masked_email.split("@", 1)
                             masked_email = (name_part[:1] + "***@" + domain_part) if name_part else "***@" + domain_part
                         st.markdown(f"**{escape(item['preference_summary'])}**")
-                        st.caption(f"{masked_email} · {state_label} · {item['sent_count']}/{item['max_messages']} sent · Next: {next_time}" if language != "தமிழ்" else f"{masked_email} · {state_label} · {item['sent_count']}/{item['max_messages']} அனுப்பப்பட்டது · அடுத்து: {next_time}")
-                        if item["status"] in {"scheduled", "saved_pending_activation"} and st.button("சேமித்த follow-up-ஐ நீக்கு" if language == "தமிழ்" and item["status"] == "saved_pending_activation" else "மின்னஞ்சல்களை நிறுத்து" if language == "தமிழ்" else "Remove saved follow-up" if item["status"] == "saved_pending_activation" else "Stop email follow-ups", key=f"stop_email_followup_{item['id']}"):
+                        delivery_label = "submitted" if item.get("channel") == "whatsapp" else "sent"
+                        if item["status"] == "accepted":
+                            state_label = "Meta accepted; delivery unconfirmed" if language != "தமிழ்" else "Meta ஏற்றது; வழங்கப்பட்டது உறுதி இல்லை"
+                        elif item["status"] == "needs_review":
+                            state_label = "Needs owner review" if language != "தமிழ்" else "உரிமையாளர் ஆய்வு தேவை"
+                        st.caption(f"{masked_email} · {state_label} · {item['sent_count']}/{item['max_messages']} {delivery_label} · Next: {next_time}")
+                        if item.get("channel") == "whatsapp":
+                            st.caption("Meta accepted the request; handset delivery is unconfirmed." if item["status"] == "accepted" else "Needs owner review; no automatic retry." if item["status"] == "needs_review" else "")
+                        if item["status"] in {"scheduled", "saved_pending_activation", "needs_review"} and st.button("சேமித்த follow-up-ஐ நீக்கு" if language == "தமிழ்" else "Stop WhatsApp follow-up" if item.get("channel") == "whatsapp" else "Remove saved follow-up" if item["status"] == "saved_pending_activation" else "Stop email follow-ups", key=f"stop_email_followup_{item['id']}"):
                             cancel_email_followup(item["id"], str(st.session_state.user_id))
                             st.session_state.followup_schedule = {**st.session_state.get("followup_schedule", {}), "status": "Stopped by user", "next_at": ""}
                             st.rerun()
@@ -5392,6 +5511,66 @@ with st.container(key="info-panel-content"):
                 st.info("இன்னும் follow-up எதுவும் அமைக்கப்படவில்லை. In-app அல்லது Email முறையைத் தேர்வு செய்து அமைக்கலாம்." if language == "தமிழ்" else "No follow-ups are scheduled yet. Choose an in-app reminder or opt in to email follow-ups above.")
     
         render_followup_list()
+
+def dismiss_visit_request():
+    st.session_state.pop("visit_property", None)
+
+
+@st.dialog("Book a slot", **({"on_dismiss": dismiss_visit_request} if "on_dismiss" in inspect.signature(st.dialog).parameters else {}))
+def visit_request_dialog():
+    record = st.session_state.visit_property
+    st.write(str(record.get("title") or "Selected property"))
+    st.caption("இது பார்வையிடும் நேரத்திற்கான கோரிக்கை. உரிமையாளர் உறுதிப்படுத்தும் வரை முன்பதிவு உறுதி இல்லை." if language == "தமிழ்" else "Request a property visit. Your appointment is pending owner confirmation; property access and availability must be verified.")
+    visit_date = st.date_input("பார்வையிடும் தேதி" if language == "தமிழ்" else "Visit date", min_value=datetime.now(INDIA_TZ).date(), value=datetime.now(INDIA_TZ).date()+timedelta(days=1), key="visit_date")
+    slot_kind = st.radio("நேரத் தேர்வு" if language == "தமிழ்" else "Choose a visit time", ["Predefined slot", "Custom time"],horizontal=True,key="visit_slot_kind")
+    if slot_kind == "Predefined slot":
+        configured_slots = [value.strip() for value in configured_value("VISIT_SLOT_TIMES", "10:00,12:00,15:00,17:00").split(",") if re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d",value.strip())]
+        try:
+            unavailable = confirmed_visit_times(record,visit_date)
+        except Exception:
+            st.error("Visit availability could not be checked. Please retry.")
+            return
+        options = [value for value in configured_slots if value not in unavailable and datetime.combine(visit_date,datetime.strptime(value,"%H:%M").time(),tzinfo=INDIA_TZ)>datetime.now(INDIA_TZ)]
+        if not options:
+            st.info("No predefined times remain for this date. Choose another date or request a custom time.")
+            return
+        selected_time = st.selectbox("Slot (IST)",options,key="visit_fixed_time")
+        visit_time = datetime.strptime(selected_time,"%H:%M").time()
+    else:
+        visit_time = st.time_input("Requested time (IST)",value=datetime.strptime("10:00","%H:%M").time(),step=1800,key="visit_custom_time")
+    with st.form("property_visit_request_form"):
+        visit_name = st.text_input("உங்கள் பெயர்" if language == "தமிழ்" else "Your name",value=str(st.session_state.get("customer_name", "")),key="visit_customer_name")
+        contact_method = st.selectbox("Contact for visit confirmation",["Email","WhatsApp"],key="visit_contact_method")
+        contact_value = st.text_input("Email address or WhatsApp number with country code",key="visit_contact_value")
+        consent = st.checkbox("இந்தப் பார்வைக் கோரிக்கைக்காக என் தொடர்பு விவரங்களை உரிமையாளருடன் பகிர ஒப்புக்கொள்கிறேன்." if language == "தமிழ்" else "I agree to share my contact with the Namma Veedu owner for this property visit request.",key="visit_consent")
+        submit = st.form_submit_button("பார்வைக் கோரிக்கையைச் சேமிக்கவும்" if language == "தமிழ்" else "Request visit")
+    if submit:
+        try:
+            visit_id = request_visit(record=record,user_id=str(st.session_state.user_id),visit_at=datetime.combine(visit_date,visit_time,tzinfo=INDIA_TZ),slot_kind=slot_kind,customer_name=visit_name,contact_method=contact_method,contact_value=contact_value,consent=consent)
+            st.session_state.visit_saved_notice = f"Visit request {visit_id[:8]} saved — pending owner confirmation."
+            dismiss_visit_request()
+            st.rerun()
+        except ValueError as error:
+            st.error(str(error))
+        except Exception:
+            st.error("Couldn’t save your visit request. Please try again.")
+
+
+if st.session_state.get("visit_property"):
+    visit_request_dialog()
+if st.session_state.get("visit_saved_notice"):
+    st.success(st.session_state.visit_saved_notice)
+    if st.button("View my visit requests",key="view_my_visits"):
+        st.session_state.show_visit_requests = not st.session_state.get("show_visit_requests",False)
+    if st.session_state.get("show_visit_requests"):
+        try:
+            for visit in list_visit_requests(str(st.session_state.user_id)):
+                st.write(f"{visit['property_title']} · {visit['visit_at']} · {visit['status']}")
+                if visit["status"] in {"Requested","Confirmed"} and st.button("Cancel visit request",key=f"cancel_visit_{visit['id']}"):
+                    update_visit_status(visit["id"],"Cancelled",user_id=str(st.session_state.user_id))
+                    st.rerun()
+        except Exception:
+            st.error("Couldn’t load your visit requests. Please retry.")
 
 # Show success after the chat's rerun, so the popup survives form submission.
 if st.session_state.pop("followup_saved_toast", False):

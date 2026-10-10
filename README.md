@@ -220,6 +220,8 @@ Without an API key, the app uses a small local phrase parser. With a key, the Op
 
 ## Share with peers
 
+For email/WhatsApp follow-ups, shared queues and property visit requests, see [Follow-up and visit setup](FOLLOWUP_CHANNELS_SETUP.md).
+
 `localhost:8501` is only reachable from this computer. To create a peer-accessible URL, publish the project through a hosting service such as Streamlit Community Cloud, which deploys from a GitHub repository and assigns the app a shareable URL. Keep the repository and app private by default, then invite only the intended viewers. Making the app public can make it searchable on the web, and the bundled property records would be available to anyone who can view the app.
 
 Before publishing, include only this app, its sanitized `data/properties.csv`, `data/sources.csv`, and the files under `assets/`. Do not upload the original workbooks or the `.venv` folder. Deployment instructions are in the [official Streamlit guide](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/deploy); sharing and visibility options are in [Share your app](https://docs.streamlit.io/deploy/streamlit-community-cloud/share-your-app).

@@ -44,6 +44,7 @@ HEADERS = (
     "Follow-up requested signal",
     "Follow-up method",
     "Follow-up summary",
+    "Follow-up recommendations",
     "Follow-up schedule status",
     "Follow-up cadence",
     "Follow-up consent timestamp (Asia/Kolkata)",
@@ -226,6 +227,7 @@ def update_conversation_fields(conversation_id: str, fields: dict[str, Any], pat
         "Final conversation transcript",
         "Follow-up method",
         "Follow-up summary",
+        "Follow-up recommendations",
         "Follow-up schedule status",
         "Follow-up cadence",
         "Follow-up consent timestamp (Asia/Kolkata)",
@@ -405,7 +407,7 @@ def read_inquiries(path: Path = INQUIRY_LOG_PATH) -> list[dict[str, Any]]:
 
 CUSTOMER_SUMMARY_HEADERS = (
     "User ID", "Customer name", "Conversation ID", "Inquiry ID", "Timestamp (Asia/Kolkata)",
-    "Language", "Conversation status", "Email follow-ups", "Interested in property",
+    "Language", "Conversation status", "Email follow-ups", "WhatsApp follow-ups", "Interested in property",
     "Not interested in property", "Interest stated", "Follow-up requested", "Human advisor requested",
     "Property type", "Location", "Budget", "Preferred size", "Follow-up schedule status",
     "Follow-up method", "Follow-up summary", "Follow-up cadence", "Next follow-up time (Asia/Kolkata)", "Chat ended at (Asia/Kolkata)",
@@ -436,6 +438,7 @@ def customer_summary_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         summary = {header: latest.get(header, "") for header in CUSTOMER_SUMMARY_HEADERS}
         summary.update({
             "Email follow-ups": "Yes" if last_value("Follow-up method") in {"Email", "Email follow-up"} and last_value("Follow-up consent timestamp (Asia/Kolkata)") else "No",
+            "WhatsApp follow-ups": "Yes" if last_value("Follow-up method") == "WhatsApp" and last_value("Follow-up consent timestamp (Asia/Kolkata)") else "No",
             "Interested in property": "Yes" if interest in {"Interested", "Interested signal"} else "No",
             "Customer interest (owner)": last_value("Customer interest (owner)"),
             "Not interested in property": "Yes" if interest in {"Not interested", "Not interested signal"} else "No",

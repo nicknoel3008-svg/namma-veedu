@@ -8,13 +8,14 @@ import sys
 import argparse
 
 from followup_service import email_config_issues, send_due_followups
+from whatsapp_followup import CONFIG_KEYS as WHATSAPP_CONFIG_KEYS, whatsapp_config_issues, send_due_whatsapp_followups
 
 
 ROOT = Path(__file__).resolve().parent
 CONFIG_KEYS = (
     "FOLLOWUP_SMTP_HOST", "FOLLOWUP_SMTP_PORT", "FOLLOWUP_SMTP_USERNAME",
     "FOLLOWUP_SMTP_PASSWORD", "FOLLOWUP_SMTP_FROM", "FOLLOWUP_PUBLIC_URL",
-)
+) + WHATSAPP_CONFIG_KEYS + ("DATABASE_URL",)
 
 
 def load_config() -> dict[str, str]:
@@ -35,19 +36,29 @@ def load_config() -> dict[str, str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Process consented email follow-ups.")
     parser.add_argument("--check", action="store_true", help="Validate configuration only; do not connect or send email.")
+    parser.add_argument("--channel", choices=("email", "whatsapp", "all"), default="email")
     args = parser.parse_args()
     config = load_config()
-    issues = email_config_issues(config)
+    if config.get("DATABASE_URL"):
+        os.environ["DATABASE_URL"] = config["DATABASE_URL"]
+    channels = ("email", "whatsapp") if args.channel == "all" else (args.channel,)
+    issues = []
+    for channel in channels:
+        issues.extend((email_config_issues if channel == "email" else whatsapp_config_issues)(config))
     if issues:
-        print("Email follow-up setup needs attention:")
+        print("Follow-up setup needs attention:")
         for issue in issues:
             print("- " + issue)
         return 2
     if args.check:
-        print("Settings are complete. No email sent; SMTP access, public URL reachability and the scheduler still need verification.")
+        print("Settings are complete. No messages sent; provider access, approved WhatsApp template and the worker scheduler still need verification.")
         return 0
-    sent, failed = send_due_followups(config)
-    print(f"Follow-up worker finished: {sent} sent, {failed} failed.")
+    sent = failed = 0
+    for channel in channels:
+        channel_sent, channel_failed = (send_due_followups if channel == "email" else send_due_whatsapp_followups)(config)
+        sent += channel_sent
+        failed += channel_failed
+    print(f"Follow-up worker finished: {sent} submitted, {failed} failed or need review. WhatsApp acceptance is not delivery confirmation.")
     return 1 if failed else 0
 
 

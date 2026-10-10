@@ -89,7 +89,8 @@ These are delivered behaviors and verification points, not a claim of real-world
 ## Operational dependencies and current boundaries
 
 - Hosted reasoning needs configured provider credentials; local supported flows remain available without it.
-- In-app reminders depend on an active browser session. The email delivery queue has a separate SQLite/worker dependency; shared reporting does not make that queue a shared email service.
+- In-app reminders depend on an active browser session. Email and Meta WhatsApp requests use the shared database when configured and require a separate worker and provider setup. Saved requests include Mira's search recommendation snapshot and source links. WhatsApp API acceptance does not prove delivery; no delivery webhooks are implemented.
+- Property cards offer Book a slot with predefined or custom IST times. Requests require contact consent and remain pending until owner confirmation in Mira Studio. Confirmed property/time pairs cannot be double-booked. Customers can cancel their own requests; owner decisions do not automatically send messages. See FOLLOWUP_CHANNELS_SETUP.md for setup and limitations.
 - Email requests may be saved while delivery is disabled. Sending needs SMTP, public URL and an active worker. Saved does not mean sent or promise advisor contact.
 - Maps need a configured map token; recorded search results and source links work without maps.
 - Studio refreshes shared snapshots on load, not continuously in an already open view.

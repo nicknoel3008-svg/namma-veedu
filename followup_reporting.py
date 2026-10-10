@@ -16,5 +16,5 @@ def followup_metrics(rows):
         owner = latest("Follow-up status (owner)")
         counts["saved"] += bool(latest("Follow-up method") or status)
         counts["completed"] += owner == "completed" or (owner not in {"needed", "scheduled", "not needed"} and status in {"complete", "completed", "done"})
-        counts["open"] += owner in {"needed", "scheduled"} or (owner not in {"completed", "not needed"} and status in {"scheduled", "saved (email delivery off)", "saved_pending_activation", "sending"})
+        counts["open"] += owner in {"needed", "scheduled"} or (owner not in {"completed", "not needed"} and status in {"scheduled", "saved (email delivery off)", "saved (whatsapp delivery off)", "saved_pending_activation", "sending", "needs review", "accepted by whatsapp; delivery unconfirmed"})
     return counts
