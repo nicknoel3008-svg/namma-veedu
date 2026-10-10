@@ -1109,6 +1109,7 @@ section[data-testid="stMain"] div[data-testid="stColumn"]:has(.st-key-mira-conte
 </style>
 """.replace("__HERO_IMAGE__", HERO_IMAGE_URL).replace("__WATERMARK_IMAGE__", WATERMARK_IMAGE_URL)
 st.markdown(_base_styles, unsafe_allow_html=True)
+st.markdown("<style>" + (ROOT / "static" / "coastal-sidebar.css").read_text(encoding="utf-8") + "</style>", unsafe_allow_html=True)
 
 st.markdown(f'''
 <section class="hero" style="background-image:linear-gradient(90deg,rgba(9,28,37,.84) 0%,rgba(9,28,37,.57) 46%,rgba(9,28,37,.08) 100%),linear-gradient(0deg,rgba(9,28,37,.52),transparent 48%),url('{HERO_IMAGE_URL}');">

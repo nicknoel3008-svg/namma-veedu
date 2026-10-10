@@ -1,0 +1,42 @@
+/* Coastal & Calm sidebar: opaque surfaces keep every label readable. */
+section[data-testid="stSidebar"] {background:#ECE9E1!important;border-right:1px solid #D6D7D0!important;backdrop-filter:none!important}
+section[data-testid="stSidebar"] [data-testid="stSidebarContent"],
+section[data-testid="stSidebar"]>div {background:#ECE9E1!important}
+section[data-testid="stSidebar"] .st-key-filter-panel-scroll,
+section[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] {
+ background:#F4F1EA!important;border:1px solid #D7DDD9!important;border-radius:14px!important;box-shadow:none!important;
+}
+section[data-testid="stSidebar"] :is(p,span,label,h1,h2,h3,h4,small,a),
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
+section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
+section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p,
+section[data-testid="stSidebar"] .language-heading,
+section[data-testid="stSidebar"] .language-heading span,
+section[data-testid="stSidebar"] .filter-heading-title,
+section[data-testid="stSidebar"] .filter-heading-subtitle {
+ color:#203C4B!important;-webkit-text-fill-color:#203C4B!important;text-shadow:none!important;opacity:1!important;
+}
+section[data-testid="stSidebar"] .language-heading {background:#F4F1EA!important;border-left:3px solid #E07A5F;padding:10px 12px;border-radius:8px;margin-bottom:8px}
+section[data-testid="stSidebar"] [data-baseweb="select"]>div,
+section[data-testid="stSidebar"] [data-baseweb="select"] *,
+section[data-testid="stSidebar"] :is(input,textarea,[role="combobox"]) {
+ background:#FFF!important;color:#17394D!important;-webkit-text-fill-color:#17394D!important;border-color:#B8C9CD!important;text-shadow:none!important;
+}
+section[data-testid="stSidebar"] input::placeholder {color:#456477!important;-webkit-text-fill-color:#456477!important;opacity:1!important}
+section[data-testid="stSidebar"] button[kind] {background:#2E6F95!important;border:1px solid #2E6F95!important;color:#FFF!important;-webkit-text-fill-color:#FFF!important}
+section[data-testid="stSidebar"] button[kind] :is(p,span) {color:#FFF!important;-webkit-text-fill-color:#FFF!important}
+section[data-testid="stSidebar"] .filter-heading-icon {color:#2E6F95!important;-webkit-text-fill-color:#2E6F95!important}
+section[data-testid="stSidebar"] svg {color:#2E6F95!important}
+section[data-testid="stSidebar"] .st-key-filter-panel-scroll::-webkit-scrollbar-thumb {background:#2E6F95!important;border-color:#F4F1EA!important}
+.stApp section[data-testid="stSidebar"] [data-testid="stSelectbox"] [role="combobox"],
+.stApp section[data-testid="stSidebar"] [data-testid="stSelectbox"] [role="combobox"] *,
+.stApp section[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"]>div,
+.stApp section[data-testid="stSidebar"] [data-testid="stTextInput"] input,
+.stApp section[data-testid="stSidebar"] [data-testid="stNumberInput"] input,
+.stApp section[data-testid="stSidebar"] [data-testid="stTextInput"] [data-baseweb="input"],
+.stApp section[data-testid="stSidebar"] [data-testid="stNumberInput"] [data-baseweb="input"] {
+ background:#FFF!important;color:#17394D!important;-webkit-text-fill-color:#17394D!important;text-shadow:none!important;
+}
+.stApp section[data-testid="stSidebar"] [data-testid="stTextInput"] input::placeholder {
+ color:#456477!important;-webkit-text-fill-color:#456477!important;
+}
