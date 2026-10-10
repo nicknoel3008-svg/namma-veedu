@@ -6,11 +6,59 @@ from unittest.mock import patch
 from agent_runtime import run_openai_agent
 from agent import parse_request
 from buyer_memory import (update_buyer_memory, record_detail_reply, feature_evidence,
-    prepare_inventory, enforce_search_args, grounded_search_reply, resolve_reference)
+    prepare_inventory, enforce_search_args, grounded_search_reply, resolve_reference, no_match_reply)
 from property_search import search_properties
 
 
 class BuyerMemoryTests(unittest.TestCase):
+    def test_no_match_identifies_budget_and_preserves_preferences(self):
+        from copy import deepcopy
+        memory = {"requirements": {"location": "Anna Nagar", "bedrooms": 3, "max_budget": 5000000}}
+        before = deepcopy(memory)
+        reply = no_match_reply(pd.DataFrame(self.records), memory)
+        self.assertIn("Budget: maximum ₹50 lakh — changing this filter leaves 2 matching records", reply)
+        self.assertIn("Lowest recorded price among those records: ₹60 lakh", reply)
+        self.assertEqual(memory, before)
+
+    def test_no_match_explains_conflicting_combination(self):
+        reply = no_match_reply(pd.DataFrame(self.records), {"requirements": {"location": "Anna Nagar", "bedrooms": 2}})
+        self.assertIn("Location: Anna Nagar — changing this filter leaves 1 matching record", reply)
+        self.assertIn("BHK: 2 — changing this filter leaves 2 matching records", reply)
+
+    def test_no_match_names_multiple_independent_failures(self):
+        reply = no_match_reply(pd.DataFrame(self.records), {"requirements": {"location": "Madurai", "bedrooms": 5}})
+        self.assertIn("Location: Madurai — no eligible", reply)
+        self.assertIn("BHK: 5 — no eligible", reply)
+
+    def test_no_match_missing_price_is_unverified(self):
+        records = pd.DataFrame(self.records)
+        records["price_inr"] = float("nan")
+        reply = no_match_reply(records, {"requirements": {"max_budget": 8000000}})
+        self.assertIn("prices are unreported", reply)
+        self.assertNotIn("Lowest recorded price", reply)
+
+    def test_no_match_required_amenity_and_tamil(self):
+        reply = no_match_reply(pd.DataFrame(self.records), {"requirements": {}, "preferences": {"pool": "required"}})
+        self.assertIn("Required details: pool", reply)
+        self.assertIn("missing details are unverified", reply)
+        reply = no_match_reply(pd.DataFrame(self.records), {"requirements": {"bedrooms": 5}, "response_language": "Tamil"})
+        self.assertIn("எந்த விருப்பத்தை", reply)
+
+    def test_no_match_multi_selection_and_area(self):
+        records = pd.DataFrame(self.records)
+        records["area_sqm"] = [70, 80, 90]
+        reply = no_match_reply(records, {"requirements": {
+            "property_types": ["Flat", "House"],
+            "listing_statuses": ["Existing sale", "Project reference"], "min_area_sqm": 100}})
+        self.assertIn("Area: minimum 100 m² — changing this filter leaves 3 matching records", reply)
+        self.assertNotIn("Property type:", reply)
+
+    def test_no_match_combination_needs_multiple_changes(self):
+        records = pd.DataFrame(self.records)
+        records["price_inr"] = [6000000, 7000000, 4000000]
+        reply = no_match_reply(records, {"requirements": {"location": "Anna Nagar", "bedrooms": 2, "max_budget": 3000000}})
+        self.assertIn("Budget: maximum ₹30 lakh — no eligible", reply)
+
     def setUp(self):
         self.records = [
             {"property_id": "a", "title": "First home", "price_inr": 6000000, "city": "Chennai", "locality": "Anna Nagar", "property_type": "Flat", "bedrooms": 3, "listing_status": "Existing sale", "source_status": "saved", "price_per_sqm_inr": 100, "amenities": "no covered parking; balcony", "car_parking": "No"},

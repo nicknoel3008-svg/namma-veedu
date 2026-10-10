@@ -47,12 +47,100 @@ def resolve_reference(text, records, selected=None):
     return None
 
 
-def grounded_search_reply(result, memory, tamil=False):
+def no_match_reply(data, memory, tamil=False, filters=None):
+    """Explain checked constraints without silently relaxing the user's search."""
+    from property_search import search_properties
+
+    context = memory.get("requirements", {})
+    args = dict(filters) if filters is not None else {
+        "location": context.get("location", ""),
+        "property_type": context.get("property_types", context.get("property_type", "Any")),
+        "status": context.get("listing_statuses", context.get("status", "Any")),
+        "bedrooms": context.get("bedrooms"), "max_budget": context.get("max_budget"),
+        "min_area_sqm": context.get("min_area_sqm"),
+    }
+    tamil = tamil or memory.get("response_language") == "Tamil"
+    tanglish = memory.get("response_language") == "Tanglish"
+    groups = []
+    def translated(english, tamil_text):
+        return tamil_text if tamil else english
+    def joined(value):
+        return ", ".join(map(str, value)) if isinstance(value, (list, tuple)) else str(value)
+    for key, label, default in (("location", "Location", ""), ("property_type", "Property type", "Any"),
+                                ("status", "Listing category", "Any"), ("bedrooms", "BHK", None)):
+        value = args.get(key, default)
+        if value not in (None, "", "Any") and value != []:
+            label = ({"Location": "பகுதி", "Property type": "சொத்து வகை", "Listing category": "பதிவு வகை", "BHK": "BHK"}.get(label, label) if tamil else label)
+            groups.append((f"{label}: {joined(value)}", {key: default}))
+    budget = [f"{'minimum' if key == 'min_budget' else 'maximum'} ₹{args[key]/100000:g} lakh"
+              for key in ("min_budget", "max_budget") if args.get(key) is not None]
+    if budget:
+        budget_text = ", ".join(budget)
+        if tamil:
+            budget_text = budget_text.replace("minimum", "குறைந்தபட்சம்").replace("maximum", "அதிகபட்சம்").replace("lakh", "லட்சம்")
+        groups.append((translated("Budget: ", "பட்ஜெட்: ") + budget_text, {"min_budget": None, "max_budget": None}))
+    area = [f"{'minimum' if key == 'min_area_sqm' else 'maximum'} {args[key]:g} m²"
+            for key in ("min_area_sqm", "max_area_sqm") if args.get(key) is not None]
+    if area:
+        area_text = ", ".join(area)
+        if tamil:
+            area_text = area_text.replace("minimum", "குறைந்தபட்சம்").replace("maximum", "அதிகபட்சம்")
+        groups.append((translated("Area: ", "பரப்பளவு: ") + area_text, {"min_area_sqm": None, "max_area_sqm": None}))
+    inventory = prepare_inventory(data, memory)
+    details = []
+    baseline = {key: value for key, value in args.items() if key == "include_ended_auctions"}
+    for label, relaxed in groups:
+        candidates = search_properties(inventory, **(args | relaxed))
+        if len(candidates):
+            detail = translated(
+                f"{label} — changing this filter leaves {len(candidates)} matching {'record' if len(candidates) == 1 else 'records'} for your other preferences.",
+                f"{label} — இந்த விருப்பத்தை மாற்றினால், மற்ற விருப்பங்களுக்குப் பொருந்தும் {len(candidates)} பதிவுகள் உள்ளன.")
+            if "max_budget" in relaxed:
+                prices = pd.to_numeric(candidates["price_inr"], errors="coerce").dropna()
+                if len(prices):
+                    detail += translated(f" Lowest recorded price among those records: ₹{prices.min()/100000:g} lakh (may be a starting price).",
+                                         f" அவற்றில் பதிவான குறைந்த விலை: ₹{prices.min()/100000:g} லட்சம் (தொடக்க விலையாக இருக்கலாம்).")
+                else:
+                    detail += translated(" Their prices are unreported, so I can’t confirm they fit your budget.", " அவற்றின் விலை பதிவாகவில்லை; உங்கள் பட்ஜெட்டுக்குப் பொருந்துவதை உறுதிப்படுத்த முடியாது.")
+            details.append(detail)
+        else:
+            criterion = {key: args.get(key) for key in relaxed}
+            if not len(search_properties(inventory, **(baseline | criterion))):
+                details.append(translated(f"{label} — no eligible saved record confirms this preference, even before applying the other search filters.",
+                                          f"{label} — மற்ற விருப்பங்களைச் சேர்ப்பதற்கு முன்பே, இதைப் பூர்த்தி செய்யும் உறுதிப்படுத்தப்பட்ட பதிவு இல்லை."))
+    required = [feature for feature, desire in memory.get("preferences", {}).items()
+                if desire == "required" and feature in FEATURES]
+    hard = required + ([f"{memory['facing']} facing"] if memory.get("facing") else []) + (["above ground floor"] if memory.get("avoid_ground_floor") else [])
+    if memory.get("excluded_terms"):
+        hard.append("exclude " + ", ".join(memory["excluded_terms"]))
+    if memory.get("rejected"):
+        hard.append("previously rejected listings excluded")
+    if hard:
+        candidates = search_properties(data, **args)
+        if len(candidates) and not len(prepare_inventory(candidates, memory)):
+            details.append(translated("Required details: " + ", ".join(hard) + " — no remaining record confirms all these details; missing details are unverified.",
+                                      "அவசியமான விவரங்கள்: " + ", ".join(hard) + " — இவை அனைத்தையும் உறுதிப்படுத்தும் பதிவு இல்லை; விடுபட்ட விவரங்கள் உறுதிப்படுத்தப்படவில்லை."))
+    if not details:
+        # Multiple conflicting constraints may need changing together.
+        labels = [label for label, _ in groups] + hard
+        details.append(translated("No saved record matches this combination: ", "இந்த விருப்பங்களின் சேர்க்கைக்குப் பொருத்தமான பதிவு இல்லை: ") + "; ".join(labels) + "." if labels
+                       else translated("There are no eligible saved records in this search category.", "இந்தத் தேடல் வகையில் தகுதியான பதிவு இல்லை."))
+    evidence = " Budget, BHK, area and required details can only be checked when the source reports them; missing values are unverified."
+    if tamil:
+        return "உங்கள் அனைத்து விருப்பங்களுக்கும் பொருந்தும் பதிவு இல்லை.\n\n" + "\n\n".join(details) + "\n\nவிடுபட்ட விவரங்களை உறுதிப்படுத்த முடியாது. எந்த விருப்பத்தை மாற்ற விரும்புகிறீர்கள்? நீங்கள் சொல்லும் வரை உங்கள் விருப்பங்களை மாற்ற மாட்டேன்."
+    if tanglish:
+        return "Ungal ella preferences-kum confirmed match kidaikkala.\n\n" + "\n\n".join(details) + evidence + "\n\nEndha preference-ai maatha virumbureenga? Neenga sollum varai preferences-ai maatha maatten."
+    return "I couldn’t find a saved record matching all your preferences.\n\n" + "\n\n".join(details) + evidence + "\n\nWhich preference would you like to change? I’ll keep your preferences until you ask to change them."
+
+
+def grounded_search_reply(result, memory, tamil=False, data=None):
     """Render recommendations from checked fields rather than model claims."""
     records = result.get("records", [])
     tanglish = memory.get("response_language") == "Tanglish"
     tamil = tamil or memory.get("response_language") == "Tamil"
     if not records:
+        if data is not None:
+            return no_match_reply(data, memory, tamil)
         if tanglish:
             return "Ungal requirements-ku saved records-la confirmed match kidaikkala. Area illa budget-ai maatha virumbureengala? Missing floor, lift, facing details-ai confirmed match-nu karudha maatten."
         return "உங்கள் நிபந்தனைகளுக்கு சேமித்த பதிவுகளில் பொருத்தம் இல்லை. பகுதியையோ பட்ஜெட்டையோ மாற்ற விரும்புகிறீர்களா?" if tamil else "I couldn’t find a match for your requirements in the saved records. Would you like to change the area or budget?"

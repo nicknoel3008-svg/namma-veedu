@@ -18,3 +18,10 @@ Shared-storage inspection confirmed existing follow-up schedule records were pre
 - Old undated-auction confirmations expire when the conversation moves on. Source-guidance confirmations are handled before generic property details.
 - A selected property's loan-options request retains the property and distinguishes available own funds from a maximum purchase price. The response gives an illustrative arithmetic difference, official lender links, and a useful next question without promising finance.
 - Automatic snapshot dates and exports are rebuilt from shared inquiry records in India time when Studio loads. This avoids relying on stale machine-local archive files after migration to Supabase.
+
+## Explain searches with no matches
+
+- Mira checks location, selected property types and listing categories, BHK, budget and area against saved records. When changing one filter reveals matches for the other requirements, she names that filter, reports the count and, for budget, the lowest recorded price where available.
+- Independently unmatched requirements and conflicting combinations are explained separately from missing source details. Required amenities, facing, floor and excluded or rejected listings remain respected; absent source information is unverified rather than a confirmed mismatch.
+- Replies ask which preference the customer wants to change, preserving all preferences until requested. English, Tamil and Tanglish responses use the same deterministic evidence checks.
+- Regression coverage includes budget, conflicting filters, multiple independent failures, unreported prices, required amenities, multiple selections, area and a complete website journey from no matches to revised preferences and results.

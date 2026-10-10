@@ -64,6 +64,16 @@ class WebsiteJourneyTests(unittest.TestCase):
         self.send("Show me properties around Tambaram")
         self.assertEqual(self.app.session_state["results_page"], 1)
 
+    def test_no_match_explains_blocking_preferences_then_recovers(self):
+        reply = self.send("Show me 5BHK flats in Chennai under 1 lakh")
+        self.assertEqual(reply.get("count"), 0)
+        self.assertIn("Budget: maximum ₹1 lakh", reply["content"])
+        self.assertNotIn("BHK: 5 — no eligible", reply["content"])
+        self.assertIn("Which preference", reply["content"])
+        self.assertEqual(self.app.session_state["search_context"]["max_budget"], 100000)
+        self.send("Remove my budget and BHK preferences and show properties in Chennai")
+        self.assertTrue(self.app.session_state["chat"][-1].get("records"))
+
     def test_tambaram_auction_explanation_and_selected_property_loan(self):
         self.send("im looking for a property around tambaram")
         explanation = self.send("auctiom properties?")

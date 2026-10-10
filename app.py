@@ -23,7 +23,7 @@ from chat_followup import followup_turn
 from mira_feedback import CATEGORIES as FEEDBACK_CATEGORIES, FEEDBACK_HEADERS, feedback_record
 from ai_config import select_ai_config
 from advisor_followup import advisor_reply
-from buyer_memory import update_buyer_memory, shown_records as current_shown_records, record_detail_reply, prepare_inventory, grounded_search_reply
+from buyer_memory import update_buyer_memory, shown_records as current_shown_records, record_detail_reply, prepare_inventory, grounded_search_reply, no_match_reply
 from mira_understanding import understand_request
 from conversation_engine import conversational_turn, unavailable_reply
 from agent_policy import (
@@ -3208,6 +3208,11 @@ def _respond_without_logging(text: str):
             queue_mira_filter_sync(intent)
             records = ranked.head(3).to_dict("records")
             reply = grounded_search_reply({"records": records}, understood["memory"], language == "தமிழ்")
+            if not records:
+                diagnostic_context = dict(understood["context"])
+                if diagnostic_context.get("listing_statuses", diagnostic_context.get("status", "Any")) == "Any":
+                    diagnostic_context["listing_statuses"] = ["Existing sale", "Project reference"]
+                reply = no_match_reply(properties, understood["memory"] | {"requirements": diagnostic_context}, language == "தமிழ்")
             if not st.session_state.buyer_memory.get("auction_offer_asked") and not re.search(r"auction|ஏலம்", normalized) and records:
                 st.session_state.buyer_memory["auction_offer_asked"] = True
                 st.session_state.buyer_memory["auction_offer_pending"] = True
@@ -3871,6 +3876,12 @@ def _respond_without_logging(text: str):
                         if language == "தமிழ்" else
                         "I’m sorry this has been frustrating. I searched with the preferences you gave me, but found no matching saved listing. Would you like to change the area, budget, or BHK?"
                     )
+            if (property_tool or property_search_request) and st.session_state.get("main_results_total_count") == 0:
+                diagnostic_context = dict(st.session_state.get("search_context") or {})
+                source_intent = api_intent if property_tool else fallback_intent
+                for field in ("location", "property_type", "status", "bedrooms", "max_budget", "min_area_sqm"):
+                    diagnostic_context[field] = getattr(source_intent, field)
+                turn.text = no_match_reply(properties, st.session_state.get("buyer_memory", {}) | {"requirements": diagnostic_context}, language == "தமிழ்")
             st.session_state.chat.append({"role": "user", "content": text})
             st.session_state.chat.append({
                 "role": "assistant",
@@ -4179,6 +4190,11 @@ def _respond_without_logging(text: str):
     shown_records = ranked.head(3).to_dict("records")
     if st.session_state.get("buyer_memory", {}).get("preferences"):
         reply = grounded_search_reply({"records": shown_records}, st.session_state.buyer_memory, language == "தமிழ்")
+    if not len(result):
+        diagnostic_context = dict(st.session_state.get("search_context") or {})
+        for field in ("location", "property_type", "status", "bedrooms", "max_budget", "min_area_sqm"):
+            diagnostic_context[field] = getattr(intent, field)
+        reply = no_match_reply(properties, st.session_state.buyer_memory | {"requirements": diagnostic_context}, language == "தமிழ்")
     missing_area_with_source = any(
         format_area_for_display(record) == tr("Not reported") and bool(record.get("source_url"))
         for record in shown_records
