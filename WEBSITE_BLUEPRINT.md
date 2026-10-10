@@ -8,6 +8,20 @@ Build a Tamil Nadu property guide where people can explain their needs in Englis
 
 The intended outcome is a useful shortlist and a clear next step. Saved records do not establish current availability. A project reference is not a confirmed unit for sale, and an approval reference is not a sale listing.
 
+## Complete customer lifecycle — local changes awaiting deployment approval
+
+Dataset → Mira search and preference refinement → explicit preferred-property selections → requested visit → owner confirmation → consented one-hour reminder → attendance response → post-visit feedback → Interested / Not interested / Undecided → assistance or another search → owner-recorded purchase outcome.
+
+The customer can select multiple preferred properties and remove selections. Visit requests capture the conversation ID and structured search preferences. The post-visit form records purchase intent separately from satisfaction; declining a property requires a reason. Customers can ask for property-agent, loan-advisor or both callbacks with sharing consent, or permit another search with revised preferences. Returning to Mira restores search constraints and applies supported changes through the existing preference parser. It never restores another browser's identity or private chat history. Unsupported changes remain visible for clarification in chat.
+
+Mira Studio's Complete customer journey view links property selections, preference snapshots, visits, customer decisions, assistance requests, evidence-based interest, verified outcomes and a conversation timeline. Existing inquiry history is linked by Conversation ID where present. Stage counts describe records and do not imply unique-customer conversion rates; historical records may lack stages. The original eight primary KPIs remain unchanged.
+
+The owner can configure property-agent and loan-advisor contacts, prepare consent-checked handoff drafts, record connection progress and record purchase outcomes with an evidence note. Draft preparation never sends a message. Advisor details must be supplied by the owner; no external connection is assumed from a callback request.
+
+Purchase interest is based on disclosed actions and recorded decisions. An explicit rejection overrides positive engagement for that property; owner-recorded purchased/not-purchased outcomes take precedence. No numerical probability is produced. Historical labelled outcomes and independent validation are prerequisites for a useful predictive model; a connection to an advisor alone does not establish purchase intent.
+
+Visit messages remain disabled pending owner activation approval and a reliable frequent worker. Real delivery, hosted-database migration and advisor contact remain separate verification steps. Automated learning continues through the existing owner approval process, rather than treating unreviewed comments or outcomes as immediate model training.
+
 ## Customer options, implementation and results
 
 | Original need | What we implemented and the options offered | Result and boundary |

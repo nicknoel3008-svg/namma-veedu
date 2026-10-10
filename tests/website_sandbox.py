@@ -24,5 +24,9 @@ with patch("ai_config.select_ai_config", return_value=("offline", "", "")), \
      patch("whatsapp_followup.schedule_whatsapp_followup", side_effect=RuntimeError("WhatsApp sending is disabled in browser QA")), \
      patch("visit_service.confirmed_visit_times", return_value=set()), \
      patch("visit_service.request_visit", return_value="qa-visit-request"), \
-     patch("visit_service.list_visit_requests", return_value=[]):
+     patch("visit_service.list_visit_requests", return_value=[]), \
+     patch("customer_journey.select_property"), \
+     patch("customer_journey.choices", return_value=[]), \
+     patch("customer_journey.timeline", return_value=[]), \
+     patch("visit_journey.owner_journeys", return_value=[]):
     runpy.run_path(str(ROOT / "app.py"), run_name="__main__")

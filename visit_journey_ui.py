@@ -26,7 +26,7 @@ def render_visit_response():
         choice=st.radio('How can we help?',choices)
         with st.form('visit_response_form'):
             reason=st.text_area('Reason or visit comments (no financial account details)')
-            when=None;attended='';satisfied='';assistance='None';details='';consent=False;explore=False
+            when=None;attended='';satisfied='';assistance='None';details='';consent=False;explore=False;intent='Undecided';changes=''
             if choice=='Reschedule':
                 day=st.date_input('New visit date',value=datetime.now(INDIA_TZ).date()+timedelta(days=1),min_value=datetime.now(INDIA_TZ).date())
                 time=st.time_input('Requested time (IST)',value=datetime.strptime('10:00','%H:%M').time())
@@ -35,19 +35,24 @@ def render_visit_response():
             if choice=='Visit feedback':
                 attended=st.radio('Did you attend the visit?',['Yes','No'])
                 satisfied=st.radio('Did the property satisfy your preferences?',['Yes','Partly','No','Not visited'])
+                intent=st.radio('Are you interested in purchasing this property?',['Undecided','Interested','Not interested','Not visited'])
                 assistance=st.selectbox('Do you need further assistance?',['None','Property agent','Loan advisor','Both'])
                 details=st.text_area('What assistance do you need?')
                 consent=st.checkbox('I permit sharing my visit details, contact and assistance request with the relevant property agent or loan advisor.')
                 st.caption('This saves a callback request for the owner. It does not automatically connect or contact an advisor.')
             if choice=='Explore other properties':
                 explore=st.checkbox('I would like to return to Mira to explore other properties.')
+            if choice in ('Visit feedback','Explore other properties'):
+                changes=st.text_area('What should Mira change in your next search?')
+                if choice=='Visit feedback':
+                    explore=st.checkbox('I would like Mira to help me explore other properties using my saved preferences and these changes.')
             submitted=st.form_submit_button('Save response')
         if submitted:
             action={'Yes, I will attend':'yes','No, I cannot attend':'no','Cancel visit':'no','Reschedule':'reschedule','Explore other properties':'explore','Visit feedback':'feedback'}[choice]
-            reply=record_response(token,action=action,reason=reason,visit_at=when,attended=attended,satisfied=satisfied,assistance=assistance,details=details,advisor_consent=consent,explore_consent=explore)
+            reply=record_response(token,action=action,reason=reason,visit_at=when,attended=attended,satisfied=satisfied,assistance=assistance,details=details,advisor_consent=consent,explore_consent=explore,purchase_intent=intent,revised_preferences=changes)
             st.success(reply)
-            if action=='explore' and explore:
-                st.link_button('Return to Mira', '/')
+            if explore:
+                st.link_button('Return to Mira', '/?resume_visit='+token)
         st.caption('Keep this private response link to yourself. No response does not cancel your visit.')
     except ValueError as error:
         st.error(str(error))

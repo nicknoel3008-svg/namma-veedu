@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1140" height="420" viewBox="0 0 1140 420" role="img" aria-label="Customer journey from search preferences to recorded purchase outcome and evidence-based interest">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#427b78"/></marker></defs>
+<rect width="1140" height="420" rx="20" fill="#f3f8f7"/>
+<style>.box{fill:white;stroke:#427b78;stroke-width:2}.title{font:600 17px sans-serif;fill:#173b3b;text-anchor:middle}.sub{font:14px sans-serif;fill:#3e6261;text-anchor:middle}.edge{fill:none;stroke:#427b78;stroke-width:2;marker-end:url(#arrow)}</style>
+<text x="570" y="30" class="title">Namma Veedu · Complete customer journey</text>
+<path class="edge" d="M340 95H400 M740 95H800 M970 130V165 M800 200H740 M400 200H340 M170 235V270 M340 305H400 M740 305H800"/>
+<g><rect class="box" x="20" y="60" width="320" height="70" rx="12"/><text class="title" x="180" y="88">1. Search and preferences</text><text class="sub" x="180" y="113">Dataset + Mira + approved learning</text></g>
+<g><rect class="box" x="400" y="60" width="340" height="70" rx="12"/><text class="title" x="570" y="88">2. Choose preferred properties</text><text class="sub" x="570" y="113">Multiple selections; remove or refine</text></g>
+<g><rect class="box" x="800" y="60" width="320" height="70" rx="12"/><text class="title" x="960" y="88">3. Request a property visit</text><text class="sub" x="960" y="113">Available/custom time; owner confirms</text></g>
+<g><rect class="box" x="800" y="165" width="320" height="70" rx="12"/><text class="title" x="960" y="193">4. One-hour reminder</text><text class="sub" x="960" y="218">Consent; Yes / No / Reschedule</text></g>
+<g><rect class="box" x="400" y="165" width="340" height="70" rx="12"/><text class="title" x="570" y="193">5. Visit feedback</text><text class="sub" x="570" y="218">Attended? Matched preferences?</text></g>
+<g><rect class="box" x="20" y="165" width="320" height="70" rx="12"/><text class="title" x="180" y="193">6. Purchase decision</text><text class="sub" x="180" y="218">Interested / Undecided / No + reason</text></g>
+<g><rect class="box" x="20" y="270" width="320" height="70" rx="12"/><text class="title" x="180" y="298">7. Assistance or another search</text><text class="sub" x="180" y="323">Consented advisor draft / return to Mira</text></g>
+<g><rect class="box" x="400" y="270" width="340" height="70" rx="12"/><text class="title" x="570" y="298">8. Record the actual outcome</text><text class="sub" x="570" y="323">Owner confirmation + evidence note</text></g>
+<g><rect class="box" x="800" y="270" width="320" height="70" rx="12"/><text class="title" x="960" y="298">9. Owner analysis and improvement</text><text class="sub" x="960" y="323">Timeline; interest evidence; eight KPIs</text></g>
+<text class="sub" x="570" y="375">Alternative search returns to step 1 with permission. Rescheduling returns to owner confirmation.</text>
+<text class="sub" x="570" y="399">Visit messaging requires separate activation. Interest evidence is not a calibrated purchase probability.</text>
+</svg>

@@ -31,6 +31,11 @@ def _schema(connection):
             connection.execute("ALTER TABLE property_visit_requests ADD COLUMN visit_email_consent TEXT NOT NULL DEFAULT ''")
     if getattr(connection,"shared",False):
         connection.execute("ALTER TABLE property_visit_requests ENABLE ROW LEVEL SECURITY")
+    for column, default in (('conversation_id',''),('preferences','{}')):
+        if getattr(connection,'shared',False):
+            connection.execute(f"ALTER TABLE property_visit_requests ADD COLUMN IF NOT EXISTS {column} TEXT NOT NULL DEFAULT '{default}'")
+        elif column not in {row[1] for row in connection.execute('PRAGMA table_info(property_visit_requests)')}:
+            connection.execute(f"ALTER TABLE property_visit_requests ADD COLUMN {column} TEXT NOT NULL DEFAULT '{default}'")
 
 
 def confirmed_visit_times(record, date, db_path=FOLLOWUP_DB):
@@ -40,7 +45,7 @@ def confirmed_visit_times(record, date, db_path=FOLLOWUP_DB):
     return {datetime.fromisoformat(row["visit_at"]).strftime("%H:%M") for row in rows if datetime.fromisoformat(row["visit_at"]).date()==date}
 
 
-def request_visit(*, record, user_id, visit_at, slot_kind, customer_name, contact_method, contact_value, consent, db_path=FOLLOWUP_DB, email_reminders=False):
+def request_visit(*, record, user_id, visit_at, slot_kind, customer_name, contact_method, contact_value, consent, db_path=FOLLOWUP_DB, email_reminders=False, conversation_id='', preferences=None):
     if not consent:
         raise ValueError("Please consent to share your contact for this visit request.")
     if not customer_name.strip():
@@ -72,6 +77,12 @@ def request_visit(*, record, user_id, visit_at, slot_kind, customer_name, contac
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",(visit_id,user_id,key,str(record.get("title") or "Saved property")[:200],str(record.get("source_url") or "")[:1000],when,slot_kind,customer_name.strip()[:100],contact_method,contact_value.strip(),"Requested",now,now))
         if email_reminders and contact_method == 'Email':
             connection.execute("UPDATE property_visit_requests SET visit_email_consent='Yes' WHERE id=?", (visit_id,))
+        from customer_journey import preferences_json, event
+        connection.execute('UPDATE property_visit_requests SET conversation_id=?,preferences=? WHERE id=?',(conversation_id,preferences_json(preferences),visit_id))
+        event(connection,user_id=user_id,conversation_id=conversation_id,property_key=key,visit_id=visit_id,event='Visit requested',detail=when)
+        from visit_journey import ensure_journey, schema
+        schema(connection)
+        ensure_journey(connection, {'id':visit_id,'visit_at':when},now)
     return visit_id
 
 
@@ -97,4 +108,7 @@ def update_visit_status(visit_id, status, *, user_id=None, db_path=FOLLOWUP_DB):
             if conflict:
                 raise ValueError("Another visit is already confirmed for this property and time.")
         connection.execute("UPDATE property_visit_requests SET status=?,updated_at=? WHERE id=?",(status,datetime.now(INDIA_TZ).isoformat(timespec="seconds"),visit_id))
+        if row['status']!=status:
+            from customer_journey import event
+            event(connection,user_id=row['user_id'],conversation_id=row['conversation_id'],property_key=row['property_key'],visit_id=visit_id,event='Visit '+status.lower(),detail=row['visit_at'])
     return True

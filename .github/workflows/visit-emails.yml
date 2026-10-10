@@ -1,0 +1,37 @@
+name: Consented property visit emails
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: property-visit-email-worker
+  cancel-in-progress: false
+
+jobs:
+  deliver:
+    if: vars.VISIT_EMAIL_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    env:
+      VISIT_EMAIL_ENABLED: 'true'
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      FOLLOWUP_SMTP_HOST: ${{ secrets.FOLLOWUP_SMTP_HOST }}
+      FOLLOWUP_SMTP_PORT: ${{ secrets.FOLLOWUP_SMTP_PORT }}
+      FOLLOWUP_SMTP_USERNAME: ${{ secrets.FOLLOWUP_SMTP_USERNAME }}
+      FOLLOWUP_SMTP_PASSWORD: ${{ secrets.FOLLOWUP_SMTP_PASSWORD }}
+      FOLLOWUP_SMTP_FROM: ${{ secrets.FOLLOWUP_SMTP_FROM }}
+      FOLLOWUP_PUBLIC_URL: https://namma-veedu.streamlit.app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python run_visit_worker.py --check
+      - run: python run_visit_worker.py

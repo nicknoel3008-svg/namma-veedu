@@ -1510,6 +1510,81 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
                 st.error(str(error))
             except Exception:
                 st.error("Visit requests could not be loaded or saved. Please retry.")
+    with st.expander("Complete customer journey", expanded=False):
+        st.caption("Search preferences → property selection → visit → purchase decision → assistance → recorded outcome. No purchase probability is claimed without a validated model.")
+        st.image(str(ROOT / "static" / "customer-journey.svg"))
+        if st.button("Load customer journey", key="load_complete_journey"):
+            st.session_state.complete_journey_loaded = True
+        if st.session_state.get("complete_journey_loaded"):
+            try:
+                from customer_journey import choices, timeline
+                from visit_journey import owner_journeys, record_purchase_outcome
+                selections = choices()
+                journeys = owner_journeys()
+                events = timeline()
+                if selections:
+                    st.markdown("##### Preferred properties and search preferences")
+                    st.dataframe(pd.DataFrame(selections), hide_index=True)
+                if journeys:
+                    st.markdown("##### Visit decisions, assistance and purchase outcomes")
+                    st.dataframe(pd.DataFrame(journeys), hide_index=True)
+                    stages = {
+                        "Selected properties": sum(row["status"]=="Selected" for row in selections),
+                        "Visit requests": len(journeys),
+                        "Confirmed visits": sum(row["status"]=="Confirmed" for row in journeys),
+                        "Attended": sum(row["attended"]=="Yes" for row in journeys),
+                        "Interested in purchasing": sum(row["purchase_intent"]=="Interested" for row in journeys),
+                        "Advisor requests": sum(row["advisor_consent"]=="Yes" for row in journeys),
+                        "Purchased (owner recorded)": sum(row["purchase_outcome"]=="Purchased" for row in journeys),
+                    }
+                    st.bar_chart(pd.DataFrame({"Stage":list(stages),"Records":list(stages.values())}).set_index("Stage"))
+                    st.caption("Counts describe records at each stage, not unique customers or conversion probabilities. Historical data may have missing stages.")
+                    visit_choice = st.selectbox("Record a verified purchase outcome", [row["visit_id"] for row in journeys],format_func=lambda value: next(row["customer_name"]+" · "+row["property_title"]+" · "+value[:8] for row in journeys if row["visit_id"]==value))
+                    with st.form("purchase_outcome_form"):
+                        outcome=st.selectbox("Outcome",["Unknown","Still deciding","Purchased","Did not purchase"])
+                        note=st.text_area("Evidence or source of confirmation (no bank or identity details)")
+                        if st.form_submit_button("Save purchase outcome"):
+                            record_purchase_outcome(visit_choice,outcome,note)
+                            st.success("Outcome and evidence saved. No messages sent.")
+                st.markdown("##### Advisor directory and handoff drafts")
+                from advisor_directory import save_advisor, advisors, prepare_handoff
+                with st.form("advisor_directory_form"):
+                    advisor_role=st.selectbox("Advisor role",["Property agent","Loan advisor"])
+                    advisor_name=st.text_input("Advisor name")
+                    advisor_email=st.text_input("Advisor email")
+                    if st.form_submit_button("Save advisor contact"):
+                        save_advisor(advisor_role,advisor_name,advisor_email)
+                        st.success("Advisor contact saved privately. No message sent.")
+                directory=advisors()
+                if directory:
+                    st.dataframe(pd.DataFrame(directory),hide_index=True)
+                eligible=[row for row in journeys if row["advisor_consent"]=="Yes"]
+                if eligible:
+                    request_id=st.selectbox("Consented callback request",[row["visit_id"] for row in eligible])
+                    role=st.selectbox("Prepare handoff to",["Property agent","Loan advisor"])
+                    if st.button("Prepare handoff draft",key="prepare_journey_handoff"):
+                        draft=prepare_handoff(request_id,role)
+                        st.session_state.owner_handoff_draft=draft
+                    if st.session_state.get("owner_handoff_draft"):
+                        draft=st.session_state.owner_handoff_draft
+                        st.write("To: "+draft["to"])
+                        st.text_area("Handoff draft — review before contacting the advisor",draft["body"],height=180)
+                        st.caption("No email is sent. Contact the advisor manually after review, then update advisor progress in the visit panel.")
+                if events:
+                    conversation = st.selectbox("Conversation timeline", sorted({row["conversation_id"] or "Unlinked legacy record" for row in events}))
+                    selected_events=[row for row in events if (row["conversation_id"] or "Unlinked legacy record")==conversation]
+                    st.dataframe(pd.DataFrame(selected_events), hide_index=True)
+                    if conversation!="Unlinked legacy record":
+                        history=[row for row in read_inquiries() if str(row.get("Conversation ID") or row.get("conversation_id") or "")==conversation]
+                        if history:
+                            st.markdown("##### Linked Mira inquiry history")
+                            st.dataframe(pd.DataFrame(history),hide_index=True)
+                if not selections and not journeys:
+                    st.info("No linked customer journey records yet. Older inquiries remain in the existing reports.")
+            except ValueError as error:
+                st.error(str(error))
+            except Exception:
+                st.error("Customer journey could not be loaded or saved. Please retry.")
     with st.expander("Website Blueprint", expanded=False):
         st.caption("Private product and engineering map. It contains no passwords, API keys, or customer conversation text.")
         flowchart_path = ROOT / "static" / "mira-blueprint-flowchart.svg"
@@ -2194,6 +2269,13 @@ def render_property_card(row, number=None):
         '</div>'
     )
     st.markdown(card_html, unsafe_allow_html=True)
+    if st.button("இந்தச் சொத்தைத் தேர்ந்தெடு" if language == "தமிழ்" else "Select this property", key=f"select_property_{visit_card_counter}"):
+        try:
+            from customer_journey import select_property
+            select_property(user_id=str(st.session_state.user_id), conversation_id=str(st.session_state.setdefault("inquiry_conversation_id", str(uuid4()))), record=record, preferences=st.session_state.get("search_context", {}))
+            st.success("Preferred property saved. You can select more properties or request a visit.")
+        except Exception:
+            st.error("Could not save your property selection. Please try again.")
     if st.button("பார்வையிட நேரம் கோருங்கள்" if language == "தமிழ்" else "Book a slot", key=f"book_visit_{visit_card_counter}"):
         st.session_state.visit_property = record
         st.rerun()
@@ -4824,6 +4906,27 @@ if st.session_state.chat and st.session_state.chat[0].get("mode") == "welcome":
     st.session_state.chat[0]["content"] = welcome
     st.session_state.chat[0]["content"] += (" நான் உதவத் தவறினாலோ இன்னும் மேம்படலாம் என்று நினைத்தாலோ, இந்த உரையாடலில் உள்ள ‘கருத்தைப் பகிருங்கள்’ விருப்பத்தைப் பயன்படுத்துங்கள்." if language == "தமிழ்" else " If I miss something or could help you better, please use Share feedback in this chat. Your suggestions help us improve Mira.")
 
+resume_token = str(st.query_params.get("resume_visit", "") or "")
+if resume_token:
+    try:
+        from visit_journey import resume_preferences
+        resumed = resume_preferences(resume_token)
+        if resumed:
+            if st.session_state.get("conversation_closed"):
+                start_new_conversation()
+            st.session_state.search_context = update_preferences(resumed["changes"], properties, resumed["preferences"]) if resumed["changes"] else resumed["preferences"]
+            st.session_state.buyer_memory = {}
+            st.session_state.return_search_changes = resumed["changes"]
+            st.session_state.chat.append({"role":"assistant", "content":"Welcome back. I have restored your saved search preferences. Your requested changes: " + (resumed["changes"] or "No changes specified") + ". Tell me what you would like to adjust or search next.", "mode":"visit_return"})
+            st.success("Your saved search preferences are restored. Tell Mira your next search or confirm your requested changes.")
+        else:
+            st.warning("This return link is invalid, expired or does not have permission to restore preferences.")
+    except Exception:
+        st.warning("Could not restore your search preferences. Please tell Mira what you need.")
+    del st.query_params["resume_visit"]
+    st.rerun()
+
+
 st.session_state.setdefault("filters_applied", False)
 st.session_state.setdefault("main_results", pd.DataFrame())
 st.session_state.setdefault("main_results_mode", "none")
@@ -5577,11 +5680,11 @@ def visit_request_dialog():
         contact_value = st.text_input("Email address or WhatsApp number with country code",key="visit_contact_value")
         consent = st.checkbox("இந்தப் பார்வைக் கோரிக்கைக்காக என் தொடர்பு விவரங்களை உரிமையாளருடன் பகிர ஒப்புக்கொள்கிறேன்." if language == "தமிழ்" else "I agree to share my contact with the Namma Veedu owner for this property visit request.",key="visit_consent")
         visit_email_reminders = st.checkbox("Email me a confirmation reminder one hour before my confirmed visit and a feedback request afterward.", key="visit_email_reminders", disabled=contact_method != "Email")
-        st.caption("Visit email automation is not enabled yet. Your consent will be saved; no visit email is currently sent.")
+        st.caption("For confirmed visits with email consent, a reminder becomes due one hour before the visit and a feedback request two hours afterward. Delivery depends on the email service and scheduled worker; messages may arrive later. WhatsApp visit messages are not enabled.")
         submit = st.form_submit_button("பார்வைக் கோரிக்கையைச் சேமிக்கவும்" if language == "தமிழ்" else "Request visit")
     if submit:
         try:
-            visit_id = request_visit(record=record,user_id=str(st.session_state.user_id),visit_at=datetime.combine(visit_date,visit_time,tzinfo=INDIA_TZ),slot_kind=slot_kind,customer_name=visit_name,contact_method=contact_method,contact_value=contact_value,consent=consent,email_reminders=visit_email_reminders)
+            visit_id = request_visit(record=record,user_id=str(st.session_state.user_id),visit_at=datetime.combine(visit_date,visit_time,tzinfo=INDIA_TZ),slot_kind=slot_kind,customer_name=visit_name,contact_method=contact_method,contact_value=contact_value,consent=consent,email_reminders=visit_email_reminders,conversation_id=str(st.session_state.setdefault("inquiry_conversation_id",str(uuid4()))),preferences=st.session_state.get("search_context", {}))
             st.session_state.visit_saved_notice = f"Visit request {visit_id[:8]} saved — pending owner confirmation."
             dismiss_visit_request()
             st.rerun()
@@ -5590,6 +5693,22 @@ def visit_request_dialog():
         except Exception:
             st.error("Couldn’t save your visit request. Please try again.")
 
+
+with st.expander("My preferred properties",expanded=False):
+    if st.button("Load my selections",key="load_my_property_choices"):
+        st.session_state.property_choices_loaded=True
+    if st.session_state.get("property_choices_loaded"):
+        try:
+            from customer_journey import choices, remove_choice
+            selected_choices=[row for row in choices(str(st.session_state.user_id)) if row["status"]=="Selected"]
+            for choice in selected_choices:
+                st.write(choice["property_title"])
+                if st.button("Remove selection",key="remove_choice_"+choice["id"]):
+                    remove_choice(choice["id"],str(st.session_state.user_id))
+                    st.rerun()
+            if not selected_choices:st.info("No preferred properties saved yet.")
+        except Exception:
+            st.error("Could not load your saved property choices. Please retry.")
 
 if st.session_state.get("visit_property"):
     visit_request_dialog()

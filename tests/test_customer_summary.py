@@ -34,15 +34,18 @@ class CustomerSummaryTests(unittest.TestCase):
         class State(dict):
             __getattr__ = dict.__getitem__
             __setattr__ = dict.__setitem__
-        state = State(chat=[{"role": "user", "content": "hello"}], inquiry_conversation_id="one", agent_history=["history"])
+        state = State(chat=[{"role": "user", "content": "hello"}], inquiry_conversation_id="one", user_id="test-user", agent_history=["history"])
         tree = ast.parse((Path(__file__).parents[1] / "app.py").read_text(encoding="utf-8-sig"))
         function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "close_conversation_from_button")
         save = Mock()
+        sender = Mock(return_value=(0, 0))
         namespace = {"st": SimpleNamespace(session_state=state), "datetime": datetime, "INDIA_TZ": INDIA_TZ,
                      "language": "English", "update_conversation_fields": save, "conversation_transcript": lambda chat: str(chat),
-                     "clear_active_preferences": Mock()}
+                     "clear_active_preferences": Mock(), "send_chat_end_recommendations": sender,
+                     "FOLLOWUP_EMAIL_CONFIG": {}, "current_followup_recommendations": lambda: "Saved shortlist"}
         exec(compile(ast.Module(body=[function], type_ignores=[]), "app.py", "exec"), namespace)
         namespace["close_conversation_from_button"]()
+        sender.assert_called_once_with(config={},user_id="test-user",conversation_id="one",recommendations="Saved shortlist")
         self.assertTrue(state.conversation_closed)
         self.assertEqual(state.chat, [])
         self.assertEqual(state.agent_history, [])
