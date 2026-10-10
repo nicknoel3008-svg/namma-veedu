@@ -1110,6 +1110,7 @@ section[data-testid="stMain"] div[data-testid="stColumn"]:has(.st-key-mira-conte
 """.replace("__HERO_IMAGE__", HERO_IMAGE_URL).replace("__WATERMARK_IMAGE__", WATERMARK_IMAGE_URL)
 st.markdown(_base_styles, unsafe_allow_html=True)
 st.markdown("<style>" + (ROOT / "static" / "coastal-sidebar.css").read_text(encoding="utf-8") + "</style>", unsafe_allow_html=True)
+st.markdown("<style>" + (ROOT / "static" / "coastal-theme.css").read_text(encoding="utf-8") + "</style>", unsafe_allow_html=True)
 
 st.markdown(f'''
 <section class="hero" style="background-image:linear-gradient(90deg,rgba(9,28,37,.84) 0%,rgba(9,28,37,.57) 46%,rgba(9,28,37,.08) 100%),linear-gradient(0deg,rgba(9,28,37,.52),transparent 48%),url('{HERO_IMAGE_URL}');">
@@ -4935,7 +4936,7 @@ with results_slot.container(border=has_visible_results, key="results-content-was
                 st.write(latest_action_reply or inline_defaults[selected_start_action])
     else:
         st.markdown(
-            f'<div style="margin:0 0 12px;padding:12px 16px;border-radius:14px;background:rgba(7,27,36,.84);border:1px solid rgba(226,240,234,.48);box-shadow:0 8px 20px rgba(3,18,25,.24);color:#F4F7F4;font-size:22px;font-weight:800;line-height:1.3;">🏡 {escape(tr("Search results"))}</div>',
+            f'<div style="margin:0 0 12px;padding:12px 16px;border-radius:14px;background:#FFFFFF;border:1px solid #CBDDDF;box-shadow:none;color:#17394D;font-size:22px;font-weight:800;line-height:1.3;">🏡 {escape(tr("Search results"))}</div>',
             unsafe_allow_html=True,
         )
         view_labels = {
@@ -4973,7 +4974,7 @@ with results_slot.container(border=has_visible_results, key="results-content-was
             category_label = view_labels[listing_view]
             results_summary = (f"{category_label}: {result_count:,} பொருத்தங்கள் · முடிந்த ஏலங்கள் தேர்வு செய்யாவிட்டால் மறைக்கப்படும்; ஏலத் தேதி இல்லாத பதிவுகளை Mira முதலில் கேட்டு உறுதிப்படுத்துவார்." if language == "தமிழ்" else f"{result_count:,} matching {category_label.lower()} · ended auctions stay hidden unless included; Mira asks before showing records with no auction date.")
             st.markdown(
-                f'<div style="margin:9px 0 14px;padding:10px 13px;border-radius:12px;background:rgba(7,27,36,.84);border:1px solid rgba(226,240,234,.38);color:#F4F7F4;font-size:13px;font-weight:600;line-height:1.45;box-shadow:0 5px 14px rgba(3,18,25,.18);">{escape(results_summary)}</div>',
+                f'<div style="margin:9px 0 14px;padding:10px 13px;border-radius:12px;background:#FFFFFF;border:1px solid #CBDDDF;color:#17394D;font-size:13px;font-weight:600;line-height:1.45;box-shadow:0 5px 14px rgba(3,18,25,.18);">{escape(results_summary)}</div>',
                 unsafe_allow_html=True,
             )
             if result.empty:

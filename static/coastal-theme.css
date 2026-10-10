@@ -1,0 +1,36 @@
+/* Shared Coastal & Calm theme for customer and owner experiences. */
+.stApp,.stApp [data-testid="stAppViewContainer"],.stApp [data-testid="stMain"],.stApp [data-testid="stHeader"] {background:#F4F1EA!important;background-image:none!important;color:#17394D!important}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container {background:#F4F1EA!important;background-image:none!important;box-shadow:none!important;border:0!important}
+.stApp section[data-testid="stMain"] .block-container :is(h1,h2,h3,h4,h5,h6,p,li,label,span,small),
+.stApp section[data-testid="stMain"] .block-container [data-testid="stMarkdownContainer"] :is(p,li),
+.stApp section[data-testid="stMain"] .block-container [data-testid="stWidgetLabel"] p,
+.stApp section[data-testid="stMain"] .block-container [data-testid="stCaptionContainer"] * {
+ color:#17394D!important;-webkit-text-fill-color:#17394D!important;text-shadow:none!important;
+}
+.stApp section[data-testid="stMain"] .block-container :is(.st-key-mira-content-wash,.st-key-results-content-wash-active,.st-key-info-panel-content),
+.stApp section[data-testid="stMain"] div[data-testid="stColumn"]:has(.st-key-mira-content-wash),
+.stApp section[data-testid="stMain"] .block-container [data-testid="stVerticalBlockBorderWrapper"],
+.stApp section[data-testid="stMain"] .block-container [data-testid="stForm"] {
+ background:#FFF!important;background-image:none!important;border-color:#CBDDDF!important;box-shadow:none!important;backdrop-filter:none!important;
+}
+.stApp section[data-testid="stMain"] .block-container .st-key-mira-content-wash [data-testid="stChatMessage"] {background:#F4F1EA!important;border:1px solid #E6E2D9!important}
+.stApp section[data-testid="stMain"] .block-container .st-key-mira-content-wash [data-testid="stChatMessage"]:has([aria-label="Chat message from user"]) {background:#E4F0F4!important;border-color:#C6DFE8!important}
+.stApp section[data-testid="stMain"] .block-container .st-key-mira-content-wash [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] :is(p,li) {color:#17394D!important;-webkit-text-fill-color:#17394D!important}
+.stApp section[data-testid="stMain"] .block-container button[kind] {background:#2E6F95!important;color:#FFF!important;-webkit-text-fill-color:#FFF!important;border:1px solid #2E6F95!important;box-shadow:none!important}
+.stApp section[data-testid="stMain"] .block-container button[kind] :is(p,span) {color:#FFF!important;-webkit-text-fill-color:#FFF!important}
+.stApp section[data-testid="stMain"] .block-container .st-key-mira-composer-row button {background:#E07A5F!important;border-color:#E07A5F!important}
+.stApp section[data-testid="stMain"] .block-container button[role="tab"] {background:transparent!important;color:#245A79!important;-webkit-text-fill-color:#245A79!important}
+.stApp section[data-testid="stMain"] .block-container button[role="tab"] :is(p,span) {color:#245A79!important;-webkit-text-fill-color:#245A79!important}
+.stApp section[data-testid="stMain"] .block-container :is(input,textarea,[role="combobox"]),
+.stApp section[data-testid="stMain"] .block-container [data-baseweb="select"]>div {background:#FFF!important;color:#17394D!important;-webkit-text-fill-color:#17394D!important;border-color:#ADC6D0!important}
+.stApp section[data-testid="stMain"] .block-container .start-option-help {background:#FFF!important;border:1px solid #CBDDDF!important;color:#17394D!important;box-shadow:none!important}
+.stApp section[data-testid="stMain"] .block-container .hero :is(h1,h2,p,span) {color:#FFF!important;-webkit-text-fill-color:#FFF!important}
+.stApp section[data-testid="stMain"] .block-container .hero h1 em {color:#FFD1C7!important;-webkit-text-fill-color:#FFD1C7!important}
+.stApp section[data-testid="stMain"] .block-container [data-testid="stMetric"] {background:#FFF!important;border-color:#CBDDDF!important}
+.stApp section[data-testid="stMain"] .block-container [data-testid="stMetricValue"] {color:#17394D!important;-webkit-text-fill-color:#17394D!important}
+.stApp section[data-testid="stMain"] .block-container ::-webkit-scrollbar-thumb {background:#2E6F95!important;border-color:#FFF!important}
+.stApp section[data-testid="stSidebar"],
+.stApp section[data-testid="stSidebar"]>div,
+.stApp section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {background:#F4F1EA!important}
+.stApp section[data-testid="stMain"] .block-container [data-testid="stCaptionContainer"] {color:#456477!important;-webkit-text-fill-color:#456477!important;opacity:1!important}
+.stApp section[data-testid="stMain"] .block-container :is(input,textarea)::placeholder {color:#456477!important;-webkit-text-fill-color:#456477!important;opacity:1!important}
