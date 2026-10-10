@@ -1,0 +1,16 @@
+/* Architectural Wash is customer-only; owner surfaces keep Navy & Gold. */
+.stApp:not(:has(.owner-dashboard-hero)) {background:#F3F2EF!important;background-image:linear-gradient(rgba(255,255,255,.93),rgba(255,255,255,.93)),url('__ARCHITECTURE_IMAGE__')!important;background-size:cover!important;background-position:center!important;background-attachment:fixed!important}
+.stApp:not(:has(.owner-dashboard-hero)) [data-testid="stAppViewContainer"],
+.stApp:not(:has(.owner-dashboard-hero)) [data-testid="stMain"],
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container {background:transparent!important;background-image:none!important}
+.stApp:not(:has(.owner-dashboard-hero)) [data-testid="stHeader"] {background:rgba(250,249,246,.94)!important}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"],
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"]>div,
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {background:rgba(250,249,246,.97)!important}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container :is(.st-key-mira-content-wash,.st-key-results-content-wash-active,.st-key-info-panel-content,[data-testid="stVerticalBlockBorderWrapper"],[data-testid="stForm"],[data-testid="stMetric"],.start-option-help),
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] div[data-testid="stColumn"]:has(.st-key-mira-content-wash) {background:#FFFFFF!important;border-color:#D8D9D7!important}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stMain"] .block-container .st-key-mira-content-wash [data-testid="stChatMessage"] {background:#F2F1EC!important}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] .st-key-filter-panel-scroll,
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"],
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] .language-heading {background:#FFFFFF!important;border-color:#D8D9D7!important}
+.stApp:not(:has(.owner-dashboard-hero)) section[data-testid="stSidebar"] .filter-heading {border-color:#B89750!important}
