@@ -1,10 +1,10 @@
-/* Coastal & Calm sidebar: opaque surfaces keep every label readable. */
-section[data-testid="stSidebar"] {background:#ECE9E1!important;border-right:1px solid #D6D7D0!important;backdrop-filter:none!important}
+/* Navy & Gold sidebar: opaque surfaces keep every label readable. */
+section[data-testid="stSidebar"] {background:#D9D3C7!important;border-right:1px solid #D6D7D0!important;backdrop-filter:none!important}
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"],
-section[data-testid="stSidebar"]>div {background:#ECE9E1!important}
+section[data-testid="stSidebar"]>div {background:#D9D3C7!important}
 section[data-testid="stSidebar"] .st-key-filter-panel-scroll,
 section[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] {
- background:#F4F1EA!important;border:1px solid #D7DDD9!important;border-radius:14px!important;box-shadow:none!important;
+ background:#D9D3C7!important;border:1px solid #D7DDD9!important;border-radius:14px!important;box-shadow:none!important;
 }
 section[data-testid="stSidebar"] :is(p,span,label,h1,h2,h3,h4,small,a),
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
@@ -14,20 +14,20 @@ section[data-testid="stSidebar"] .language-heading,
 section[data-testid="stSidebar"] .language-heading span,
 section[data-testid="stSidebar"] .filter-heading-title,
 section[data-testid="stSidebar"] .filter-heading-subtitle {
- color:#203C4B!important;-webkit-text-fill-color:#203C4B!important;text-shadow:none!important;opacity:1!important;
+ color:#18334D!important;-webkit-text-fill-color:#18334D!important;text-shadow:none!important;opacity:1!important;
 }
-section[data-testid="stSidebar"] .language-heading {background:#F4F1EA!important;border-left:3px solid #E07A5F;padding:10px 12px;border-radius:8px;margin-bottom:8px}
+section[data-testid="stSidebar"] .language-heading {background:#D9D3C7!important;border-left:3px solid #B89750;padding:10px 12px;border-radius:8px;margin-bottom:8px}
 section[data-testid="stSidebar"] [data-baseweb="select"]>div,
 section[data-testid="stSidebar"] [data-baseweb="select"] *,
 section[data-testid="stSidebar"] :is(input,textarea,[role="combobox"]) {
- background:#FFF!important;color:#17394D!important;-webkit-text-fill-color:#17394D!important;border-color:#B8C9CD!important;text-shadow:none!important;
+ background:#F5F2EA!important;color:#18334D!important;-webkit-text-fill-color:#18334D!important;border-color:#B8C9CD!important;text-shadow:none!important;
 }
-section[data-testid="stSidebar"] input::placeholder {color:#456477!important;-webkit-text-fill-color:#456477!important;opacity:1!important}
-section[data-testid="stSidebar"] button[kind] {background:#2E6F95!important;border:1px solid #2E6F95!important;color:#FFF!important;-webkit-text-fill-color:#FFF!important}
-section[data-testid="stSidebar"] button[kind] :is(p,span) {color:#FFF!important;-webkit-text-fill-color:#FFF!important}
-section[data-testid="stSidebar"] .filter-heading-icon {color:#2E6F95!important;-webkit-text-fill-color:#2E6F95!important}
-section[data-testid="stSidebar"] svg {color:#2E6F95!important}
-section[data-testid="stSidebar"] .st-key-filter-panel-scroll::-webkit-scrollbar-thumb {background:#2E6F95!important;border-color:#F4F1EA!important}
+section[data-testid="stSidebar"] input::placeholder {color:#40516A!important;-webkit-text-fill-color:#40516A!important;opacity:1!important}
+section[data-testid="stSidebar"] button[kind] {background:#18334D!important;border:1px solid #18334D!important;color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important}
+section[data-testid="stSidebar"] button[kind] :is(p,span) {color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important}
+section[data-testid="stSidebar"] .filter-heading-icon {color:#18334D!important;-webkit-text-fill-color:#18334D!important}
+section[data-testid="stSidebar"] svg {color:#18334D!important}
+section[data-testid="stSidebar"] .st-key-filter-panel-scroll::-webkit-scrollbar-thumb {background:#18334D!important;border-color:#D9D3C7!important}
 .stApp section[data-testid="stSidebar"] [data-testid="stSelectbox"] [role="combobox"],
 .stApp section[data-testid="stSidebar"] [data-testid="stSelectbox"] [role="combobox"] *,
 .stApp section[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"]>div,
@@ -35,8 +35,8 @@ section[data-testid="stSidebar"] .st-key-filter-panel-scroll::-webkit-scrollbar-
 .stApp section[data-testid="stSidebar"] [data-testid="stNumberInput"] input,
 .stApp section[data-testid="stSidebar"] [data-testid="stTextInput"] [data-baseweb="input"],
 .stApp section[data-testid="stSidebar"] [data-testid="stNumberInput"] [data-baseweb="input"] {
- background:#FFF!important;color:#17394D!important;-webkit-text-fill-color:#17394D!important;text-shadow:none!important;
+ background:#F5F2EA!important;color:#18334D!important;-webkit-text-fill-color:#18334D!important;text-shadow:none!important;
 }
 .stApp section[data-testid="stSidebar"] [data-testid="stTextInput"] input::placeholder {
- color:#456477!important;-webkit-text-fill-color:#456477!important;
+ color:#40516A!important;-webkit-text-fill-color:#40516A!important;
 }

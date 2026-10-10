@@ -8,7 +8,7 @@ from openpyxl import Workbook
 from agent_runtime import INDIA_TZ
 from inquiry_log import customer_summary_rows, _excel_text
 
-TEAL, CORAL = "#2E6F95", "#E07A5F"
+NAVY, GOLD = "#18334D", "#B89750"
 
 
 def date_of(value):
@@ -114,10 +114,10 @@ def render(rows, *, sessions, deliveries, visits, selections, rules, history_row
                 continue
             encoding = {"x": {"field": "Date", "type": "temporal", "axis": {"title": None, "format": "%d %b", "labelAngle": 0, "tickCount": 5}},
                         "y": {"field": "Sessions" if kind == "website" else "Count", "type": "quantitative", "axis": {"title": None, "tickMinStep": 1}}}
-            mark = {"type": "area", "line": {"color": TEAL, "strokeWidth": 3}, "color": TEAL, "opacity": .24, "point": {"filled": True, "size": 40}}
+            mark = {"type": "area", "line": {"color": NAVY, "strokeWidth": 3}, "color": NAVY, "opacity": .24, "point": {"filled": True, "size": 40}}
             if kind == "mira":
                 mark = {"type": "bar", "cornerRadiusTopLeft": 4, "cornerRadiusTopRight": 4}
-                encoding.update({"xOffset": {"field": "Series"}, "color": {"field": "Series", "scale": {"domain": ["Conversations", "Replies"], "range": [TEAL, CORAL]}, "legend": {"orient": "top", "title": None}}})
+                encoding.update({"xOffset": {"field": "Series"}, "color": {"field": "Series", "scale": {"domain": ["Conversations", "Replies"], "range": [NAVY, GOLD]}, "legend": {"orient": "top", "title": None}}})
             encoding["tooltip"] = [{"field": "Date", "type": "temporal"}, {"field": "Sessions" if kind == "website" else "Count", "type": "quantitative"}]
             st.vega_lite_chart(pd.DataFrame(data), {"height": 240, "background": "transparent", "mark": mark, "encoding": encoding, "config": {"view": {"stroke": None}, "axis": {"labelColor": "#456477", "gridColor": "#E8EDF0", "domain": False, "labelFontSize": 11}}}, use_container_width=True)
     st.subheader("Owner records")
@@ -157,7 +157,7 @@ def render(rows, *, sessions, deliveries, visits, selections, rules, history_row
         st.subheader("Customer journey")
         selected = {r.get("conversation_id") for r in selections if str(r.get("conversation_id") or "") in relevant and r.get("status") == "Selected"}
         journey_data = pd.DataFrame({"Stage": ["Conversations", "Active shortlists", "Visits completed", "Verified purchases"], "Count": [len(summary), len(selected), complete, purchased]})
-        st.vega_lite_chart(journey_data, {"height": 150, "background": "transparent", "mark": {"type": "bar", "color": TEAL, "cornerRadiusEnd": 5}, "encoding": {"y": {"field": "Stage", "type": "nominal", "sort": None, "axis": {"title": None, "domain": False, "ticks": False, "labelColor": "#456477"}}, "x": {"field": "Count", "type": "quantitative", "axis": {"title": None, "tickMinStep": 1, "gridColor": "#E8EDF0"}}, "tooltip": [{"field": "Stage"}, {"field": "Count"}]}, "config": {"view": {"stroke": None}}}, use_container_width=True)
+        st.vega_lite_chart(journey_data, {"height": 150, "background": "transparent", "mark": {"type": "bar", "color": NAVY, "cornerRadiusEnd": 5}, "encoding": {"y": {"field": "Stage", "type": "nominal", "sort": None, "axis": {"title": None, "domain": False, "ticks": False, "labelColor": "#456477"}}, "x": {"field": "Count", "type": "quantitative", "axis": {"title": None, "tickMinStep": 1, "gridColor": "#E8EDF0"}}, "tooltip": [{"field": "Stage"}, {"field": "Count"}]}, "config": {"view": {"stroke": None}}}, use_container_width=True)
         st.caption("Recorded stages use different units; this is not a purchase conversion forecast.")
     with left, st.container(border=True):
         st.subheader("Action queue")
