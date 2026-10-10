@@ -50,6 +50,36 @@ class WebsiteJourneyTests(unittest.TestCase):
         self.assertFalse(self.app.session_state["conversation_closed"])
         self.assertEqual(self.app.session_state["search_context"], {})
 
+    def test_all_search_results_remain_available_on_numbered_pages(self):
+        self.send("Show me properties in Chennai")
+        full = self.app.session_state["main_results"]
+        self.assertGreater(len(full), 5)
+        self.assertEqual(len(full), self.app.session_state["main_results_total_count"])
+        self.assertTrue(any("Page 1 of" in item.value and "Listings 1–5" in item.value for item in self.app.caption))
+        next(item for item in self.app.pills if item.label == "Results page").set_value(2).run()
+        self.assertFalse(self.app.exception)
+        self.assertTrue(any("Page 2 of" in item.value and "Listings 6–10" in item.value for item in self.app.caption))
+        next(item for item in self.app.pills if item.label == "Results page").set_value(1).run()
+        self.assertEqual(self.app.session_state["results_page"], 1)
+        self.send("Show me properties around Tambaram")
+        self.assertEqual(self.app.session_state["results_page"], 1)
+
+    def test_tambaram_auction_explanation_and_selected_property_loan(self):
+        self.send("im looking for a property around tambaram")
+        explanation = self.send("auctiom properties?")
+        self.assertEqual(explanation["mode"], "auction_explanation")
+        self.assertEqual(self.app.session_state["search_context"]["location"].casefold(), "tambaram")
+        self.send("show me properties around Tambaram")
+        reply = self.send("Im interested in VGN Marble Arch and I have a budget of 20 lakhs with me and Im looking for loan options as well")
+        self.assertEqual(reply["mode"], "loan_options")
+        self.assertIn("103", reply["content"])
+        self.assertIn("VGN Marble Arch", reply["content"])
+        self.assertNotIn("max_budget", self.app.session_state["search_context"])
+        self.assertEqual(self.send("can you check for loan optionm for this property")["mode"], "loan_options")
+        self.assertEqual(self.send("i already gave you my preference")["mode"], "loan_options")
+        self.send("show me property in Tambaram")
+        self.assertTrue(self.app.session_state["chat"][-1].get("records"))
+
     def test_public_chat_location_correction_and_context_questions(self):
         self.send("Show me properties in Chennai with minimum price")
         self.assertEqual(self.send("what are the properties they provide")["mode"], "result_explanation")

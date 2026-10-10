@@ -10,3 +10,11 @@
 - Follow-up descriptions are included in newly saved records, customer summaries, and exports, alongside the method, status, cadence, and next scheduled time.
 
 Shared-storage inspection confirmed existing follow-up schedule records were present; the previous open-follow-up KPI counted only manually maintained owner statuses. Email requests saved while delivery is disabled remain reviewable but do not send email. In-app reminders remain browser-session notifications.
+
+## Latest Tambaram conversation and result browsing
+
+- Main results retain the complete matching set and display five cards per page with numbered page choices. A changed search or listing category resets pagination to page one. Explicitly accepted undated auction records remain accessible as historical records.
+- “Auction properties?” (including the observed “auctiom” typo) explains the auction process and retains the requested area instead of searching the whole catalogue.
+- Old undated-auction confirmations expire when the conversation moves on. Source-guidance confirmations are handled before generic property details.
+- A selected property's loan-options request retains the property and distinguishes available own funds from a maximum purchase price. The response gives an illustrative arithmetic difference, official lender links, and a useful next question without promising finance.
+- Automatic snapshot dates and exports are rebuilt from shared inquiry records in India time when Studio loads. This avoids relying on stale machine-local archive files after migration to Supabase.

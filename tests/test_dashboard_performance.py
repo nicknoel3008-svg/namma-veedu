@@ -29,6 +29,7 @@ class DashboardPerformanceTests(unittest.TestCase):
         self.assertEqual(next(item.value for item in app.metric if item.label == "Confirmed interested leads"), "1")
         self.assertEqual(next(item.value for item in app.metric if item.label == "Search match rate"), "100%")
         self.assertEqual(next(item.value for item in app.metric if item.label == "Average satisfaction"), "4.0 / 5")
+        self.assertEqual(next(item.value for item in app.selectbox if item.label == "Automatic snapshot date"), today)
 
     def test_owner_dashboard_flowchart_and_empty_counts(self):
         started = perf_counter()

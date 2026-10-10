@@ -133,6 +133,7 @@ def response_language(text, previous="English"):
 def conversational_turn(text, data, chat, context=None, memory=None, language="English", now=None):
     """Interpret current intent first; retain state independently of provider availability."""
     query = " ".join(text.casefold().replace("’", "'").split())
+    query = re.sub(r"\bauctiom\b", "auction", query)
     previous_context = dict(context or {})
     replacement_property_type = bool(re.search(
         r"\b(?:add|set|keep|want|prefer)\s+(?:a\s+)?(?:flat|apartment|house|plot)\b",
@@ -199,6 +200,42 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
     if selected:
         memory["selected"] = selected
     selected = memory.get("selected")
+    if re.fullmatch(r"(?:what (?:is|are) )?auction(?: properties)?\?+", query):
+        context.clear()
+        context.update(previous_context)
+        memory["auction_offer_pending"] = True
+        memory["auction_offer_asked"] = True
+        return answer("auction_explanation", "Auction properties are offered through a bidding process, often by a bank recovering a loan. The notice sets the reserve price, deposit, deadline and inspection terms. Would you like me to include auction listings alongside ordinary sales in your area?", "ஏலச் சொத்துகள் போட்டி ஏல முறையில் விற்கப்படுகின்றன. அறிவிப்பில் ஆரம்ப விலை, முன்பணம், கடைசி நாள் மற்றும் ஆய்வு விதிகள் இருக்கும். உங்கள் பகுதியில் விற்பனைச் சொத்துகளுடன் ஏலங்களையும் சேர்க்கவா?", "Auction properties bidding moolama sell pannuvaanga. Reserve price, deposit, deadline notice-la irukkum. Sales-oda auctions-um include pannalama?")
+    loan_options = bool(re.search(r"loan|கடன்", query) and re.search(r"options?|optionm|exceed|remaining|this property|with me|அதிக|மீத", query))
+    if selected and memory.get("available_funds") is not None and re.search(r"already (?:gave|shared|told)|already.*prefer", query):
+        loan_options = True
+    if loan_options:
+        funds = re.search(r"([\d,.]+)\s*(lakhs?|lacs?|crores?|cr)\b", query)
+        if funds and re.search(r"with me|cash|down payment|available|i have", query):
+            memory["available_funds"] = float(funds.group(1).replace(',', '')) * (10000000 if funds.group(2).startswith('cr') else 100000)
+            if previous_context.get("max_budget") is not None:
+                context["max_budget"] = previous_context["max_budget"]
+            else:
+                context.pop("max_budget", None)
+        available = memory.get("available_funds")
+        lead = "I can help you explore home-loan options while keeping your selected property and preferences. "
+        tamil_lead = "தேர்ந்தெடுத்த சொத்தையும் விருப்பங்களையும் வைத்துக் கொண்டு வீட்டுக் கடன் வாய்ப்புகளைப் பார்க்க உதவுகிறேன். "
+        if selected:
+            title = selected.get("title", "the selected property")
+            lead = f"For {title}, "
+            tamil_lead = f"{title} சொத்துக்கு, "
+            try:
+                price = float(selected.get("price_inr") or 0)
+            except (TypeError, ValueError):
+                price = 0
+            if price > 0 and available is not None:
+                gap = max(0, price - available)
+                lead += f"the recorded price is {selected.get('price_display') or f'₹{price/100000:g} lakh'}. With ₹{available/100000:g} lakh available, the illustrative difference is ₹{gap/100000:g} lakh, before taxes and other charges. Your available funds are not being used as a new property-price limit. "
+                tamil_lead += f"பதிவான விலை ₹{price/100000:g} லட்சம்; உங்களிடம் ₹{available/100000:g} லட்சம் இருந்தால் கணித வித்தியாசம் ₹{gap/100000:g} லட்சம். வரி மற்றும் மற்ற செலவுகள் சேர்க்கப்படவில்லை. "
+        links = "[SBI home loans](https://sbi.co.in/web/personal-banking/loans/home-loans) · [HDFC Bank home loans](https://www.hdfcbank.com/personal/borrow/popular-loans/home-loan)"
+        detail = "A lender must confirm the property valuation, eligible loan amount, income, credit history, own contribution and documents; the entire difference is not guaranteed to be financeable. Compare official lender terms here: " + links
+        question = " What monthly EMI would be comfortable for you?" if available is not None else " How much of your own funds would you contribute?"
+        return answer("loan_options", lead + detail + question, tamil_lead + "கடன் தொகை, தகுதி மற்றும் ஆவணங்களை வங்கிதான் உறுதிப்படுத்தும்; முழு வித்தியாசத்திற்கும் கடன் உறுதி இல்லை. " + links + " மாதாந்திர EMI எவ்வளவு வசதியாக இருக்கும்?", lead + detail + question)
     if memory.get("auction_offer_pending") and re.fullmatch(r"(?:yes|yeah|sure|ok|okay|no|no thanks|not now|ஆம்|சரி|வேண்டாம்)[.! ]*", query):
         include = not bool(re.match(r"no|not now|வேண்டாம்", query))
         memory["auction_offer_pending"] = False
@@ -214,7 +251,7 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
     if records and re.search(r"\b(?:only\s+3|only\s+three|how many|more (?:properties|matches|results))\b", query):
         last_result = next((item for item in reversed(chat) if item.get("role") == "assistant" and item.get("count") is not None), {})
         count = last_result.get("count", len(records))
-        return answer("result_count", f"There are {count} matching saved records; I showed only the first three. You can browse the website results or ask me to narrow them further.", f"பொருந்தும் சேமித்த பதிவுகள் {count}; முதலில் மூன்றை மட்டும் காட்டினேன்.", f"{count} saved matches irukku; first three mattum kaattinen.")
+        return answer("result_count", f"There are {count} matching saved records. My chat mentions a few; all matches are available in the results panel, five listings per page. Use the numbered page buttons to see the rest.", f"பொருந்தும் பதிவுகள் {count}. முடிவுகள் பகுதியில் அனைத்தையும் ஒரு பக்கத்திற்கு ஐந்து வீதம் பக்க எண்களைத் தேர்ந்தெடுத்து பார்க்கலாம்.", f"{count} saved matches irukku; results panel-la five per page, page numbers use panni ellam paarkalaam.")
     if records and re.search(r"what are the properties they provide|what (?:types?|properties) (?:do they|are these)|which.*(?:prefer|best|suggest)|asking for your suggestion", query):
         if re.search(r"provide|types?|are these", query):
             details = "; ".join(f"{row.get('title', 'Saved listing')}: {row.get('property_type', 'type not stated')} ({row.get('listing_status', 'saved record')})" for row in records[:3])

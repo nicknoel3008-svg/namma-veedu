@@ -18,6 +18,7 @@ class StartActionTests(unittest.TestCase):
 
     def run_action(self, label):
         with patch("ai_config.select_ai_config", return_value=("offline", "", "")), \
+             patch("storage_backend._database_url", return_value=""), \
              patch("inquiry_log.append_inquiry"), \
              patch("inquiry_log.update_conversation_fields"), \
              patch("followup_service.cancel_user_followups", return_value=0):

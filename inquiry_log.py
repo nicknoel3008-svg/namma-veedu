@@ -330,6 +330,20 @@ def archive_inquiry_export(data: bytes, export_kind: str, period_label: str = "s
     return target
 
 
+def inquiry_snapshot_groups(rows):
+    """Group shared or local records by the actual inquiry date in India."""
+    grouped = {}
+    for row in rows:
+        try:
+            stamp = datetime.fromisoformat(str(row.get("Timestamp (Asia/Kolkata)") or row.get("Timestamp (Asia/Calcutta)")))
+            if stamp.tzinfo:
+                stamp = stamp.astimezone(ZoneInfo("Asia/Kolkata"))
+            grouped.setdefault(stamp.date().isoformat(), []).append(row)
+        except (ValueError, TypeError):
+            continue
+    return grouped
+
+
 def write_daily_inquiry_snapshot(path: Path = INQUIRY_LOG_PATH) -> Path | None:
     """Refresh today's automatic owner export after each saved chat turn."""
     path = Path(path)

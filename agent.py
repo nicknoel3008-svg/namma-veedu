@@ -143,5 +143,5 @@ def friendly_reply(count: int, intent: SearchIntent) -> str:
         return f"I couldn’t find a{exact} match in the saved listings. Would you like to widen the area or adjust the budget?"
     where = f" around {intent.location}" if intent.location else " across Tamil Nadu"
     kind = f" {intent.bedrooms} BHK {intent.property_type.lower()}" if intent.bedrooms else f" {intent.property_type.lower()}" if intent.property_type != "Any" else " property"
-    return f"I found {count} saved{kind} option{'s' if count != 1 else ''}{where}, and put up to three in the results panel. Is there one you’d like to look at more closely?"
+    return f"I found {count} saved{kind} option{'s' if count != 1 else ''}{where}. All matching listings are in the results panel, five per page; use the numbered pages to browse. Is there one you’d like to look at more closely?"
 

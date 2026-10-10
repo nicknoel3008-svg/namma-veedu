@@ -1691,23 +1691,31 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
                 key="download_complete_chat_archive",
             )
             st.caption("Private owner download: one row per conversation, including the saved customer messages, Mira replies, and any submitted rating.")
-            st.caption(f"Automatic daily exports are refreshed as inquiries arrive and saved under {INQUIRY_ARCHIVE_DIR.relative_to(Path(__file__).resolve().parent)}\\YYYY-MM-DD. Manual downloads are archived in the same dated folder with ‘manual’ in the filename.")
+            st.caption("Automatic snapshots refresh from the shared inquiry records when Mira Studio loads. Snapshot dates use India time. Older file archives remain available.")
             archived_daily_exports = sorted(
                 INQUIRY_ARCHIVE_DIR.glob("*/automatic_inquiries_*.xlsx"),
                 key=lambda item: item.parent.name,
                 reverse=True,
             ) if INQUIRY_ARCHIVE_DIR.exists() else []
-            if archived_daily_exports:
-                selected_archive = st.selectbox(
+            from inquiry_log import inquiry_snapshot_groups
+            snapshot_groups = inquiry_snapshot_groups(inquiry_rows)
+            archived_by_date = {item.parent.name: item for item in archived_daily_exports}
+            snapshot_dates = sorted(set(snapshot_groups) | set(archived_by_date), reverse=True)
+            if snapshot_dates:
+                if st.session_state.get("latest_automatic_snapshot_date") != snapshot_dates[0]:
+                    st.session_state.latest_automatic_snapshot_date = snapshot_dates[0]
+                    st.session_state.pop("shared_automatic_snapshot_date", None)
+                selected_snapshot_date = st.selectbox(
                     "Automatic snapshot date",
-                    archived_daily_exports,
-                    format_func=lambda item: item.parent.name,
-                    key="automatic_inquiry_archive_date",
+                    snapshot_dates,
+                    key="shared_automatic_snapshot_date",
                 )
+                snapshot_data = (build_inquiry_export(snapshot_groups[selected_snapshot_date], selected_snapshot_date, selected_snapshot_date, selected_snapshot_date)
+                                 if selected_snapshot_date in snapshot_groups else structured_archive_export(archived_by_date[selected_snapshot_date]))
                 st.download_button(
-                    f"Download automatic snapshot for {selected_archive.parent.name} (.xlsx)",
-                    data=structured_archive_export(selected_archive),
-                    file_name=selected_archive.name,
+                    f"Download automatic snapshot for {selected_snapshot_date} (.xlsx)",
+                    data=snapshot_data,
+                    file_name=f"automatic_inquiries_{selected_snapshot_date.replace('-', '')}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True,
                     key="download_automatic_inquiry_snapshot",
@@ -1957,6 +1965,7 @@ def filter_listing_view(records: pd.DataFrame, view: str, limit: int | None = No
         records[statuses.eq("Existing sale")],
         records[statuses.eq("Project reference")],
         records[statuses.isin(("Auction", "Auction ended"))],
+        records[~statuses.isin(("Existing sale", "Project reference", "Auction", "Auction ended"))],
     ]
     mixed_rows = []
     row_limit = limit if limit is not None else sum(len(group) for group in groups)
@@ -2964,7 +2973,14 @@ def _respond_without_logging(text: str):
     # Keep recurring reviewed patterns discoverable without making customer
     # messages wait on or alter the approved guidance set.
     refresh_learning_library_drafts()
+    text = re.sub(r"\bauctiom\b", "auction", text, flags=re.I)
+    text = re.sub(r"\barounf\b", "around", text, flags=re.I)
     normalized = text.casefold()
+    pending_undated = st.session_state.get("pending_undated_auction_records")
+    if isinstance(pending_undated, pd.DataFrame) and not pending_undated.empty:
+        last_assistant = next((message for message in reversed(st.session_state.chat) if message.get("role") == "assistant"), {})
+        if not re.search(r"Would you like me to show (?:them|those records)|அந்தப் பதிவுகளையும்", last_assistant.get("content", "")) or not re.match(r"\s*(?:yes|yeah|sure|ok|show (?:me )?(?:them|those)|go ahead|ஆம்|சரி|காட்டு)\b", normalized):
+            st.session_state.pending_undated_auction_records = None
     language_choice = re.fullmatch(r"\s*(?:(?:i prefer|i choose|use|speak in|continue in|please use)\s+)?(english|tamil|தமிழ்|ஆங்கிலம்)(?:\s+(?:please|only))?[.!\s]*", normalized)
     if language_choice:
         chosen_tamil = language_choice.group(1) in {"tamil", "தமிழ்"}
@@ -3091,6 +3107,11 @@ def _respond_without_logging(text: str):
                  "mode": "callback_request_confirmed" if next_state.get("stage") == "confirmed" else "advisor_preferences"},
             ])
             return
+    if st.session_state.get("pending_area_source_check") and re.fullmatch(r"\s*(?:yes[, ]*(?:guide me)?|sure|please|go ahead|ஆம்|சரி)[.! ]*", normalized):
+        st.session_state.pending_area_source_check = False
+        reply = "Open **Verify details or view source** on the matching property card, then select its source link to check the current area and availability." if language != "தமிழ்" else "பொருந்திய சொத்தின் **Verify details or view source** பகுதியில் மூல இணைப்பைத் திறந்து தற்போதைய விவரங்களைச் சரிபார்க்கலாம்."
+        st.session_state.chat.extend([{"role": "user", "content": text}, {"role": "assistant", "content": reply, "mode": "source_guidance"}])
+        return
     conversation = conversational_turn(text, properties, st.session_state.chat,
         st.session_state.get("search_context"), st.session_state.get("buyer_memory"),
         st.session_state.get("response_language", "Tamil" if language == "தமிழ்" else "English"))
@@ -3174,7 +3195,7 @@ def _respond_without_logging(text: str):
         if "results" in understood:
             ranked = understood["results"]
             st.session_state.last_results = ranked.head(30)
-            st.session_state.main_results = ranked.head(3).copy()
+            st.session_state.main_results = ranked.copy()
             st.session_state.main_results_total_count = len(ranked)
             st.session_state.main_results_mode = "chat"
             st.session_state.active_listing_view = "all"
@@ -3280,7 +3301,7 @@ def _respond_without_logging(text: str):
             records = pending_undated.copy()
             st.session_state.pending_undated_auction_records = None
             st.session_state.last_results = records.head(30).copy()
-            st.session_state.main_results = records.head(3).copy()
+            st.session_state.main_results = records.copy()
             st.session_state.main_results_total_count = len(records)
             st.session_state.main_results_mode = "chat"
             st.session_state.active_listing_view = "all"
@@ -3449,7 +3470,7 @@ def _respond_without_logging(text: str):
         plot_count = int(comparison["property_type"].eq("Plot").sum()) if not comparison.empty else 0
         flat_count = int(comparison["property_type"].eq("Flat").sum()) if not comparison.empty else 0
         st.session_state.last_results = comparison.head(30).copy()
-        st.session_state.main_results = comparison.head(3).copy()
+        st.session_state.main_results = comparison.copy()
         st.session_state.main_results_total_count = len(comparison)
         st.session_state.main_results_mode = "chat"
         st.session_state.active_listing_view = "all"
@@ -3500,7 +3521,7 @@ def _respond_without_logging(text: str):
                 unique = frame.drop_duplicates(subset=["property_id"], keep="first").reset_index(drop=True)
                 if len(unique) < len(frame):
                     st.session_state.last_results = unique
-                    st.session_state.main_results = unique.head(3).copy()
+                    st.session_state.main_results = unique.copy()
                     st.session_state.main_results_total_count = len(unique)
                     st.session_state.main_results_mode = "chat"
                     st.session_state.active_listing_view = "all"
@@ -3739,7 +3760,7 @@ def _respond_without_logging(text: str):
                     api_intent.status = previous["status"]
                 queue_mira_filter_sync(api_intent)
                 property_records = property_tool.data.get("records", [])
-                st.session_state.main_results = pd.DataFrame(property_records[:3])
+                st.session_state.main_results = apply_filters(intent=api_intent).copy()
                 st.session_state.last_results = pd.DataFrame(property_records[:30])
                 st.session_state.main_results_total_count = int(property_tool.data.get("count", 0))
                 st.session_state.main_results_mode = "chat"
@@ -3821,7 +3842,7 @@ def _respond_without_logging(text: str):
                         max_budget=fallback_intent.max_budget,
                     ).head(30)
                     st.session_state.last_results = fallback_ranked.copy()
-                    st.session_state.main_results = fallback_ranked.head(3).copy()
+                    st.session_state.main_results = fallback_ranked.copy()
                     st.session_state.main_results_total_count = len(fallback_ranked)
                     st.session_state.main_results_mode = "chat"
                     st.session_state.active_listing_view = "all"
@@ -4064,7 +4085,7 @@ def _respond_without_logging(text: str):
     if sort_col:
         ranked = ranked.sort_values(sort_col, ascending=intent.sort == "price", na_position="last")
     st.session_state.last_results = ranked.head(30)
-    st.session_state.main_results = ranked.head(3).copy()
+    st.session_state.main_results = ranked.copy()
     st.session_state.main_results_total_count = len(result)
     st.session_state.main_results_mode = "chat"
     st.session_state.active_listing_view = "all"
@@ -4817,9 +4838,8 @@ with results_slot.container(border=has_visible_results, key="results-content-was
             result = filter_listing_view(base_result, listing_view)
             if listing_view != "all":
                 result_count = len(result)
-            visible_limit = 3 if mode == "chat" else 8
-            if mode != "chat" and listing_view == "all":
-                result = filter_listing_view(base_result, listing_view, limit=visible_limit)
+            result_count = len(result)
+            visible_limit = 5
             category_label = view_labels[listing_view]
             results_summary = (f"{category_label}: {result_count:,} பொருத்தங்கள் · முடிந்த ஏலங்கள் தேர்வு செய்யாவிட்டால் மறைக்கப்படும்; ஏலத் தேதி இல்லாத பதிவுகளை Mira முதலில் கேட்டு உறுதிப்படுத்துவார்." if language == "தமிழ்" else f"{result_count:,} matching {category_label.lower()} · ended auctions stay hidden unless included; Mira asks before showing records with no auction date.")
             st.markdown(
@@ -4829,8 +4849,22 @@ with results_slot.container(border=has_visible_results, key="results-content-was
             if result.empty:
                 st.info("இந்த வகை மற்றும் தற்போதைய வடிகட்டிகளுக்கு பதிவுகள் இல்லை. வேறு பட்டியல் வகையையோ பகுதியையோ தேர்ந்தெடுத்துப் பாருங்கள்." if language == "தமிழ்" else "No records in this listing type match the current filters. Try another listing type or area.")
             else:
+                signature = (mode, listing_view, tuple(result.get("property_id", result.index.to_series()).astype(str)))
+                if st.session_state.get("results_page_signature") != signature:
+                    st.session_state.results_page_signature = signature
+                    st.session_state.results_page = 1
+                page_count = (len(result) + visible_limit - 1) // visible_limit
+                page = min(st.session_state.get("results_page", 1), page_count)
+                page_choices = sorted({1, page_count, *range(max(1, page - 2), min(page_count, page + 2) + 1)})
+                selected_page = st.pills("Results page", page_choices, default=page, key=f"results_page_choice_{hash(signature)}") or page
+                if selected_page != page:
+                    st.session_state.results_page = selected_page
+                    st.rerun()
+                page_start = (page - 1) * visible_limit
+                page_results = result.iloc[page_start:page_start + visible_limit]
+                st.caption(f"Page {page} of {page_count} · Listings {page_start + 1}–{min(page_start + visible_limit, len(result))} of {len(result):,}")
                 if MAPBOX_ACCESS_TOKEN:
-                    points, has_exact_coordinates = map_points(result.head(8).to_dict("records"), MAPBOX_ACCESS_TOKEN)
+                    points, has_exact_coordinates = map_points(page_results.to_dict("records"), MAPBOX_ACCESS_TOKEN)
                     if points:
                         st.markdown("**📍 Location suggestions**" if language != "தமிழ்" else "**📍 இட பரிந்துரைகள்**")
                         st.map(pd.DataFrame(points), latitude="lat", longitude="lon", size=90, zoom=7, use_container_width=True)
@@ -4843,15 +4877,8 @@ with results_slot.container(border=has_visible_results, key="results-content-was
                         st.caption("A map pin is unavailable for these records; the saved source does not contain coordinates." if language != "தமிழ்" else "இந்த பதிவுகளுக்கு map pin இல்லை; சேமித்த ஆதாரத்தில் coordinates இல்லை.")
                 elif result is not None:
                     st.caption("Add MAPBOX_ACCESS_TOKEN in Streamlit Secrets to show Tamil Nadu map suggestions. Saved results remain available without it." if language != "தமிழ்" else "Tamil Nadu map பரிந்துரைகளுக்கு Streamlit Secrets-ல் MAPBOX_ACCESS_TOKEN சேர்க்கவும். Map இல்லாமலும் சேமித்த முடிவுகள் கிடைக்கும்.")
-                for i, (_, row) in enumerate(result.head(visible_limit).iterrows(), 1):
+                for i, (_, row) in enumerate(page_results.iterrows(), page_start + 1):
                     render_property_card(row, i)
-                shown_count = min(len(result), visible_limit)
-                if result_count > shown_count:
-                    if mode == "chat":
-                        note = "Mira தேர்ந்தெடுத்த முதல் 3 பொருத்தங்கள் இங்கே உள்ளன. வடிகட்டிகள் அல்லது பட்டியல் வகையை மாற்றிப் பாருங்கள்." if language == "தமிழ்" else "Mira’s top matches are shown here. Change the filters or listing type to refine them."
-                    else:
-                        note = f"முதல் {shown_count} முடிவுகள் காட்டப்படுகின்றன. வடிகட்டிகளைச் சுருக்குங்கள்." if language == "தமிழ்" else f"Showing the first {shown_count} matches. Narrow the filters to see a shorter list."
-                    st.info(note)
 
 with chat_slot.container(key="mira-content-wash"):
     chat_header, expand_control = st.columns([8, 1], vertical_alignment="center")
