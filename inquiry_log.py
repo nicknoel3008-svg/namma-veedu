@@ -409,7 +409,7 @@ def read_inquiries(path: Path = INQUIRY_LOG_PATH) -> list[dict[str, Any]]:
 CUSTOMER_SUMMARY_HEADERS = (
     "Purchase likelihood", "Supporting evidence", "Prediction status", "Prediction last updated", "Actual purchase outcome",
     "User ID", "Customer name", "Conversation ID", "Inquiry ID", "Timestamp (Asia/Kolkata)",
-    "Language", "Conversation status", "Email follow-ups", "WhatsApp follow-ups", "Interested in property",
+    "Language", "Conversation status", "Email follow-ups", "WhatsApp follow-ups", "Follow-up methods", "Interested in property",
     "Not interested in property", "Interest stated", "Follow-up requested", "Human advisor requested",
     "Property type", "Location", "Budget", "Preferred size", "Follow-up schedule status",
     "Follow-up method", "Follow-up summary", "Follow-up cadence", "Next follow-up time (Asia/Kolkata)", "Chat ended at (Asia/Kolkata)",
@@ -437,10 +437,23 @@ def customer_summary_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             return next((str(turn.get(field) or "") for turn in reversed(turns)
                          if str(turn.get(field) or "") not in ignored), "")
         interest = last_value("Customer interest (owner)") or last_value("Customer interest signal")
+        methods = []
+        for turn in turns:
+            raw_method = str(turn.get("Follow-up method") or "").strip()
+            for method in re.split(r"\s*(?:,|/|\+|\band\b)\s*", raw_method, flags=re.I):
+                normalized = "Email" if method.casefold() in {"email", "email follow-up"} else "WhatsApp" if method.casefold() == "whatsapp" else method.strip()
+                if normalized and normalized not in methods:
+                    methods.append(normalized)
+        consented_methods = {
+            ("Email" if str(turn.get("Follow-up method") or "").casefold() in {"email", "email follow-up"}
+             else "WhatsApp" if str(turn.get("Follow-up method") or "").casefold() == "whatsapp" else "")
+            for turn in turns if str(turn.get("Follow-up consent timestamp (Asia/Kolkata)") or "").strip()
+        }
         summary = {header: latest.get(header, "") for header in CUSTOMER_SUMMARY_HEADERS}
         summary.update({
-            "Email follow-ups": "Yes" if last_value("Follow-up method") in {"Email", "Email follow-up"} and last_value("Follow-up consent timestamp (Asia/Kolkata)") else "No",
-            "WhatsApp follow-ups": "Yes" if last_value("Follow-up method") == "WhatsApp" and last_value("Follow-up consent timestamp (Asia/Kolkata)") else "No",
+            "Email follow-ups": "Yes" if "Email" in consented_methods else "No",
+            "WhatsApp follow-ups": "Yes" if "WhatsApp" in consented_methods else "No",
+            "Follow-up methods": ", ".join(methods),
             "Interested in property": "Yes" if interest in {"Interested", "Interested signal"} else "No",
             "Customer interest (owner)": last_value("Customer interest (owner)"),
             "Not interested in property": "Yes" if interest in {"Not interested", "Not interested signal"} else "No",

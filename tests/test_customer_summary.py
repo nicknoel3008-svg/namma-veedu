@@ -24,11 +24,21 @@ class CustomerSummaryTests(unittest.TestCase):
         self.assertEqual(summary["Interested in property"], "No")
         self.assertEqual(summary["Not interested in property"], "Yes")
         self.assertEqual(summary["Email follow-ups"], "Yes")
+        self.assertEqual(summary["Follow-up methods"], "Email")
         self.assertEqual(summary["Budget"], "30 lakh")
         self.assertNotIn("private answer", str(summary))
         unstated, = customer_summary_rows([{"Conversation ID": "two"}])
         self.assertEqual(unstated["Interest stated"], "No")
         self.assertEqual(unstated["Not interested in property"], "No")
+
+    def test_dashboard_summary_keeps_every_consented_followup_method(self):
+        summary, = customer_summary_rows([
+            {"Conversation ID": "both", "Timestamp (Asia/Kolkata)": "2026-10-01", "Follow-up method": "Email", "Follow-up consent timestamp (Asia/Kolkata)": "2026-10-01"},
+            {"Conversation ID": "both", "Timestamp (Asia/Kolkata)": "2026-10-02", "Follow-up method": "WhatsApp", "Follow-up consent timestamp (Asia/Kolkata)": "2026-10-02"},
+        ])
+        self.assertEqual(summary["Email follow-ups"], "Yes")
+        self.assertEqual(summary["WhatsApp follow-ups"], "Yes")
+        self.assertEqual(summary["Follow-up methods"], "Email, WhatsApp")
 
     def test_end_button_saves_then_clears_chat(self):
         class State(dict):
