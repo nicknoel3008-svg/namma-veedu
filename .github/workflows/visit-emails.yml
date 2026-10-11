@@ -35,3 +35,4 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python run_visit_worker.py --check
       - run: python run_visit_worker.py
+      - run: python run_followup_worker.py --channel email
