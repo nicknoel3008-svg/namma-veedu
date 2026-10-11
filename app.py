@@ -1442,6 +1442,13 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
     # A successful sign-in now opens a dedicated main-page dashboard. Keeping
     # this out of dynamically inserted tabs makes the export easy to find.
     st.title("Mira Studio")
+    with st.expander("Customer relationship management (CRM)", expanded=False):
+        from crm_ui import render as render_crm
+        try:
+            render_crm()
+        except Exception:
+            logging.exception("Could not load CRM")
+            st.error("CRM could not be loaded. Please refresh and try again.")
     st.markdown('<style>' + (ROOT / 'static' / 'owner-coastal.css').read_text(encoding='utf-8') + '</style>', unsafe_allow_html=True)
     st.markdown('<style>' + (ROOT / 'static' / 'owner-emerald.css').read_text(encoding='utf-8') + '</style>', unsafe_allow_html=True)
     st.markdown('<style>' + (ROOT / 'static' / 'readability.css').read_text(encoding='utf-8') + '</style>', unsafe_allow_html=True)
@@ -1505,7 +1512,14 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
         st.caption("Email follow-ups are intentionally excluded from this readiness view.")
     blueprint_path = ROOT / "WEBSITE_BLUEPRINT.md"
     with st.expander("Property visit requests", expanded=False):
-        st.caption("Confirm a visit only after checking access with the listing source. Changing a status does not send a customer message.")
+        st.caption("Confirm a visit only after checking access with the listing source. For email contacts who opted in, the scheduled email worker sends a confirmation after approval, a reminder within the hour before the visit, and a feedback request two hours afterward. Saving a decision does not itself deliver email.")
+        from run_followup_worker import load_config as load_visit_email_config
+        from followup_service import email_config_issues
+        visit_email_issues = email_config_issues(load_visit_email_config())
+        if visit_email_issues:
+            st.warning("Visit emails need configuration: " + "; ".join(visit_email_issues))
+        else:
+            st.info("Email settings are complete. Automatic sending also requires the visit worker to be running. Email statuses below show SMTP submission, not inbox delivery.")
         if st.button("Load visit requests", key="load_visit_requests"):
             st.session_state.visit_requests_loaded = True
         if st.session_state.get("visit_requests_loaded"):
@@ -1520,7 +1534,7 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
                         for original, updated in zip(visits,edited_visits.to_dict("records")):
                             if original["status"] != updated["status"]:
                                 update_visit_status(original["id"],updated["status"])
-                        st.success("Visit decisions saved. Customers can check their request status on this browser.")
+                        st.success("Visit decisions saved. Eligible email confirmations will be processed by the scheduled visit worker.")
                         st.rerun()
                     st.download_button("Download visit requests (.csv)",visit_frame.to_csv(index=False),file_name="namma_veedu_visit_requests.csv",mime="text/csv")
                     from visit_journey import owner_journeys, set_advisor_status
@@ -1539,7 +1553,7 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
                             st.success("Advisor progress saved. No messages sent.")
                             st.rerun()
                     else:
-                        st.info("No visit responses yet. The new visit email worker is disabled until approved.")
+                        st.info("No visit email journeys yet. The scheduled worker creates them for confirmed visits with email consent.")
 
                 else:
                     st.info("No property visit requests yet.")
@@ -5706,12 +5720,15 @@ def visit_request_dialog():
         contact_method = st.selectbox("Contact for visit confirmation",["Email","WhatsApp"],key="visit_contact_method")
         contact_value = st.text_input("Email address or WhatsApp number with country code",key="visit_contact_value")
         consent = st.checkbox("இந்தப் பார்வைக் கோரிக்கைக்காக என் தொடர்பு விவரங்களை உரிமையாளருடன் பகிர ஒப்புக்கொள்கிறேன்." if language == "தமிழ்" else "I agree to share my contact with the Namma Veedu owner for this property visit request.",key="visit_consent")
-        visit_email_reminders = st.checkbox("Email me a confirmation reminder one hour before my confirmed visit and a feedback request afterward.", key="visit_email_reminders", disabled=contact_method != "Email")
-        st.caption("For confirmed visits with email consent, a reminder becomes due one hour before the visit and a feedback request two hours afterward. Delivery depends on the email service and scheduled worker; messages may arrive later. WhatsApp visit messages are not enabled.")
+        followup_email = st.text_input("Email for automatic visit reminders and follow-ups (required if opting in)", key="visit_followup_email")
+        visit_email_reminders = st.checkbox("I agree to email reminders, attendance and property feedback requests, and one follow-up addressing my response.", key="visit_email_reminders")
+        st.caption("Email contacts use the confirmation email address. For WhatsApp confirmation, enter your email above. An email reminder becomes due one hour before the confirmed visit and feedback two hours afterward; delivery depends on the scheduled email worker.")
+        manual_whatsapp_confirmation = st.checkbox("I agree to receive a WhatsApp visit confirmation sent manually by the Namma Veedu team.", key="visit_manual_whatsapp_confirmation", disabled=contact_method != "WhatsApp")
+        st.caption("WhatsApp confirmation is sent manually after owner approval. Email handles the later reminders and follow-ups. No automatic WhatsApp messages are enabled by this request.")
         submit = st.form_submit_button("பார்வைக் கோரிக்கையைச் சேமிக்கவும்" if language == "தமிழ்" else "Request visit")
     if submit:
         try:
-            visit_id = request_visit(record=record,user_id=str(st.session_state.user_id),visit_at=datetime.combine(visit_date,visit_time,tzinfo=INDIA_TZ),slot_kind=slot_kind,customer_name=visit_name,contact_method=contact_method,contact_value=contact_value,consent=consent,email_reminders=visit_email_reminders,conversation_id=str(st.session_state.setdefault("inquiry_conversation_id",str(uuid4()))),preferences=st.session_state.get("search_context", {}))
+            visit_id = request_visit(record=record,user_id=str(st.session_state.user_id),visit_at=datetime.combine(visit_date,visit_time,tzinfo=INDIA_TZ),slot_kind=slot_kind,customer_name=visit_name,contact_method=contact_method,contact_value=contact_value,consent=consent,email_reminders=visit_email_reminders,followup_email=followup_email,manual_whatsapp_confirmation=manual_whatsapp_confirmation,conversation_id=str(st.session_state.setdefault("inquiry_conversation_id",str(uuid4()))),preferences=st.session_state.get("search_context", {}))
             st.session_state.visit_saved_notice = f"Visit request {visit_id[:8]} saved — pending owner confirmation."
             dismiss_visit_request()
             st.rerun()

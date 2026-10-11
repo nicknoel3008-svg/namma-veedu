@@ -45,6 +45,15 @@ class VisitTests(unittest.TestCase):
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 request_visit(**{**self.args, **changes})
 
+    def test_resubmitted_request_uses_corrected_address_and_current_consent(self):
+        visit_id=request_visit(**{**self.args,'contact_value':'old@example.com','email_reminders':True})
+        self.assertEqual(request_visit(**{**self.args,'email_reminders':True}),visit_id)
+        row=list_visit_requests('customer',self.db)[0]
+        self.assertEqual(row['contact_value'],'test@example.com')
+        self.assertEqual(row['visit_email_consent'],'Yes')
+        request_visit(**{**self.args,'email_reminders':False})
+        self.assertEqual(list_visit_requests('customer',self.db)[0]['visit_email_consent'],'')
+
     def test_customer_dialog_supports_both_slot_types(self):
         from streamlit.testing.v1 import AppTest
         app = AppTest.from_file(str(Path(__file__).parent / "website_sandbox.py"), default_timeout=60).run()

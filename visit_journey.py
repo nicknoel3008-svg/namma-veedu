@@ -163,18 +163,22 @@ def interest(row):
 def owner_journeys(db_path=FOLLOWUP_DB):
     with _connect(db_path) as c:
         schema(c)
+        from visit_whatsapp import outbox_schema
+        outbox_schema(c)
+        whatsapp_states = {(m['visit_id'],m['visit_at'],m['kind']):m['status'] for m in c.execute('SELECT visit_id,visit_at,kind,status FROM visit_whatsapp_outbox').fetchall()}
         rows = c.execute("""SELECT j.visit_id,j.visit_at,j.attendance,j.reason,j.attended,j.satisfied,
             j.assistance,j.assistance_details,j.advisor_consent,j.advisor_status,j.explore_consent,
             j.purchase_intent,j.revised_preferences,j.purchase_outcome,j.outcome_note,j.customer_purchase_confirmed_at,j.customer_purchase_note,
-            v.property_title,v.customer_name,v.contact_method,v.contact_value,v.status,v.conversation_id,v.preferences,v.user_id
+            v.property_title,v.customer_name,v.contact_method,v.contact_value,v.status,v.conversation_id,v.preferences,v.user_id,v.followup_email,v.manual_whatsapp_confirmation_consent
             FROM visit_journeys j JOIN property_visit_requests v ON v.id=j.visit_id""").fetchall()
         all_emails=c.execute('SELECT visit_id,visit_at,kind,status FROM visit_email_outbox').fetchall()
         email_states={(mail['visit_id'],mail['visit_at'],mail['kind']):mail['status'] for mail in all_emails}
     results = []
     for row in rows:
         result = dict(row)
-        for kind in ('reminder','review'):
+        for kind in ('confirmation','reminder','review','decision'):
             result[kind+' email'] = email_states.get((row['visit_id'],row['visit_at'],kind),'Not sent')
+            result[kind+' WhatsApp'] = whatsapp_states.get((row['visit_id'],row['visit_at'],kind),'Not submitted')
         result['Purchase interest'], result['Evidence'] = interest(result)
         results.append(result)
     return results
@@ -212,7 +216,7 @@ def resume_preferences(token, db_path=FOLLOWUP_DB):
     return {'preferences':json.loads(context['preferences']), 'changes':context['revised_preferences']}
 
 
-def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None, delivery_test=False):
+def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None, delivery_test=False, only_visit_id=None):
     if delivery_test:
         from pathlib import Path
         if Path(db_path) == FOLLOWUP_DB:
@@ -226,35 +230,53 @@ def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None, delivery_test=Fal
     stamp = now.isoformat(timespec='seconds')
     with _connect(db_path) as c:
         schema(c)
-        visits = c.execute("SELECT * FROM property_visit_requests WHERE status='Confirmed' AND contact_method='Email' AND visit_email_consent='Yes'").fetchall()
+        query="SELECT * FROM property_visit_requests WHERE status='Confirmed' AND visit_email_consent='Yes' AND (contact_method='Email' OR followup_email<>'')"
+        visits = c.execute(query + (' AND id=?' if only_visit_id else ''), (only_visit_id,) if only_visit_id else ()).fetchall()
         for visit in visits:
             at = datetime.fromisoformat(visit['visit_at'])
             journey = ensure_journey(c,visit,stamp)
-            kind = None
+            kinds = []
             if journey['customer_purchase_confirmed_at']: continue
-            if at-timedelta(hours=1) <= now < at and journey['attendance']=='Awaiting response': kind='reminder'
-            if at+timedelta(hours=2) <= now < at+timedelta(days=1) and not journey['attended']: kind='review'
-            if kind:
+            if visit['contact_method']=='Email' and now < at and str(config.get('VISIT_CONFIRMATION_EMAIL_ENABLED','true')).lower() == 'true':
+                kinds.append('confirmation')
+            if at-timedelta(hours=1) <= now < at and journey['attendance']=='Awaiting response':
+                # One confirmation covers the reminder when approved within an hour.
+                confirmation = c.execute("SELECT updated_at FROM visit_email_outbox WHERE visit_id=? AND visit_at=? AND kind='confirmation' AND status='sent'", (visit['id'],visit['visit_at'])).fetchone()
+                if not kinds or (confirmation and datetime.fromisoformat(confirmation['updated_at']) < at-timedelta(hours=1)):
+                    kinds.append('reminder')
+            if at+timedelta(hours=2) <= now < at+timedelta(days=1) and not journey['attended']: kinds.append('review')
+            if at<=now<at+timedelta(days=7) and journey['attended'] in ('Yes','No'): kinds.append('decision')
+            for kind in kinds:
                 c.execute("""INSERT INTO visit_email_outbox(id,visit_id,visit_at,kind,updated_at)
                     VALUES(?,?,?,?,?) ON CONFLICT(visit_id,visit_at,kind) DO NOTHING""", (uuid4().hex,visit['id'],visit['visit_at'],kind,stamp))
-        queued = c.execute("SELECT * FROM visit_email_outbox WHERE status='queued'").fetchall()
+        queued = c.execute("SELECT * FROM visit_email_outbox WHERE status='queued'" + (' AND visit_id=?' if only_visit_id else ''), (only_visit_id,) if only_visit_id else ()).fetchall()
     sent=failed=0
     for mail in queued:
         with _connect(db_path) as c:
             visit = c.execute('SELECT * FROM property_visit_requests WHERE id=?', (mail['visit_id'],)).fetchone()
             j = c.execute('SELECT * FROM visit_journeys WHERE visit_id=?',(mail['visit_id'],)).fetchone()
             at = datetime.fromisoformat(mail['visit_at'])
-            valid = visit and j and not j['customer_purchase_confirmed_at'] and visit['status']=='Confirmed' and visit['visit_at']==mail['visit_at'] and visit['visit_email_consent']=='Yes'
-            valid = valid and ((mail['kind']=='reminder' and at-timedelta(hours=1)<=now<at and j['attendance']=='Awaiting response') or (mail['kind']=='review' and at+timedelta(hours=2)<=now<at+timedelta(days=1) and not j['attended']))
+            valid = visit and j and not j['customer_purchase_confirmed_at'] and visit['status']=='Confirmed' and visit['visit_at']==mail['visit_at'] and (visit['contact_method']=='Email' or visit['followup_email']) and visit['visit_email_consent']=='Yes'
+            valid = valid and ((mail['kind']=='confirmation' and visit['contact_method']=='Email' and now<at and str(config.get('VISIT_CONFIRMATION_EMAIL_ENABLED','true')).lower()=='true') or (mail['kind']=='reminder' and at-timedelta(hours=1)<=now<at and j['attendance']=='Awaiting response') or (mail['kind']=='review' and at+timedelta(hours=2)<=now<at+timedelta(days=1) and not j['attended']) or (mail['kind']=='decision' and at<=now<at+timedelta(days=7) and j['attended'] in ('Yes','No')))
             if not valid:
                 c.execute("UPDATE visit_email_outbox SET status='skipped',updated_at=? WHERE id=? AND status='queued'",(stamp,mail['id']))
                 continue
             claim=c.execute("UPDATE visit_email_outbox SET status='sending',updated_at=? WHERE id=? AND status='queued'",(stamp,mail['id']))
             if claim.rowcount!=1: continue
         message=EmailMessage()
-        message['From']=config['FOLLOWUP_SMTP_FROM'];message['To']=visit['contact_value']
-        message['Subject']='Please confirm your property visit' if mail['kind']=='reminder' else 'How was your property visit?'
-        prompt='Will you attend? Choose Yes, No or Reschedule on the secure response page.' if mail['kind']=='reminder' else 'Did you attend, and did the property match your preferences? Tell us if you need property or loan assistance.'
+        message['From']=config['FOLLOWUP_SMTP_FROM'];message['To']=visit['followup_email'] or visit['contact_value']
+        subjects = {'confirmation':'Your property visit is confirmed — Namma Veedu', 'reminder':'Reminder: your upcoming property visit', 'review':'How was your property visit?', 'decision':'Next steps after your property visit — Namma Veedu'}
+        prompts = {'confirmation':'The owner has confirmed your visit. We look forward to welcoming you. Please confirm your attendance, cancel, or request a different time on the secure response page.', 'reminder':'Will you attend? Choose Yes, No or Reschedule on the secure response page.', 'review':'Did you attend? If yes, did the property match your preferences and are you interested in purchasing? Tell us if you need property or loan assistance, or would like more options. If you did not attend, please share the reason, any concerns, and whether you would like to reschedule, explore other properties, or pause your search.'}
+        if mail['kind']=='decision':
+            if j['attended']=='No':
+                prompt='Thank you for letting us know you could not attend. Would you like to reschedule, discuss any concerns, explore other properties, or pause your search? Use the response page to request another time or return to Mira. No new appointment is confirmed automatically.'
+            elif j['purchase_intent']=='Interested':
+                prompt='Thank you for sharing your interest. Do you need further assistance with the property, documents or a home loan? Update your assistance request on the response page. Requests are reviewed by our team; an advisor is not yet connected.'
+            else:
+                prompt='Thank you for your feedback. If this property did not meet your preferences, tell us the reason and what should change. Would you like further assistance, to explore more options, or to pause your search? Update your preferences on the response page and return to Mira with your permission.'
+        else:
+            prompt=prompts[mail['kind']]
+        message['Subject']=subjects[mail['kind']]
         url=config['FOLLOWUP_PUBLIC_URL'].rstrip('/')+'/?visit_response='+j['token']
         message.set_content(f"Hello {visit['customer_name']},\n\n{visit['property_title']}\nVisit: {at.strftime('%d %b %Y, %I:%M %p IST')}\n\n{prompt}\n{url}\n\nIf you no longer want visit emails, cancel the visit through this page or contact the owner.\nNamma Veedu")
         if delivery_test:

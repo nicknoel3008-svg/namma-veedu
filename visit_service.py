@@ -31,7 +31,7 @@ def _schema(connection):
             connection.execute("ALTER TABLE property_visit_requests ADD COLUMN visit_email_consent TEXT NOT NULL DEFAULT ''")
     if getattr(connection,"shared",False):
         connection.execute("ALTER TABLE property_visit_requests ENABLE ROW LEVEL SECURITY")
-    for column, default in (('conversation_id',''),('preferences','{}')):
+    for column, default in (('conversation_id',''),('preferences','{}'),('visit_whatsapp_consent',''),('followup_email',''),('manual_whatsapp_confirmation_consent','')):
         if getattr(connection,'shared',False):
             connection.execute(f"ALTER TABLE property_visit_requests ADD COLUMN IF NOT EXISTS {column} TEXT NOT NULL DEFAULT '{default}'")
         elif column not in {row[1] for row in connection.execute('PRAGMA table_info(property_visit_requests)')}:
@@ -45,7 +45,7 @@ def confirmed_visit_times(record, date, db_path=FOLLOWUP_DB):
     return {datetime.fromisoformat(row["visit_at"]).strftime("%H:%M") for row in rows if datetime.fromisoformat(row["visit_at"]).date()==date}
 
 
-def request_visit(*, record, user_id, visit_at, slot_kind, customer_name, contact_method, contact_value, consent, db_path=FOLLOWUP_DB, email_reminders=False, conversation_id='', preferences=None):
+def request_visit(*, record, user_id, visit_at, slot_kind, customer_name, contact_method, contact_value, consent, db_path=FOLLOWUP_DB, email_reminders=False, whatsapp_reminders=False, conversation_id='', preferences=None, followup_email='', manual_whatsapp_confirmation=False):
     if not consent:
         raise ValueError("Please consent to share your contact for this visit request.")
     if not customer_name.strip():
@@ -58,6 +58,11 @@ def request_visit(*, record, user_id, visit_at, slot_kind, customer_name, contac
         contact_value=normalize_phone(contact_value)
     elif contact_method != "Email" or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+",contact_value.strip()):
         raise ValueError("Please enter a valid contact address or WhatsApp number.")
+    followup_email=contact_value.strip() if contact_method=='Email' else followup_email.strip()
+    if email_reminders and not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+",followup_email):
+        raise ValueError('Enter a valid email address for visit reminders and follow-ups.')
+    if not email_reminders:
+        followup_email=''
     key=property_key(record)
     when=visit_at.astimezone(INDIA_TZ).replace(second=0,microsecond=0).isoformat(timespec="minutes")
     now=datetime.now(INDIA_TZ).isoformat(timespec="seconds")
@@ -68,15 +73,24 @@ def request_visit(*, record, user_id, visit_at, slot_kind, customer_name, contac
             raise ValueError("This property visit time is already confirmed. Please choose another time.")
         existing=connection.execute("SELECT id FROM property_visit_requests WHERE user_id=? AND property_key=? AND visit_at=? AND status='Requested'",(user_id,key,when)).fetchone()
         if existing:
-            if email_reminders and contact_method == 'Email':
-                connection.execute("UPDATE property_visit_requests SET visit_email_consent='Yes' WHERE id=?", (existing['id'],))
+            connection.execute("UPDATE property_visit_requests SET followup_email=?,manual_whatsapp_confirmation_consent=? WHERE id=?",(followup_email,'Yes' if manual_whatsapp_confirmation and contact_method=='WhatsApp' else '',existing['id']))
+            connection.execute("UPDATE property_visit_requests SET visit_whatsapp_consent=? WHERE id=?", ('Yes' if whatsapp_reminders and contact_method=='WhatsApp' else '',existing['id']))
+            # A repeated request may correct the address or withdraw email consent.
+            # Never apply new consent while retaining an old recipient.
+            connection.execute("""UPDATE property_visit_requests SET customer_name=?,contact_method=?,contact_value=?,
+                visit_email_consent=?,consent_at=?,updated_at=? WHERE id=?""",
+                (customer_name.strip()[:100],contact_method,contact_value.strip(),
+                 'Yes' if email_reminders else '',now,now,existing['id']))
             return existing["id"]
         visit_id=uuid4().hex
         connection.execute("""INSERT INTO property_visit_requests
             (id,user_id,property_key,property_title,source_url,visit_at,slot_kind,customer_name,contact_method,contact_value,status,consent_at,updated_at)
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",(visit_id,user_id,key,str(record.get("title") or "Saved property")[:200],str(record.get("source_url") or "")[:1000],when,slot_kind,customer_name.strip()[:100],contact_method,contact_value.strip(),"Requested",now,now))
-        if email_reminders and contact_method == 'Email':
+        connection.execute("UPDATE property_visit_requests SET followup_email=?,manual_whatsapp_confirmation_consent=? WHERE id=?",(followup_email,'Yes' if manual_whatsapp_confirmation and contact_method=='WhatsApp' else '',visit_id))
+        if email_reminders:
             connection.execute("UPDATE property_visit_requests SET visit_email_consent='Yes' WHERE id=?", (visit_id,))
+        if whatsapp_reminders and contact_method == 'WhatsApp':
+            connection.execute("UPDATE property_visit_requests SET visit_whatsapp_consent='Yes' WHERE id=?", (visit_id,))
         from customer_journey import preferences_json, event
         connection.execute('UPDATE property_visit_requests SET conversation_id=?,preferences=? WHERE id=?',(conversation_id,preferences_json(preferences),visit_id))
         event(connection,user_id=user_id,conversation_id=conversation_id,property_key=key,visit_id=visit_id,event='Visit requested',detail=when)

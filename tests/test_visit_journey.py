@@ -20,13 +20,42 @@ class VisitJourneyTests(unittest.TestCase):
             contact_value='test@example.com',consent=True,email_reminders=True,db_path=self.db)
         self.id=request_visit(**self.args)
         update_visit_status(self.id,'Confirmed',db_path=self.db)
-        self.config=dict(VISIT_EMAIL_ENABLED='true',FOLLOWUP_SMTP_HOST='smtp.example.com',
+        self.config=dict(VISIT_EMAIL_ENABLED='true',VISIT_CONFIRMATION_EMAIL_ENABLED='false',FOLLOWUP_SMTP_HOST='smtp.example.com',
             FOLLOWUP_SMTP_USERNAME='sender',FOLLOWUP_SMTP_PASSWORD='test',
             FOLLOWUP_SMTP_FROM='sender@example.com',FOLLOWUP_PUBLIC_URL='https://example.com')
         self.smtp=patch('visit_journey.smtplib.SMTP').start();self.addCleanup(patch.stopall)
 
     def remind(self):
         return run_visit_worker(self.config,self.db,now=self.at-timedelta(hours=1))
+
+    def test_confirmation_reminder_and_review_sequence(self):
+        self.config['VISIT_CONFIRMATION_EMAIL_ENABLED']='true'
+        early=self.at-timedelta(days=1)
+        self.assertEqual(run_visit_worker(self.config,self.db,now=early),(1,0))
+        self.assertEqual(run_visit_worker(self.config,self.db,now=early),(0,0))
+        message=self.smtp.return_value.__enter__.return_value.send_message.call_args.args[0]
+        self.assertIn('visit is confirmed',message['Subject'])
+        self.assertIn('visit_response=',message.get_content())
+        self.assertEqual(owner_journeys(self.db)[0]['confirmation email'],'sent')
+        self.assertEqual(self.remind(),(1,0))
+        self.assertEqual(self.remind(),(0,0))
+        self.assertEqual(run_visit_worker(self.config,self.db,now=self.at+timedelta(hours=2)),(1,0))
+        self.assertEqual(self.smtp.return_value.__enter__.return_value.send_message.call_count,3)
+
+    def test_last_hour_confirmation_covers_reminder(self):
+        self.config['VISIT_CONFIRMATION_EMAIL_ENABLED']='true'
+        self.assertEqual(self.remind(),(1,0))
+        self.assertEqual(self.remind(),(0,0))
+        message=self.smtp.return_value.__enter__.return_value.send_message.call_args.args[0]
+        self.assertIn('visit is confirmed',message['Subject'])
+
+    def test_confirmation_excludes_requested_cancelled_and_nonconsenting(self):
+        self.config['VISIT_CONFIRMATION_EMAIL_ENABLED']='true'
+        for status in ('Requested','Cancelled','Confirmed'):
+            with _connect(self.db) as c:
+                c.execute('UPDATE property_visit_requests SET status=?, visit_email_consent=? WHERE id=?',(status,'' if status=='Confirmed' else 'Yes',self.id))
+            self.assertEqual(run_visit_worker(self.config,self.db,now=self.at-timedelta(days=1)),(0,0))
+        self.smtp.assert_not_called()
 
     def token(self):
         with _connect(self.db) as c:
@@ -96,7 +125,53 @@ class VisitJourneyTests(unittest.TestCase):
         self.assertEqual(row['Purchase interest'],'Strong engagement')
         set_advisor_status(self.id,'Connected',self.db)
         self.assertIn('connection recorded',owner_journeys(self.db)[0]['Evidence'])
+        self.assertEqual(run_visit_worker(self.config,self.db,now=now),(1,0))
         self.assertEqual(run_visit_worker(self.config,self.db,now=now),(0,0))
+
+    def test_manual_whatsapp_confirmation_with_automatic_emails(self):
+        args=dict(self.args, user_id='mixed',record={'property_id':'mixed','title':'Mixed visit'},
+                  contact_method='WhatsApp',contact_value='+919876543210',
+                  followup_email='mixed@example.com',manual_whatsapp_confirmation=True)
+        mixed_id=request_visit(**args)
+        update_visit_status(mixed_id,'Confirmed',db_path=self.db)
+        with _connect(self.db) as c:
+            c.execute("UPDATE property_visit_requests SET visit_email_consent='' WHERE id=?",(self.id,))
+            token=c.execute('SELECT token FROM visit_journeys WHERE visit_id=?',(mixed_id,)).fetchone()['token']
+        self.config['VISIT_CONFIRMATION_EMAIL_ENABLED']='true'
+        self.assertEqual(run_visit_worker(self.config,self.db,now=self.at-timedelta(days=1)),(0,0))
+        self.assertEqual(self.remind(),(1,0))
+        message=self.smtp.return_value.__enter__.return_value.send_message.call_args.args[0]
+        self.assertEqual(message['To'],'mixed@example.com')
+        self.assertIn('Reminder',message['Subject'])
+        self.assertEqual(self.remind(),(0,0))
+        after=self.at+timedelta(hours=2)
+        self.assertEqual(run_visit_worker(self.config,self.db,now=after),(1,0))
+        record_response(token,action='feedback',attended='No',satisfied='Not visited',
+                        reason='Work conflict',db_path=self.db,now=after)
+        self.assertEqual(run_visit_worker(self.config,self.db,now=after),(1,0))
+        message=self.smtp.return_value.__enter__.return_value.send_message.call_args.args[0]
+        self.assertIn('reschedule',message.get_content())
+        self.assertEqual(message['To'],'mixed@example.com')
+        self.assertEqual(run_visit_worker(self.config,self.db,now=after),(0,0))
+
+    def test_whatsapp_email_requires_valid_address_and_consent(self):
+        args=dict(self.args,user_id='mixed',record={'property_id':'another','title':'Another visit'},contact_method='WhatsApp',contact_value='+919876543210')
+        with self.assertRaisesRegex(ValueError,'valid email'):
+            request_visit(**args)
+        mixed_id=request_visit(**dict(args,email_reminders=False,followup_email='unused@example.com'))
+        with _connect(self.db) as c:
+            row=c.execute('SELECT * FROM property_visit_requests WHERE id=?',(mixed_id,)).fetchone()
+        self.assertEqual(row['followup_email'],'')
+        self.assertEqual(row['visit_email_consent'],'')
+
+    def test_scoped_worker_never_sends_another_visits_queued_email(self):
+        with _connect(self.db) as c:
+            c.execute("INSERT INTO visit_email_outbox(id,visit_id,visit_at,kind,updated_at) VALUES(?,?,?,?,?)",
+                      ('outside',self.id,self.at.isoformat(timespec='minutes'),'reminder',self.at.isoformat()))
+        self.assertEqual(run_visit_worker(self.config,self.db,now=self.at-timedelta(hours=1),only_visit_id='missing'),(0,0))
+        self.smtp.assert_not_called()
+        with _connect(self.db) as c:
+            self.assertEqual(c.execute("SELECT status FROM visit_email_outbox WHERE id='outside'").fetchone()['status'],'queued')
 
     def test_explore_requires_permission(self):
         self.remind()
