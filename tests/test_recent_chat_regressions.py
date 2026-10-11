@@ -20,6 +20,17 @@ class RecentChatTests(unittest.TestCase):
                 self.assertEqual(update_preferences(text,self.data,{'location':'Avadi'})['location'],'Avadi')
         self.assertEqual(parse_request('show property near Taramani',self.data).location.casefold(),'taramani')
 
+    def test_purchase_is_intent_even_with_stale_state_or_bad_catalogue(self):
+        import pandas as pd
+        polluted = pd.DataFrame({'locality':['Purchase'], 'city':['Chennai']})
+        for text in ('purchase', 'I want to purchase', 'purchase la'):
+            self.assertEqual(parse_request(text, polluted).location, '')
+        turn = conversational_turn('Im looking for a property to purchase', self.data, [], {'location':'Purchase', 'max_budget':4000000})
+        self.assertEqual(turn['intent'], 'purchase_location_needed')
+        self.assertNotIn('location', turn['context'])
+        self.assertEqual(turn['context']['max_budget'],4000000)
+        self.assertIn('Which city or area', turn['reply'])
+
     def test_correction_preserves_budget_and_reset_clears_all(self):
         context={'location':'Purchase','max_budget':3000000}
         turn=conversational_turn('i did not mention the location',self.data,[],context)

@@ -28,6 +28,10 @@ TYPE_TERMS = {
     "Flat": ("flat", "flats", "apartment", "apartments"),
 }
 
+# Action words must never become places, including from malformed catalogue
+# cells or colloquial-location parsing.
+NON_LOCATION_TERMS = {'purchase', 'purchasing', 'buy', 'buying', 'visit', 'vist', 'change'}
+
 
 def normalize_intent_text(text):
     """Normalize observed spelling variants for routing, not displayed messages."""
@@ -124,7 +128,7 @@ def parse_request(text: str, data: pd.DataFrame) -> SearchIntent:
     # Resolve a locality exactly before considering a larger locality that
     # merely contains the same word (for example, Porur before Thiruporur).
     places_by_column = {
-        column: {str(value).strip() for value in data.get(column, []) if str(value).strip()}
+        column: {str(value).strip() for value in data.get(column, []) if str(value).strip() and str(value).strip().casefold() not in NON_LOCATION_TERMS}
         for column in ("locality", "city", "district")
     }
     for column in ("locality", "city", "district"):
@@ -173,6 +177,8 @@ def parse_request(text: str, data: pd.DataFrame) -> SearchIntent:
             candidate = replacement_area.group(1).strip()
             if candidate not in {"the", "same", "my", "this", "that", "home", "property", "area", "budget", "purchase", "visit", "change", "buy", "selected", "existing"}:
                 intent.location = candidate.title()
+    if intent.location.casefold() in NON_LOCATION_TERMS:
+        intent.location = ''
     return intent
 
 

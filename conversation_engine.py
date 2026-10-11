@@ -213,6 +213,8 @@ def conversational_turn(text, data, chat, context=None, memory=None, language="E
     if selected:
         memory["selected"] = selected
     selected = memory.get("selected")
+    if not selected and not context.get('location') and re.search(r'\b(?:purchase|buy|buying|purchasing)\b', query) and not re.search(r"\b(?:not|don't|do not)\b", query):
+        return answer('purchase_location_needed', 'I understand you want to buy a property. Which city or area are you looking in?', 'நீங்கள் சொத்து வாங்க விரும்புகிறீர்கள். எந்த நகரம் அல்லது பகுதியில் தேடுகிறீர்கள்?', 'Property vaanga virumbureenga. Endha city illa area-la thedureenga?')
     visit_request = bool(re.search(r"\b(?:visit|view|inspect)\b.{0,60}\b(?:property|properties|site|listing|person|directly)\b|\b(?:property|site)\b.{0,35}\bvisit\b|\b(?:book|schedule|arrange|request)\b.{0,25}\b(?:visit|slot|appointment)\b", query))
     visit_request = visit_request or bool(selected and re.fullmatch(r'(?:a |property )?visit(?: please)?[.! ]*', query))
     visit_request = visit_request and not re.search(r"\b(?:don't|do not|not now|cancel|completed|attended|already visited)\b", query)

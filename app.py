@@ -3303,7 +3303,7 @@ def _respond_without_logging(text: str):
     # soon as a conversational preference update is accepted. The old flow
     # only queued this for a later interaction, which could leave stale type
     # checkboxes (for example House) visible while Mira said Flat.
-    preference_filter_sync_needed = conversation.get("intent") in {"preference_update", "location_correction"}
+    preference_filter_sync_needed = conversation.get("intent") in {"preference_update", "location_correction", "purchase_location_needed"}
     if preference_filter_sync_needed:
         sync_intent = parse_request("", properties)
         for key, value in conversation.get("context", {}).items():
