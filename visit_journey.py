@@ -24,7 +24,7 @@ def schema(c):
         id TEXT PRIMARY KEY, visit_id TEXT NOT NULL, visit_at TEXT NOT NULL,
         kind TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'queued', updated_at TEXT NOT NULL,
         UNIQUE(visit_id,visit_at,kind))""")
-    for column,default in (('clarification_note',''),('arrival_time',''),('met_person',''),('clarified_at',''),('agent_attended',''),('agent_name',''),('agent_note',''),('agent_recorded_at',''),('followup_paused',''),('purchase_intent',''),('revised_preferences',''),('purchase_outcome','Unknown'),('outcome_note',''),('customer_purchase_confirmed_at',''),('customer_purchase_note','')):
+    for column,default in (('assistance_requested_at',''),('callback_preference',''),('clarification_note',''),('arrival_time',''),('met_person',''),('clarified_at',''),('agent_attended',''),('agent_name',''),('agent_note',''),('agent_recorded_at',''),('followup_paused',''),('purchase_intent',''),('revised_preferences',''),('purchase_outcome','Unknown'),('outcome_note',''),('customer_purchase_confirmed_at',''),('customer_purchase_note','')):
         if getattr(c,'shared',False):
             c.execute(f"ALTER TABLE visit_journeys ADD COLUMN IF NOT EXISTS {column} TEXT NOT NULL DEFAULT '{default}'")
         elif column not in {row[1] for row in c.execute('PRAGMA table_info(visit_journeys)')}:
@@ -42,7 +42,7 @@ def ensure_journey(c, visit, now):
     if row['visit_at'] != visit['visit_at']:
         c.execute("""UPDATE visit_journeys SET token=?,visit_at=?,attendance='Awaiting response',
             reason='',attended='',satisfied='',assistance='',assistance_details='',
-            advisor_consent='',advisor_status='',explore_consent='',purchase_intent='',revised_preferences='',agent_attended='',agent_name='',agent_note='',agent_recorded_at='',arrival_time='',met_person='',clarified_at='',clarification_note='',updated_at=? WHERE visit_id=?""",
+            advisor_consent='',advisor_status='',explore_consent='',purchase_intent='',revised_preferences='',agent_attended='',agent_name='',agent_note='',agent_recorded_at='',arrival_time='',met_person='',clarified_at='',clarification_note='',assistance_requested_at='',callback_preference='',updated_at=? WHERE visit_id=?""",
             (secrets.token_urlsafe(32), visit['visit_at'], now, visit['id']))
         row = c.execute('SELECT * FROM visit_journeys WHERE visit_id=?', (visit['id'],)).fetchone()
     return dict(row)
@@ -66,7 +66,7 @@ def response_context(token, db_path=FOLLOWUP_DB):
 
 def record_response(token, *, action, reason='', visit_at=None, attended='', satisfied='',
                     assistance='None', details='', advisor_consent=False, explore_consent=False,
-                    purchase_intent='Undecided', revised_preferences='',arrival_time='',met_person='',db_path=FOLLOWUP_DB, now=None):
+                    purchase_intent='Undecided', revised_preferences='',arrival_time='',met_person='',callback_preference='',db_path=FOLLOWUP_DB, now=None):
     now = now or datetime.now(INDIA_TZ)
     stamp = now.isoformat(timespec='seconds')
     with _connect(db_path) as c:
@@ -81,6 +81,13 @@ def record_response(token, *, action, reason='', visit_at=None, attended='', sat
         from customer_journey import event
         def log(label,detail=''):
             event(c,user_id=row['user_id'],conversation_id=row['conversation_id'],property_key=row['property_key'],visit_id=row['visit_id'],event=label,detail=detail)
+        if action=='help':
+            if assistance not in ('Property agent','Loan advisor','Both') or not details.strip() or not advisor_consent:
+                raise ValueError('Choose assistance, describe your question and permit an advisor callback request.')
+            c.execute('UPDATE visit_journeys SET assistance=?,assistance_details=?,advisor_consent=?,advisor_status=?,assistance_requested_at=?,callback_preference=?,updated_at=? WHERE token=?',
+                      (assistance,details.strip()[:1000],'Yes','Requested',stamp,callback_preference.strip()[:200],stamp,token))
+            log('Advisor callback requested',assistance+'; '+details.strip()[:1000])
+            return 'Your assistance request is saved. If visit emails are enabled, we will email an acknowledgment. A person will review requests needing an advisor; no callback time is confirmed.'
         if action=='clarify':
             if now<datetime.fromisoformat(row['visit_at']) or attended not in ('Yes','No'):
                 raise ValueError('Confirm whether you visited after the appointment time.')
@@ -153,6 +160,7 @@ def record_response(token, *, action, reason='', visit_at=None, attended='', sat
             c.execute('UPDATE visit_journeys SET purchase_intent=?,revised_preferences=?,explore_consent=? WHERE token=?',
                 (purchase_intent,revised_preferences.strip()[:1000],'Yes' if explore_consent else '',token))
             log('Visit feedback saved',f'{attended}; {satisfied}; {purchase_intent}')
+            if assistance!='None': c.execute('UPDATE visit_journeys SET assistance_requested_at=?,callback_preference=? WHERE token=?',(stamp,callback_preference.strip()[:200],token))
             if assistance!='None': log('Advisor callback requested',assistance)
             if explore_consent: log('Return to Mira permitted',revised_preferences)
             return 'Thank you for your feedback. Your assistance request is saved for owner review; an advisor is not yet connected.' if assistance != 'None' else 'Thank you for sharing how your visit went.'
@@ -188,7 +196,7 @@ def owner_journeys(db_path=FOLLOWUP_DB):
         whatsapp_states = {(m['visit_id'],m['visit_at'],m['kind']):m['status'] for m in c.execute('SELECT visit_id,visit_at,kind,status FROM visit_whatsapp_outbox').fetchall()}
         rows = c.execute("""SELECT j.visit_id,j.visit_at,j.attendance,j.reason,j.attended,j.satisfied,
             j.assistance,j.assistance_details,j.advisor_consent,j.advisor_status,j.explore_consent,
-            j.clarification_note,j.arrival_time,j.met_person,j.clarified_at,j.agent_attended,j.agent_name,j.agent_note,j.agent_recorded_at,j.followup_paused,j.purchase_intent,j.revised_preferences,j.purchase_outcome,j.outcome_note,j.customer_purchase_confirmed_at,j.customer_purchase_note,
+            j.assistance_requested_at,j.callback_preference,j.clarification_note,j.arrival_time,j.met_person,j.clarified_at,j.agent_attended,j.agent_name,j.agent_note,j.agent_recorded_at,j.followup_paused,j.purchase_intent,j.revised_preferences,j.purchase_outcome,j.outcome_note,j.customer_purchase_confirmed_at,j.customer_purchase_note,
             v.property_title,v.customer_name,v.contact_method,v.contact_value,v.status,v.conversation_id,v.preferences,v.user_id,v.followup_email,v.manual_whatsapp_confirmation_consent
             FROM visit_journeys j JOIN property_visit_requests v ON v.id=j.visit_id""").fetchall()
         all_emails=c.execute('SELECT visit_id,visit_at,kind,status FROM visit_email_outbox').fetchall()
@@ -196,7 +204,7 @@ def owner_journeys(db_path=FOLLOWUP_DB):
     results = []
     for row in rows:
         result = dict(row)
-        for kind in ('confirmation','reminder','review','clarification','decision'):
+        for kind in ('confirmation','reminder','review','clarification','assistance','attendance_check','decision'):
             result[kind+' email'] = email_states.get((row['visit_id'],row['visit_at'],kind),'Not sent')
             result[kind+' WhatsApp'] = whatsapp_states.get((row['visit_id'],row['visit_at'],kind),'Not submitted')
         result['Purchase interest'], result['Evidence'] = interest(result)
@@ -267,6 +275,8 @@ def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None, delivery_test=Fal
             if at+timedelta(hours=2) <= now < at+timedelta(days=1) and not journey['attended']: kinds.append('review')
             if at<=now<at+timedelta(days=7) and journey['attended'] in ('Yes','No') and journey['attended']==journey['agent_attended']: kinds.append('decision')
             if at<=now<at+timedelta(days=7) and journey['attended'] in ('Yes','No') and journey['agent_attended'] in ('Yes','No') and journey['attended']!=journey['agent_attended']: kinds.append('clarification')
+            if now<at+timedelta(days=7) and journey['advisor_consent']=='Yes' and journey['assistance'] not in ('','None') and journey['advisor_status'] in ('Requested','Contacting'): kinds.append('assistance')
+            if at+timedelta(days=1)<=now<at+timedelta(days=7) and not journey['attended']: kinds.append('attendance_check')
             for kind in kinds:
                 c.execute("""INSERT INTO visit_email_outbox(id,visit_id,visit_at,kind,updated_at)
                     VALUES(?,?,?,?,?) ON CONFLICT(visit_id,visit_at,kind) DO NOTHING""", (uuid4().hex,visit['id'],visit['visit_at'],kind,stamp))
@@ -278,7 +288,7 @@ def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None, delivery_test=Fal
             j = c.execute('SELECT * FROM visit_journeys WHERE visit_id=?',(mail['visit_id'],)).fetchone()
             at = datetime.fromisoformat(mail['visit_at'])
             valid = visit and j and not j['customer_purchase_confirmed_at'] and visit['status']=='Confirmed' and visit['visit_at']==mail['visit_at'] and (visit['contact_method']=='Email' or visit['followup_email']) and visit['visit_email_consent']=='Yes'
-            valid = valid and j['followup_paused']!='Yes' and ((mail['kind']=='confirmation' and now<at and str(config.get('VISIT_CONFIRMATION_EMAIL_ENABLED','true')).lower()=='true') or (mail['kind']=='reminder' and at-timedelta(hours=1)<=now<at and j['attendance']=='Awaiting response') or (mail['kind']=='review' and at+timedelta(hours=2)<=now<at+timedelta(days=1) and not j['attended']) or (mail['kind']=='clarification' and at<=now<at+timedelta(days=7) and j['attended'] in ('Yes','No') and j['agent_attended'] in ('Yes','No') and j['attended']!=j['agent_attended']) or (mail['kind']=='decision' and at<=now<at+timedelta(days=7) and j['attended'] in ('Yes','No') and j['attended']==j['agent_attended']))
+            valid = valid and j['followup_paused']!='Yes' and ((mail['kind']=='confirmation' and now<at and str(config.get('VISIT_CONFIRMATION_EMAIL_ENABLED','true')).lower()=='true') or (mail['kind']=='reminder' and at-timedelta(hours=1)<=now<at and j['attendance']=='Awaiting response') or (mail['kind']=='review' and at+timedelta(hours=2)<=now<at+timedelta(days=1) and not j['attended']) or (mail['kind']=='assistance' and now<at+timedelta(days=7) and j['advisor_consent']=='Yes' and j['assistance'] not in ('','None') and j['advisor_status'] in ('Requested','Contacting')) or (mail['kind']=='attendance_check' and at+timedelta(days=1)<=now<at+timedelta(days=7) and not j['attended']) or (mail['kind']=='clarification' and at<=now<at+timedelta(days=7) and j['attended'] in ('Yes','No') and j['agent_attended'] in ('Yes','No') and j['attended']!=j['agent_attended']) or (mail['kind']=='decision' and at<=now<at+timedelta(days=7) and j['attended'] in ('Yes','No') and j['attended']==j['agent_attended']))
             if not valid:
                 c.execute("UPDATE visit_email_outbox SET status='skipped',updated_at=? WHERE id=? AND status='queued'",(stamp,mail['id']))
                 continue
@@ -286,8 +296,8 @@ def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None, delivery_test=Fal
             if claim.rowcount!=1: continue
         message=EmailMessage()
         message['From']=config['FOLLOWUP_SMTP_FROM'];message['To']=visit['followup_email'] or visit['contact_value']
-        subjects = {'clarification':'Please clarify your property visit — Namma Veedu', 'confirmation':'Your property visit is confirmed — Namma Veedu', 'reminder':'Reminder: your upcoming property visit', 'review':'How was your property visit?', 'decision':'Next steps after your property visit — Namma Veedu'}
-        prompts = {'clarification':'We have different attendance reports for this appointment and would like to check the details with you. Please confirm whether you visited this property, your approximate arrival time and whom you met. If you did not visit, please tell us what happened. Use Clarify my visit on the secure response page. Your report is recorded separately from the property advisor report; we will keep any disagreement under review.', 'confirmation':'The owner has confirmed your visit. We look forward to welcoming you. Please confirm your attendance, cancel, or request a different time on the secure response page.', 'reminder':'Will you attend? Choose Yes, No or Reschedule on the secure response page.', 'review':'Did you attend? If yes, did the property match your preferences and are you interested in purchasing? Tell us if you need property or loan assistance, or would like more options. If you did not attend, please share the reason, any concerns, and whether you would like to reschedule, explore other properties, or pause your search.'}
+        subjects = {'assistance':'Your assistance request is saved — Namma Veedu','attendance_check':'Please confirm how your property visit went — Namma Veedu','clarification':'Please clarify your property visit — Namma Veedu', 'confirmation':'Your property visit is confirmed — Namma Veedu', 'reminder':'Reminder: your upcoming property visit', 'review':'How was your property visit?', 'decision':'Next steps after your property visit — Namma Veedu'}
+        prompts = {'assistance':'We have saved your assistance request for team review. Please use Request assistance to add your specific question and preferred callback time, or return to Mira for property search help. For property questions, tell us which details you need. For loan assistance, describe the question without account numbers, passwords or identity documents. Your preferred callback time is a request, not a confirmed appointment. An advisor has not yet been connected.', 'attendance_check':'We have not received your actual attendance report. Please confirm whether you visited and share any concerns using the private response page. Silence will not be treated as a missed visit. You can also request assistance, explore other properties or pause visit emails.','clarification':'We have different attendance reports for this appointment and would like to check the details with you. Please confirm whether you visited this property, your approximate arrival time and whom you met. If you did not visit, please tell us what happened. Use Clarify my visit on the secure response page. Your report is recorded separately from the property advisor report; we will keep any disagreement under review.', 'confirmation':'The owner has confirmed your visit. We look forward to welcoming you. Please confirm your attendance, cancel, or request a different time on the secure response page.', 'reminder':'Will you attend? Choose Yes, No or Reschedule on the secure response page.', 'review':'Did you attend? If yes, did the property match your preferences and are you interested in purchasing? Tell us if you need property or loan assistance, or would like more options. If you did not attend, please share the reason, any concerns, and whether you would like to reschedule, explore other properties, or pause your search.'}
         if mail['kind']=='decision':
             if j['attended']=='No':
                 prompt='Thank you for letting us know you could not attend. Would you like to reschedule, discuss any concerns, explore other properties, or pause your search? Use the response page to request another time or return to Mira. No new appointment is confirmed automatically.'
@@ -300,13 +310,14 @@ def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None, delivery_test=Fal
         message['Subject']=subjects[mail['kind']]
         url=config['FOLLOWUP_PUBLIC_URL'].rstrip('/')+'/?visit_response='+j['token']
         if mail['kind']=='clarification': url+='&visit_action=clarify'
+        if mail['kind']=='assistance': url+='&visit_action=help'
         message.set_content(f"Hello {visit['customer_name']},\n\n{visit['property_title']}\nVisit: {at.strftime('%d %b %Y, %I:%M %p IST')}\n\n{prompt}\n{url}\n\nIf you no longer want visit emails, cancel the visit through this page or contact the owner.\nNamma Veedu")
         if delivery_test:
             message.replace_header('Subject', 'Namma Veedu email delivery test')
             message.set_content(f"Hello,\n\n{visit['property_title']}\n\nThis is an email delivery test, not a property visit booking. No appointment was created on the live portal, and no response is required.\n\nTo request a real visit, open Namma Veedu and select Book a slot on a property.\n{config['FOLLOWUP_PUBLIC_URL'].rstrip('/')}\n\nNamma Veedu")
         if not delivery_test:
             from html import escape
-            actions=(('clarify','Clarify my visit'),('pause','Pause visit emails')) if mail['kind']=='clarification' else (('yes','Confirm attendance'),('reschedule','Request another time'),('no','Cancel visit'),('feedback','Share visit feedback'),('pause','Pause visit emails'))
+            actions=(('clarify','Clarify my visit'),('pause','Pause visit emails')) if mail['kind']=='clarification' else (('help','Request assistance'),('yes','Confirm attendance'),('reschedule','Request another time'),('no','Cancel visit'),('feedback','Share visit feedback'),('pause','Pause visit emails'))
             buttons=''.join('<p><a href="'+escape(url.split('&visit_action=')[0]+'&visit_action='+action,quote=True)+'">'+label+'</a></p>' for action,label in actions)
             message.add_alternative('<html><body><p>'+escape(visit['property_title'])+'</p><p>'+escape(at.strftime('%d %b %Y, %I:%M %p IST'))+'</p><p>'+escape(prompt)+'</p>'+buttons+'<p>Buttons open a secure page; submit there to save your choice.</p></body></html>',subtype='html')
         state='sent'
@@ -322,4 +333,7 @@ def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None, delivery_test=Fal
             state='needs_review';failed+=1
         with _connect(db_path) as c:
             c.execute('UPDATE visit_email_outbox SET status=?,updated_at=? WHERE id=? AND status=\'sending\'',(state,stamp,mail['id']))
+    if not delivery_test:
+        from visit_actions import sync_actions
+        sync_actions(db_path,now=now,only_visit_id=only_visit_id)
     return sent,failed

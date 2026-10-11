@@ -5731,7 +5731,7 @@ def visit_request_dialog():
         contact_value = st.text_input("Email address or WhatsApp number with country code",key="visit_contact_value")
         consent = st.checkbox("இந்தப் பார்வைக் கோரிக்கைக்காக என் தொடர்பு விவரங்களை உரிமையாளருடன் பகிர ஒப்புக்கொள்கிறேன்." if language == "தமிழ்" else "I agree to share my contact with the Namma Veedu owner for this property visit request.",key="visit_consent")
         followup_email = st.text_input("Email for automatic visit confirmation, reminders and follow-ups (required if opting in)", key="visit_followup_email")
-        visit_email_reminders = st.checkbox("I agree to email visit confirmation, reminders, attendance and property feedback requests, and one follow-up addressing my response.", key="visit_email_reminders")
+        visit_email_reminders = st.checkbox("I agree to email visit confirmation, reminders, attendance and property feedback requests, an additional attendance check, assistance acknowledgments and one outcome follow-up.", key="visit_email_reminders")
         st.caption("Email contacts use the confirmation email address. For WhatsApp confirmation, enter your email above. An email reminder becomes due one hour before the confirmed visit and feedback two hours afterward; delivery depends on the scheduled email worker.")
         manual_whatsapp_confirmation = st.checkbox("I agree to receive a WhatsApp visit confirmation sent manually by the Namma Veedu team.", key="visit_manual_whatsapp_confirmation", disabled=contact_method != "WhatsApp")
         st.caption("WhatsApp confirmation is sent manually after owner approval. Email handles the later reminders and follow-ups. No automatic WhatsApp messages are enabled by this request.")

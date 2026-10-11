@@ -17,6 +17,8 @@ def render():
         sync_inquiries(read_inquiries())
         sync_visits(owner_journeys())
         st.session_state.crm_loaded = True
+    from visit_actions import render_queue
+    render_queue()
     from crm_workspace import create_customer
     create_customer()
     if not st.session_state.get('crm_loaded'):
@@ -84,7 +86,7 @@ def render():
     st.write('Activity history')
     st.dataframe(pd.DataFrame(activities(lead_id)),hide_index=True)
     with st.expander('Linked visits and customer journey'):
-        linked=[r for r in journeys if lead['conversation_id'] and r['conversation_id']==lead['conversation_id']]
+        linked=[r for r in journeys if lead['conversation_id'] and (r['conversation_id']==lead['conversation_id'] or lead['conversation_id']=='visit:'+r['visit_id'])]
         from crm_service import journey_summary
         st.dataframe(pd.DataFrame([journey_summary(r) for r in linked]),hide_index=True) if linked else st.info('No linked visits yet.')
         st.caption('For WhatsApp confirmation with email follow-ups, send the confirmation manually; the email worker handles reminders and later questions with consent. Other manual WhatsApp drafts require pressing Send. Customer feedback updates this view on refresh; an attendance promise is not a completed visit.')
