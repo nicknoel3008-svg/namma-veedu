@@ -36,7 +36,14 @@ def visit_message(visit, kind, *, now=None, response_url=''):
         verified=attendance_state(visit)
         if verified=='Attendance conflict': raise ValueError('Customer and advisor attendance disagree. Resolve the record before preparing an outcome follow-up.')
         if visit.get('followup_paused')=='Yes': raise ValueError('This customer paused visit follow-ups.')
-        text+=f"Did you attend your visit for {title}, scheduled for {when}? Did it meet your preferences, and are you interested in purchasing? If yes, do you need any further assistance? If not, please share your reason and whether you would like assistance or to explore other properties."
+        if verified=='Did not visit':
+            text+=f"We understand you could not attend your visit for {title} at {when}. Were there any concerns? Would you like to request another time, explore more properties, or pause your search?"
+        elif verified=='Visited' and visit.get('purchase_intent')=='Interested':
+            text+=f"Thank you for visiting {title} and sharing your interest. Do you need further property or loan assistance? Please update your request on the response page."
+        elif verified=='Visited':
+            text+=f"Thank you for visiting {title}. Did it match your preferences? Please share your decision and any reason it was unsuitable. Would you like assistance or other options?"
+        else:
+            text+=f"Did you attend your visit for {title}, scheduled for {when}? Did it meet your preferences, and are you interested in purchasing? If yes, do you need any further assistance? If not, please share your reason and whether you would like assistance or to explore other properties."
     if response_url:
         text+='\nRespond securely here: '+response_url
     else:
