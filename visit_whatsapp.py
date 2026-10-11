@@ -4,7 +4,7 @@ from uuid import uuid4
 from agent_runtime import INDIA_TZ
 from followup_service import FOLLOWUP_DB, _connect
 from visit_journey import schema, ensure_journey
-from whatsapp_followup import whatsapp_config_issues, send_wati_template
+from whatsapp_followup import whatsapp_config_issues
 
 
 def config_issues(config):
@@ -84,6 +84,7 @@ def run_worker(config, db_path=FOLLOWUP_DB, *, now=None):
                            ('response_url',config['FOLLOWUP_PUBLIC_URL'].rstrip('/')+'/?visit_response='+journey['token']))])
         message_id = ''
         try:
+            from whatsapp_followup import send_wati_template
             message_id = send_wati_template(config,visit['contact_value'],payload)
             state = 'accepted'; accepted += 1
         except Exception:
