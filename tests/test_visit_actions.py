@@ -10,6 +10,26 @@ class VisitActionsTests(unittest.TestCase):
     remind=fixtures.VisitJourneyTests.remind
     token=fixtures.VisitJourneyTests.token
 
+    def test_assistance_form_collects_question_and_callback_preference(self):
+        from unittest.mock import patch
+        from streamlit.testing.v1 import AppTest
+        self.remind()
+        from visit_journey import response_context
+        context=response_context(self.token(),self.db)
+        with patch('visit_journey_ui.response_context',return_value=context),patch('visit_journey_ui.record_response') as save:
+            app=AppTest.from_string('from visit_journey_ui import render_visit_response\nrender_visit_response()')
+            app.query_params.update(visit_response='private-test-token',visit_action='help')
+            app.run()
+            self.assertFalse(app.exception)
+            self.assertEqual(app.radio[0].value,'Request assistance')
+            next(w for w in app.text_area if w.label=='What assistance do you need?').set_value('Need floor plan')
+            next(w for w in app.text_input if w.label.startswith('Preferred callback')).set_value('Tomorrow 5 PM IST')
+            next(w for w in app.checkbox if w.label.startswith('I permit sharing')).check()
+            next(w for w in app.button if w.label=='Save response').click().run()
+            self.assertFalse(app.exception)
+            self.assertEqual(save.call_args.kwargs['action'],'help')
+            self.assertEqual(save.call_args.kwargs['callback_preference'],'Tomorrow 5 PM IST')
+
     def help(self):
         record_response(self.token(),action='help',assistance='Property agent',details='Need floor plan',advisor_consent=True,callback_preference='Tomorrow evening IST',db_path=self.db,now=self.at-timedelta(hours=2))
 
