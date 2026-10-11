@@ -4,7 +4,7 @@ The selected flow uses a WhatsApp booking contact and a separate, consented foll
 
 For these bookings, the email worker skips the initial email confirmation, sends the reminder in the hour before the visit, and requests attendance and feedback from two hours afterward. After feedback, one additional email addresses the customer's interest or missed visit, assistance needs, and options to reschedule or explore more properties. It is eligible for seven days after the visit and is deduplicated per visit/time. Customer responses through the private response page update the CRM. Ordinary email or WhatsApp replies are not automatically interpreted.
 
-This change adds no paid messaging service. Email provider sending limits and existing computer/hosting availability still apply. The existing sender stays unchanged until a replacement is supplied. Local tests use simulated delivery; deployment and scheduler operation must be verified separately.
+This change adds no paid messaging service. Email provider sending limits and existing computer/hosting availability still apply. The hosted sender is propertynm38@gmail.com. Local tests use simulated delivery; hosted checks and the separate real sender test are recorded below.
 
 The visit worker sends opted-in email contacts:
 
@@ -16,7 +16,7 @@ Cancelled, unconfirmed, past, and nonconsenting bookings do not receive confirma
 
 The owner dashboard's Visit responses and advisor requests table shows confirmation, reminder, and review email statuses. `sent` means the SMTP server accepted the message; it does not guarantee inbox delivery. `needs_review` or a persistent `sending` state requires checking provider records before any retry.
 
-The official replacement sender requested by the owner is **propertynm38@gmail.com**. Activation is pending Gmail sending authorization for this account. Do not reuse the previous account's app password or change only the From header. All email services (recommendations, visit emails and purchase acknowledgments) read the same sender settings.
+The official hosted sender is **propertynm38@gmail.com**. Gmail sending authorization is configured and the owner confirmed receipt of the delivery test. Do not reuse the previous account's app password or change only the From header. All email services (recommendations, visit emails and purchase acknowledgments) read the same sender settings.
 
 Configure these together in private local `.streamlit/secrets.toml`, Streamlit hosted Secrets, and the existing GitHub Actions repository secrets:
 
@@ -34,6 +34,6 @@ Run `python run_visit_worker.py --check` for configuration validation without se
 
 Hosted operation is selected. The old Windows tasks **Namma Veedu Visit Emails**, **Namma Veedu Email Followups**, and **Namma Veedu WhatsApp Test Followups** are disabled. Local SMTP credentials still refer to the former sender and must not be reactivated without migration. The hosted visit workflow also processes already-consented recommendation emails through `run_followup_worker.py --channel email`, using the same official sender secrets. It does not activate WhatsApp sending.
 
-Release `68fef53` passed the hosted PostgreSQL journey check on 11 October 2026: booking, WhatsApp confirmation draft, reminder/review/decision outbox behavior, CRM attendance/interest, and deduplication. Test records were rolled back; SMTP was simulated for the journey check. A separate real sender test was received by the owner from propertynm38@gmail.com. The deployed customer form was inspected; the authenticated owner CRM screen still requires verification in the accessible browser session.
+Release `68fef53` passed the hosted PostgreSQL journey check on 11 October 2026: booking, WhatsApp confirmation draft, reminder/review/decision outbox behavior, CRM attendance/interest, and deduplication. Test records were rolled back; SMTP was simulated for the journey check. A separate real sender test was received by the owner from propertynm38@gmail.com. The deployed customer form and authenticated owner CRM lead list were verified in the hosted browser. Release `d43b063` passed the hosted email worker run. GitHub scheduling can be delayed; the five-minute schedule does not guarantee delivery exactly one hour before a visit.
 
 The customer response URL must be publicly reachable and connected to the same shared database as the worker. Localhost cannot serve customer response links. No marketing emails are included in this sequence.
