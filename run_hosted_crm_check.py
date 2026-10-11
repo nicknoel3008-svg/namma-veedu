@@ -13,6 +13,8 @@ import visit_service as visits
 import visit_journey as journeys
 import crm_service as crm
 import visit_attendance as attendance
+import visit_whatsapp as whatsapp
+import customer_journey as customer
 from crm_whatsapp import visit_message, chat_link
 
 
@@ -23,11 +25,13 @@ def main():
         raise ValueError('Shared database and official sender settings are required.')
     os.environ['DATABASE_URL']=config['DATABASE_URL']
     config['VISIT_EMAIL_ENABLED']='true'
+    # Commit each migration independently so this check does not hold schema
+    # locks across unrelated CRM and visit tables while the live app is active.
+    for migrate in (journeys.schema,crm.schema,attendance.schema,whatsapp.outbox_schema,customer.schema):
+        with _connect() as c:
+            if not getattr(c,'shared',False): raise ValueError('Shared PostgreSQL is required.')
+            migrate(c)
     with _connect() as c:
-        if not getattr(c,'shared',False): raise ValueError('Shared PostgreSQL is required.')
-        journeys.schema(c)
-        crm.schema(c)
-        attendance.schema(c)
         for table in ('property_visit_requests','visit_journeys','visit_email_outbox','crm_leads','crm_activity','crm_deals','crm_tasks','advisor_visit_registers'):
             row=c.execute('SELECT relrowsecurity FROM pg_class WHERE oid=CAST(? AS regclass)',(table,)).fetchone()
             assert row and row['relrowsecurity'], 'Private table protections missing'
@@ -40,6 +44,10 @@ def main():
             with ExitStack() as stack:
                 for module in (visits,journeys,crm,attendance):
                     stack.enter_context(patch.object(module,'_connect',shared))
+                # Schema is verified above; avoid reacquiring DDL locks inside the
+                # long rollback-only data test while customers use the website.
+                for module,name in ((visits,'_schema'),(journeys,'schema'),(crm,'schema'),(attendance,'schema'),(whatsapp,'outbox_schema'),(customer,'schema')):
+                    stack.enter_context(patch.object(module,name,lambda c:None))
                 smtp=stack.enter_context(patch('visit_journey.smtplib.SMTP'))
                 now=datetime.now(INDIA_TZ)
                 at=(now+timedelta(days=2)).replace(second=0,microsecond=0)
