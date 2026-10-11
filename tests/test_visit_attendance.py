@@ -35,6 +35,7 @@ class DualAttendanceTests(unittest.TestCase):
         self.assertEqual(run_visit_worker(self.config,self.db,now=after),(0,0))
         record_agent_attendance(token,self.id,'No',db_path=self.db,now=after)
         self.assertEqual(attendance_state(owner_journeys(self.db)[0]),'Attendance conflict')
+        self.assertEqual(run_visit_worker(self.config,self.db,now=after),(1,0))
         self.assertEqual(run_visit_worker(self.config,self.db,now=after),(0,0))
         record_agent_attendance(token,self.id,'Yes','Corrected from site register',self.db,now=after)
         self.assertEqual(attendance_state(owner_journeys(self.db)[0]),'Visited')

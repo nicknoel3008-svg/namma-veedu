@@ -48,3 +48,8 @@ Both parties report actual attendance after the appointment. Matching Yes report
 Emails contain secure action links for attendance, rescheduling, cancellation, feedback and pausing. Opening a link does not save a response; the customer submits the form. Not buying now and Pause visit emails stop this booking's visit emails without cancelling its appointment or unrelated email subscriptions. Resume requires an explicit form submission. Explore other properties restores saved preferences and requested changes in Mira and displays matching alternatives excluding the original property; matches depend on the current listing data.
 
 WhatsApp remains manual. Optional post-visit drafts require separately verified WhatsApp permission. Conflicting attendance and paused follow-ups block those visit drafts. No WhatsApp API is activated.
+
+
+## Attendance clarification email
+
+A conflicting actual attendance report queues one neutral clarification email per visit/time, from the configured official sender, on the next hosted worker run. It includes the property and appointment and a Clarify my visit link. The customer explicitly submits actual attendance, an explanation and (if visited) approximate arrival time and whom they met. Opening the link is read-only. These details and the clarification email status appear in CRM; the advisor report is never overwritten by the customer. Disagreements continue to hold outcome emails. Matching reports permit the usual outcome email within seven days. Paused, nonconsenting, cancelled, rescheduled, expired or purchased bookings do not receive clarification emails. Direct email replies are not parsed. No additional paid email service is added.

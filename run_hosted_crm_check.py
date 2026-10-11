@@ -71,6 +71,7 @@ def main():
                 assert journeys.run_visit_worker(config,now=after,only_visit_id=visit_id)==(0,0)
                 register=attendance.create_register(visit_id,'Release QA advisor')
                 attendance.record_agent_attendance(register,visit_id,'No',now=after)
+                assert journeys.run_visit_worker(config,now=after,only_visit_id=visit_id)==(1,0)
                 assert journeys.run_visit_worker(config,now=after,only_visit_id=visit_id)==(0,0)
                 attendance.record_agent_attendance(register,visit_id,'Yes','Correction verified in QA',now=after)
                 assert journeys.run_visit_worker(config,now=after,only_visit_id=visit_id)==(1,0)
@@ -85,7 +86,7 @@ def main():
                 for call in smtp.return_value.__enter__.return_value.send_message.call_args_list:
                     mail=call.args[0]
                     assert mail['To']==official and parseaddr(mail['From'])[1].lower()==official
-                assert smtp.return_value.__enter__.return_value.send_message.call_count==4
+                assert smtp.return_value.__enter__.return_value.send_message.call_count==5
                 print('Shared booking, manual WhatsApp draft, reminder, feedback, decision email, CRM attendance/interest and duplicate prevention verified. SMTP simulated; no customer messages sent.')
         finally:
             c.execute('ROLLBACK')

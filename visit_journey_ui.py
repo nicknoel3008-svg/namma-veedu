@@ -24,15 +24,22 @@ def render_visit_response():
             st.info('Please contact the owner about this request. Rescheduled times need owner confirmation.')
             st.stop()
         past = datetime.now(INDIA_TZ)>=datetime.fromisoformat(context['visit_at'])
-        choices = ['Visit feedback','I purchased this property','Reschedule','Explore other properties','Cancel visit','Not buying now','Pause visit emails','Resume visit emails'] if past else ['Yes, I will attend','I purchased this property','No, I cannot attend','Reschedule','Explore other properties','Not buying now','Pause visit emails','Resume visit emails']
-        wanted={'yes':'Yes, I will attend','no':'Cancel visit' if past else 'No, I cannot attend','reschedule':'Reschedule','feedback':'Visit feedback','pause':'Pause visit emails'}.get(str(st.query_params.get('visit_action','')))
+        choices = ['Clarify my visit','Visit feedback','I purchased this property','Reschedule','Explore other properties','Cancel visit','Not buying now','Pause visit emails','Resume visit emails'] if past else ['Yes, I will attend','I purchased this property','No, I cannot attend','Reschedule','Explore other properties','Not buying now','Pause visit emails','Resume visit emails']
+        wanted={'clarify':'Clarify my visit','yes':'Yes, I will attend','no':'Cancel visit' if past else 'No, I cannot attend','reschedule':'Reschedule','feedback':'Visit feedback','pause':'Pause visit emails'}.get(str(st.query_params.get('visit_action','')))
         if context.get('followup_paused')=='Yes': st.info('Visit emails are paused. Your booking is unchanged.')
-        choice=st.radio('How can we help?',choices,index=choices.index(wanted) if wanted in choices else 0)
+        choice=st.radio('How can we help?',choices,index=choices.index(wanted) if wanted in choices else (choices.index('Visit feedback') if past else 0))
         if choice in ('Not buying now','Pause visit emails'): st.caption('This pauses visit emails for this booking. The appointment remains booked; choose Cancel visit if you cannot attend.')
         with st.form('visit_response_form'):
             reason=st.text_area('Reason or visit comments (no financial account details)')
             when=None;attended='';satisfied='';assistance='None';details='';consent=False;explore=False;intent='Undecided';changes=''
             purchase_confirmed=False;receipt_consent=False
+            arrival='';met=''
+            if choice=='Clarify my visit':
+                st.info('Please check the property and appointment shown above. This saves your report separately from the property advisor report.')
+                attended=st.radio('Did you actually visit this property?',['Yes','No'],index=None)
+                arrival=st.text_input('Approximate arrival time (IST)',value=context.get('arrival_time',''))
+                met=st.text_input('Whom did you meet? (Name or role; say unknown if unsure)',value=context.get('met_person',''))
+                st.caption('In the comments above, explain what happened. Do not include identity documents or financial details.')
             if choice=='I purchased this property':
                 purchase_confirmed=st.checkbox('I confirm that I completed the purchase of this property.')
                 receipt_consent=st.checkbox('Email me a thank-you message and optional final-rating link.',disabled=context['contact_method']!='Email')
@@ -62,8 +69,8 @@ def render_visit_response():
                 from purchase_confirmation import confirm_purchase
                 st.success(confirm_purchase(context['visit_id'],token=token,confirmed=purchase_confirmed,note=reason,email_receipt=receipt_consent))
                 st.stop()
-            action={'Yes, I will attend':'yes','No, I cannot attend':'no','Cancel visit':'no','Reschedule':'reschedule','Explore other properties':'explore','Visit feedback':'feedback','Not buying now':'not_buying','Pause visit emails':'pause','Resume visit emails':'resume'}[choice]
-            reply=record_response(token,action=action,reason=reason,visit_at=when,attended=attended,satisfied=satisfied,assistance=assistance,details=details,advisor_consent=consent,explore_consent=explore,purchase_intent=intent,revised_preferences=changes)
+            action={'Clarify my visit':'clarify','Yes, I will attend':'yes','No, I cannot attend':'no','Cancel visit':'no','Reschedule':'reschedule','Explore other properties':'explore','Visit feedback':'feedback','Not buying now':'not_buying','Pause visit emails':'pause','Resume visit emails':'resume'}[choice]
+            reply=record_response(token,action=action,reason=reason,visit_at=when,attended=attended,satisfied=satisfied,assistance=assistance,details=details,advisor_consent=consent,explore_consent=explore,purchase_intent=intent,revised_preferences=changes,arrival_time=arrival,met_person=met)
             st.success(reply)
             if explore:
                 st.link_button('Return to Mira', '/?resume_visit='+token)
