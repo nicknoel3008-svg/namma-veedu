@@ -237,6 +237,8 @@ FOLLOWUP_EMAIL_CONFIG = {
 FOLLOWUP_EMAIL_READY = email_config_ready(FOLLOWUP_EMAIL_CONFIG)
 from visit_journey_ui import render_visit_response, render_purchase_rating
 render_purchase_rating()
+from visit_attendance import render_register
+render_register()
 render_visit_response()
 FOLLOWUP_WHATSAPP_CONFIG = {key: configured_value(key) for key in WHATSAPP_CONFIG_KEYS}
 FOLLOWUP_WHATSAPP_READY = not whatsapp_config_issues(FOLLOWUP_WHATSAPP_CONFIG)
@@ -4951,9 +4953,17 @@ if resume_token:
             if st.session_state.get("conversation_closed"):
                 start_new_conversation()
             st.session_state.search_context = update_preferences(resumed["changes"], properties, resumed["preferences"]) if resumed["changes"] else resumed["preferences"]
+            from visit_service import property_key as visit_property_key
+            preferences=st.session_state.search_context
+            allowed=('location','property_type','bedrooms','status','min_budget','max_budget','min_area_sqm','max_area_sqm')
+            alternatives=search_properties(properties,**{k:v for k,v in preferences.items() if k in allowed and v is not None})
+            alternatives=alternatives.loc[[visit_property_key(row)!=resumed.get('exclude_property') for row in alternatives.to_dict('records')]]
+            st.session_state.main_results=alternatives.copy()
+            st.session_state.main_results_mode='chat'
+            st.session_state.filters_applied=False
             st.session_state.buyer_memory = {}
             st.session_state.return_search_changes = resumed["changes"]
-            st.session_state.chat.append({"role":"assistant", "content":"Welcome back. I have restored your saved search preferences. Your requested changes: " + (resumed["changes"] or "No changes specified") + ". Tell me what you would like to adjust or search next.", "mode":"visit_return"})
+            st.session_state.chat.append({"role":"assistant", "content":"Welcome back. I have restored your saved search preferences. Your requested changes: " + (resumed["changes"] or "No changes specified") + ". Tell me what you would like to adjust or search next.", "mode":"results", "records":alternatives.head(5).to_dict("records"),"count":len(alternatives)})
             st.success("Your saved search preferences are restored. Tell Mira your next search or confirm your requested changes.")
         else:
             st.warning("This return link is invalid, expired or does not have permission to restore preferences.")
@@ -5720,8 +5730,8 @@ def visit_request_dialog():
         contact_method = st.selectbox("Contact for visit confirmation",["Email","WhatsApp"],key="visit_contact_method")
         contact_value = st.text_input("Email address or WhatsApp number with country code",key="visit_contact_value")
         consent = st.checkbox("இந்தப் பார்வைக் கோரிக்கைக்காக என் தொடர்பு விவரங்களை உரிமையாளருடன் பகிர ஒப்புக்கொள்கிறேன்." if language == "தமிழ்" else "I agree to share my contact with the Namma Veedu owner for this property visit request.",key="visit_consent")
-        followup_email = st.text_input("Email for automatic visit reminders and follow-ups (required if opting in)", key="visit_followup_email")
-        visit_email_reminders = st.checkbox("I agree to email reminders, attendance and property feedback requests, and one follow-up addressing my response.", key="visit_email_reminders")
+        followup_email = st.text_input("Email for automatic visit confirmation, reminders and follow-ups (required if opting in)", key="visit_followup_email")
+        visit_email_reminders = st.checkbox("I agree to email visit confirmation, reminders, attendance and property feedback requests, and one follow-up addressing my response.", key="visit_email_reminders")
         st.caption("Email contacts use the confirmation email address. For WhatsApp confirmation, enter your email above. An email reminder becomes due one hour before the confirmed visit and feedback two hours afterward; delivery depends on the scheduled email worker.")
         manual_whatsapp_confirmation = st.checkbox("I agree to receive a WhatsApp visit confirmation sent manually by the Namma Veedu team.", key="visit_manual_whatsapp_confirmation", disabled=contact_method != "WhatsApp")
         st.caption("WhatsApp confirmation is sent manually after owner approval. Email handles the later reminders and follow-ups. No automatic WhatsApp messages are enabled by this request.")

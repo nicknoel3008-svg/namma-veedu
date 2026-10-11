@@ -227,6 +227,8 @@ def journey_summary(visit, *, now=None):
     status=visit['status']
     attended=visit.get('attended','')
     attendance='Visited' if attended=='Yes' else 'Did not visit' if attended=='No' else 'Awaiting response' if now>=at and status=='Confirmed' else 'Not yet due'
+    from visit_attendance import attendance_state
+    dual=attendance_state(visit)
     readiness='Insufficient evidence'
     evidence=[]
     if visit.get('purchase_outcome')=='Purchased':
@@ -251,8 +253,13 @@ def journey_summary(visit, *, now=None):
                  'Ask whether further assistance is needed' if visit.get('purchase_intent')=='Interested' else
                  'Review decline reason and offer assistance or more properties' if visit.get('purchase_intent')=='Not interested' else
                  'Check attendance after the visit' if attendance=='Not yet due' else 'Review customer feedback')
+    if visit.get('explore_consent')=='Yes' and readiness=='Insufficient evidence': readiness='Exploring alternatives'
+    if visit.get('followup_paused')=='Yes': readiness='Paused'; next_step='Customer paused visit emails'
+    elif dual=='Attendance conflict': next_step='Review conflicting customer and advisor attendance before follow-up'
+    elif now>=at and dual in ('Awaiting customer','Awaiting advisor','Awaiting both'): next_step='Collect missing attendance confirmation'
     return {'Visit ID':visit['visit_id'],'Property':visit['property_title'],'Visit time':visit['visit_at'],
-            'Booking status':status,'Attendance':attendance,'Satisfaction':visit.get('satisfied') or 'Awaiting response',
+            'Booking status':status,'Attendance':attendance,'Verified attendance':dual,
+            'Customer attendance':attended or 'Pending','Advisor attendance':visit.get('agent_attended') or 'Pending','Property advisor':visit.get('agent_name',''),'Advisor observation':visit.get('agent_note',''),'Emails paused':visit.get('followup_paused',''),'Satisfaction':visit.get('satisfied') or 'Awaiting response',
             'Purchase interest':visit.get('purchase_intent') or 'Awaiting response','Reason':visit.get('reason',''),
             'Assistance':visit.get('assistance') or 'Not answered','Advisor status':visit.get('advisor_status',''),
             'Explore more':visit.get('explore_consent',''),'Revised preferences':visit.get('revised_preferences',''),

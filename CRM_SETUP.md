@@ -45,3 +45,10 @@ The CRM shows visits within the final hour in a reminder-due list when the page 
 After actually pressing Send in WhatsApp, the advisor may check the send declaration and **Record manually sent message**. This adds an advisor-reported entry to CRM history. Opening a chat never records a send, and no delivery/read status is inferred. A recorded send does not suppress the due list; the list reflects the visit time so the team must review history before sending again.
 
 Where a valid public portal URL is configured, visit drafts include the existing private response link. Customer submissions through that link update the visit record and CRM/Mira Studio. Ordinary WhatsApp replies do not update the database automatically; the team must review them and guide the customer to the response page. No customer message is sent by the app itself. WATI/API setup and activation are outside the active plan.
+
+
+## Site advisor attendance and attention queue
+
+The CRM now shows a visit attendance overview, property/date attendance totals, customer and advisor reports, missing reports, conflicts, assistance and rescheduling requests. Follow-up emails about an outcome require matching attendance reports. Readiness reflects customer evidence and pause/exploration preferences, without a numerical purchase forecast.
+
+Choose Load advisor register controls to create or revoke a private link for one property/date. Your team manually shares the link with the named advisor. The advisor records which scheduled customers visited or did not visit, with optional observations. This is separate from the customer's report. Register links show names and appointment details, never contact details, private feedback or customer response links. Keep these links private; possession permits updating that register. See VISIT_EMAIL_SETUP.md for the seven-day expiry and no-show timing.

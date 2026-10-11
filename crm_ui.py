@@ -23,12 +23,17 @@ def render():
         return
     leads = list_leads()
     if not leads:
+        from visit_journey import owner_journeys
+        from visit_attendance import render_owner
+        render_owner(owner_journeys())
         st.info('No conversation leads yet. Customer conversations will appear when you refresh the CRM.')
         return
     now = datetime.now(INDIA_TZ)
     from visit_journey import owner_journeys
     from crm_whatsapp import reminder_due
     journeys=owner_journeys()
+    from visit_attendance import render_owner
+    render_owner(journeys)
     reminders=[v for v in journeys if reminder_due(v,now)]
     if reminders:
         st.warning(f'{len(reminders)} confirmed visit(s) are within the final hour. Select the customer below and prepare a WhatsApp reminder to send manually.')

@@ -24,7 +24,7 @@ def schema(c):
         id TEXT PRIMARY KEY, visit_id TEXT NOT NULL, visit_at TEXT NOT NULL,
         kind TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'queued', updated_at TEXT NOT NULL,
         UNIQUE(visit_id,visit_at,kind))""")
-    for column,default in (('purchase_intent',''),('revised_preferences',''),('purchase_outcome','Unknown'),('outcome_note',''),('customer_purchase_confirmed_at',''),('customer_purchase_note','')):
+    for column,default in (('agent_attended',''),('agent_name',''),('agent_note',''),('agent_recorded_at',''),('followup_paused',''),('purchase_intent',''),('revised_preferences',''),('purchase_outcome','Unknown'),('outcome_note',''),('customer_purchase_confirmed_at',''),('customer_purchase_note','')):
         if getattr(c,'shared',False):
             c.execute(f"ALTER TABLE visit_journeys ADD COLUMN IF NOT EXISTS {column} TEXT NOT NULL DEFAULT '{default}'")
         elif column not in {row[1] for row in c.execute('PRAGMA table_info(visit_journeys)')}:
@@ -42,7 +42,7 @@ def ensure_journey(c, visit, now):
     if row['visit_at'] != visit['visit_at']:
         c.execute("""UPDATE visit_journeys SET token=?,visit_at=?,attendance='Awaiting response',
             reason='',attended='',satisfied='',assistance='',assistance_details='',
-            advisor_consent='',advisor_status='',explore_consent='',purchase_intent='',revised_preferences='',updated_at=? WHERE visit_id=?""",
+            advisor_consent='',advisor_status='',explore_consent='',purchase_intent='',revised_preferences='',agent_attended='',agent_name='',agent_note='',agent_recorded_at='',updated_at=? WHERE visit_id=?""",
             (secrets.token_urlsafe(32), visit['visit_at'], now, visit['id']))
         row = c.execute('SELECT * FROM visit_journeys WHERE visit_id=?', (visit['id'],)).fetchone()
     return dict(row)
@@ -53,7 +53,7 @@ def response_context(token, db_path=FOLLOWUP_DB):
         return None
     with _connect(db_path) as c:
         schema(c)
-        row = c.execute("""SELECT j.*,v.property_title,v.status,v.contact_method,v.preferences
+        row = c.execute("""SELECT j.*,v.property_title,v.status,v.contact_method,v.preferences,v.property_key
             FROM visit_journeys j JOIN property_visit_requests v ON v.id=j.visit_id
             WHERE j.token=? AND j.visit_at=v.visit_at""", (token,)).fetchone()
     if not row:
@@ -81,6 +81,11 @@ def record_response(token, *, action, reason='', visit_at=None, attended='', sat
         from customer_journey import event
         def log(label,detail=''):
             event(c,user_id=row['user_id'],conversation_id=row['conversation_id'],property_key=row['property_key'],visit_id=row['visit_id'],event=label,detail=detail)
+        if action in ('pause','resume','not_buying'):
+            c.execute('UPDATE visit_journeys SET followup_paused=?,updated_at=? WHERE token=?',('Yes' if action in ('pause','not_buying') else '',stamp,token))
+            if action=='not_buying': c.execute("UPDATE visit_journeys SET purchase_intent='Not buying now',reason=? WHERE token=?",(reason.strip()[:1000],token))
+            log('Visit emails paused' if action in ('pause','not_buying') else 'Visit emails resumed',reason)
+            return 'Visit emails paused. Your booking is unchanged.' if action in ('pause','not_buying') else 'Visit emails resumed with your permission.'
         if action == 'yes' and now >= datetime.fromisoformat(row['visit_at']):
             raise ValueError('This visit time has passed. Please share your visit feedback instead.')
         if action == 'yes':
@@ -141,6 +146,7 @@ def record_response(token, *, action, reason='', visit_at=None, attended='', sat
 
 
 def interest(row):
+    if row.get('followup_paused')=='Yes': return 'Paused','Customer paused visit emails'
     reasons = []
     if row.get('purchase_outcome')=='Purchased':
         return 'Purchased (owner recorded)',row.get('outcome_note') or 'Owner recorded a completed purchase'
@@ -168,7 +174,7 @@ def owner_journeys(db_path=FOLLOWUP_DB):
         whatsapp_states = {(m['visit_id'],m['visit_at'],m['kind']):m['status'] for m in c.execute('SELECT visit_id,visit_at,kind,status FROM visit_whatsapp_outbox').fetchall()}
         rows = c.execute("""SELECT j.visit_id,j.visit_at,j.attendance,j.reason,j.attended,j.satisfied,
             j.assistance,j.assistance_details,j.advisor_consent,j.advisor_status,j.explore_consent,
-            j.purchase_intent,j.revised_preferences,j.purchase_outcome,j.outcome_note,j.customer_purchase_confirmed_at,j.customer_purchase_note,
+            j.agent_attended,j.agent_name,j.agent_note,j.agent_recorded_at,j.followup_paused,j.purchase_intent,j.revised_preferences,j.purchase_outcome,j.outcome_note,j.customer_purchase_confirmed_at,j.customer_purchase_note,
             v.property_title,v.customer_name,v.contact_method,v.contact_value,v.status,v.conversation_id,v.preferences,v.user_id,v.followup_email,v.manual_whatsapp_confirmation_consent
             FROM visit_journeys j JOIN property_visit_requests v ON v.id=j.visit_id""").fetchall()
         all_emails=c.execute('SELECT visit_id,visit_at,kind,status FROM visit_email_outbox').fetchall()
@@ -213,7 +219,7 @@ def resume_preferences(token, db_path=FOLLOWUP_DB):
     import json
     context=response_context(token,db_path)
     if not context or context['explore_consent']!='Yes': return None
-    return {'preferences':json.loads(context['preferences']), 'changes':context['revised_preferences']}
+    return {'preferences':json.loads(context['preferences']), 'changes':context['revised_preferences'],'exclude_property':context['property_key']}
 
 
 def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None, delivery_test=False, only_visit_id=None):
@@ -236,8 +242,8 @@ def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None, delivery_test=Fal
             at = datetime.fromisoformat(visit['visit_at'])
             journey = ensure_journey(c,visit,stamp)
             kinds = []
-            if journey['customer_purchase_confirmed_at']: continue
-            if visit['contact_method']=='Email' and now < at and str(config.get('VISIT_CONFIRMATION_EMAIL_ENABLED','true')).lower() == 'true':
+            if journey['customer_purchase_confirmed_at'] or journey['followup_paused']=='Yes': continue
+            if now < at and str(config.get('VISIT_CONFIRMATION_EMAIL_ENABLED','true')).lower() == 'true':
                 kinds.append('confirmation')
             if at-timedelta(hours=1) <= now < at and journey['attendance']=='Awaiting response':
                 # One confirmation covers the reminder when approved within an hour.
@@ -245,7 +251,7 @@ def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None, delivery_test=Fal
                 if not kinds or (confirmation and datetime.fromisoformat(confirmation['updated_at']) < at-timedelta(hours=1)):
                     kinds.append('reminder')
             if at+timedelta(hours=2) <= now < at+timedelta(days=1) and not journey['attended']: kinds.append('review')
-            if at<=now<at+timedelta(days=7) and journey['attended'] in ('Yes','No'): kinds.append('decision')
+            if at<=now<at+timedelta(days=7) and journey['attended'] in ('Yes','No') and journey['attended']==journey['agent_attended']: kinds.append('decision')
             for kind in kinds:
                 c.execute("""INSERT INTO visit_email_outbox(id,visit_id,visit_at,kind,updated_at)
                     VALUES(?,?,?,?,?) ON CONFLICT(visit_id,visit_at,kind) DO NOTHING""", (uuid4().hex,visit['id'],visit['visit_at'],kind,stamp))
@@ -257,7 +263,7 @@ def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None, delivery_test=Fal
             j = c.execute('SELECT * FROM visit_journeys WHERE visit_id=?',(mail['visit_id'],)).fetchone()
             at = datetime.fromisoformat(mail['visit_at'])
             valid = visit and j and not j['customer_purchase_confirmed_at'] and visit['status']=='Confirmed' and visit['visit_at']==mail['visit_at'] and (visit['contact_method']=='Email' or visit['followup_email']) and visit['visit_email_consent']=='Yes'
-            valid = valid and ((mail['kind']=='confirmation' and visit['contact_method']=='Email' and now<at and str(config.get('VISIT_CONFIRMATION_EMAIL_ENABLED','true')).lower()=='true') or (mail['kind']=='reminder' and at-timedelta(hours=1)<=now<at and j['attendance']=='Awaiting response') or (mail['kind']=='review' and at+timedelta(hours=2)<=now<at+timedelta(days=1) and not j['attended']) or (mail['kind']=='decision' and at<=now<at+timedelta(days=7) and j['attended'] in ('Yes','No')))
+            valid = valid and j['followup_paused']!='Yes' and ((mail['kind']=='confirmation' and now<at and str(config.get('VISIT_CONFIRMATION_EMAIL_ENABLED','true')).lower()=='true') or (mail['kind']=='reminder' and at-timedelta(hours=1)<=now<at and j['attendance']=='Awaiting response') or (mail['kind']=='review' and at+timedelta(hours=2)<=now<at+timedelta(days=1) and not j['attended']) or (mail['kind']=='decision' and at<=now<at+timedelta(days=7) and j['attended'] in ('Yes','No') and j['attended']==j['agent_attended']))
             if not valid:
                 c.execute("UPDATE visit_email_outbox SET status='skipped',updated_at=? WHERE id=? AND status='queued'",(stamp,mail['id']))
                 continue
@@ -282,6 +288,10 @@ def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None, delivery_test=Fal
         if delivery_test:
             message.replace_header('Subject', 'Namma Veedu email delivery test')
             message.set_content(f"Hello,\n\n{visit['property_title']}\n\nThis is an email delivery test, not a property visit booking. No appointment was created on the live portal, and no response is required.\n\nTo request a real visit, open Namma Veedu and select Book a slot on a property.\n{config['FOLLOWUP_PUBLIC_URL'].rstrip('/')}\n\nNamma Veedu")
+        if not delivery_test:
+            from html import escape
+            buttons=''.join('<p><a href="'+escape(url+'&visit_action='+action,quote=True)+'">'+label+'</a></p>' for action,label in (('yes','Confirm attendance'),('reschedule','Request another time'),('no','Cancel visit'),('feedback','Share visit feedback'),('pause','Pause visit emails')))
+            message.add_alternative('<html><body><p>'+escape(visit['property_title'])+'</p><p>'+escape(at.strftime('%d %b %Y, %I:%M %p IST'))+'</p><p>'+escape(prompt)+'</p>'+buttons+'<p>Buttons open a secure page; submit there to save your choice.</p></body></html>',subtype='html')
         state='sent'
         try:
             port=int(config.get('FOLLOWUP_SMTP_PORT') or 587)

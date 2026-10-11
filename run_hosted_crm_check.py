@@ -12,6 +12,7 @@ from followup_service import _connect
 import visit_service as visits
 import visit_journey as journeys
 import crm_service as crm
+import visit_attendance as attendance
 from crm_whatsapp import visit_message, chat_link
 
 
@@ -26,7 +27,8 @@ def main():
         if not getattr(c,'shared',False): raise ValueError('Shared PostgreSQL is required.')
         journeys.schema(c)
         crm.schema(c)
-        for table in ('property_visit_requests','visit_journeys','visit_email_outbox','crm_leads','crm_activity','crm_deals','crm_tasks'):
+        attendance.schema(c)
+        for table in ('property_visit_requests','visit_journeys','visit_email_outbox','crm_leads','crm_activity','crm_deals','crm_tasks','advisor_visit_registers'):
             row=c.execute('SELECT relrowsecurity FROM pg_class WHERE oid=CAST(? AS regclass)',(table,)).fetchone()
             assert row and row['relrowsecurity'], 'Private table protections missing'
     print('Shared PostgreSQL schemas and private table protections verified.')
@@ -36,7 +38,7 @@ def main():
             yield c
         try:
             with ExitStack() as stack:
-                for module in (visits,journeys,crm):
+                for module in (visits,journeys,crm,attendance):
                     stack.enter_context(patch.object(module,'_connect',shared))
                 smtp=stack.enter_context(patch('visit_journey.smtplib.SMTP'))
                 now=datetime.now(INDIA_TZ)
@@ -50,7 +52,7 @@ def main():
                 visits.update_visit_status(visit_id,'Confirmed')
                 row=next(v for v in journeys.owner_journeys() if v['visit_id']==visit_id)
                 assert chat_link(row['contact_value'],visit_message(row,'confirmation',now=now)).startswith('https://wa.me/')
-                assert journeys.run_visit_worker(config,now=now,only_visit_id=visit_id)==(0,0)
+                assert journeys.run_visit_worker(config,now=now,only_visit_id=visit_id)==(1,0)
                 assert journeys.run_visit_worker(config,now=at-timedelta(hours=1),only_visit_id=visit_id)==(1,0)
                 assert journeys.run_visit_worker(config,now=at-timedelta(hours=1),only_visit_id=visit_id)==(0,0)
                 after=at+timedelta(hours=2)
@@ -58,6 +60,11 @@ def main():
                 token=c.execute('SELECT token FROM visit_journeys WHERE visit_id=?',(visit_id,)).fetchone()['token']
                 journeys.record_response(token,action='feedback',attended='Yes',satisfied='Yes',
                     purchase_intent='Interested',now=after)
+                assert journeys.run_visit_worker(config,now=after,only_visit_id=visit_id)==(0,0)
+                register=attendance.create_register(visit_id,'Release QA advisor')
+                attendance.record_agent_attendance(register,visit_id,'No',now=after)
+                assert journeys.run_visit_worker(config,now=after,only_visit_id=visit_id)==(0,0)
+                attendance.record_agent_attendance(register,visit_id,'Yes','Correction verified in QA',now=after)
                 assert journeys.run_visit_worker(config,now=after,only_visit_id=visit_id)==(1,0)
                 assert journeys.run_visit_worker(config,now=after,only_visit_id=visit_id)==(0,0)
                 row=next(v for v in journeys.owner_journeys() if v['visit_id']==visit_id)
@@ -70,7 +77,7 @@ def main():
                 for call in smtp.return_value.__enter__.return_value.send_message.call_args_list:
                     mail=call.args[0]
                     assert mail['To']==official and parseaddr(mail['From'])[1].lower()==official
-                assert smtp.return_value.__enter__.return_value.send_message.call_count==3
+                assert smtp.return_value.__enter__.return_value.send_message.call_count==4
                 print('Shared booking, manual WhatsApp draft, reminder, feedback, decision email, CRM attendance/interest and duplicate prevention verified. SMTP simulated; no customer messages sent.')
         finally:
             c.execute('ROLLBACK')

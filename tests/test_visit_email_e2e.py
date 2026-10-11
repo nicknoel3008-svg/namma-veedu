@@ -35,6 +35,17 @@ class VisitEmailEndToEndTests(unittest.TestCase):
     def test_whatsapp_booking_with_email_followups_and_feedback(self):
         self.check_customer_journey(mixed=True)
 
+    def test_return_to_mira_displays_alternatives(self):
+        source=self.source('website_sandbox.py')
+        source=source.replace('with patch("ai_config', 'with patch("visit_journey.resume_preferences", return_value={"preferences":{},"changes":"","exclude_property":"original-property"}), patch("ai_config',1)
+        customer=AppTest.from_string(source,default_timeout=60)
+        customer.query_params['resume_visit']='private-test-token'
+        customer.run()
+        self.assertFalse(customer.exception)
+        returned=[m for m in customer.session_state['chat'] if m.get('mode')=='results']
+        self.assertTrue(returned)
+        self.assertTrue(returned[-1]['records'])
+
     def check_customer_journey(self, mixed):
         source = self.source('website_sandbox.py')
         source = source.replace('with patch("ai_config',
@@ -75,13 +86,13 @@ class VisitEmailEndToEndTests(unittest.TestCase):
         self.assertFalse(owner.exception)
         self.assertEqual(list_visit_requests(db_path=self.db)[0]['status'], 'Confirmed')
         at = datetime.fromisoformat(visit['visit_at'])
-        self.assertEqual(run_visit_worker(self.config, self.db, now=at-timedelta(days=1)), (0,0) if mixed else (1,0))
+        self.assertEqual(run_visit_worker(self.config, self.db, now=at-timedelta(days=1)), (1,0))
         self.assertEqual(run_visit_worker(self.config, self.db, now=at-timedelta(days=1)), (0,0))
         if not mixed:
             confirmation = self.smtp.return_value.__enter__.return_value.send_message.call_args.args[0]
             self.assertEqual(confirmation['To'], 'e2e@example.com')
             self.assertIn('visit is confirmed', confirmation['Subject'])
-            self.assertIn('E2E home', confirmation.get_content())
+            self.assertIn('E2E home', confirmation.get_body(preferencelist=('plain',)).get_content())
         self.assertEqual(run_visit_worker(self.config, self.db, now=at-timedelta(minutes=55)), (1,0))
         with _connect(self.db) as c:
             token = c.execute('SELECT token FROM visit_journeys WHERE visit_id=?',(visit['id'],)).fetchone()['token']
@@ -120,7 +131,10 @@ with patch('visit_journey_ui.datetime',Clock), patch(''',1)
         self.assertFalse(feedback.exception)
         self.assertFalse(feedback.error)
         self.assertEqual(owner_journeys(self.db)[0]['attended'], 'Yes')
-        self.assertEqual(self.smtp.return_value.__enter__.return_value.send_message.call_count,2 if mixed else 3)
+        self.assertEqual(self.smtp.return_value.__enter__.return_value.send_message.call_count,3)
+        from visit_attendance import create_register, record_agent_attendance
+        register=create_register(visit['id'],'Test advisor',self.db)
+        record_agent_attendance(register,visit['id'],'Yes',db_path=self.db,now=at+timedelta(hours=2))
         self.assertEqual(run_visit_worker(self.config,self.db,now=at+timedelta(hours=2)),(1,0))
         decision=self.smtp.return_value.__enter__.return_value.send_message.call_args.args[0]
         self.assertEqual(decision['To'],'e2e@example.com')
@@ -128,7 +142,7 @@ with patch('visit_journey_ui.datetime',Clock), patch(''',1)
         self.assertEqual(run_visit_worker(self.config,self.db,now=at+timedelta(hours=2)),(0,0))
         owner.run()
         self.assertFalse(owner.exception)
-        self.assertEqual(owner_journeys(self.db)[0]['confirmation email'],'Not sent' if mixed else 'sent')
+        self.assertEqual(owner_journeys(self.db)[0]['confirmation email'],'sent')
 
 
 if __name__=='__main__':

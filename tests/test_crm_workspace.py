@@ -59,7 +59,7 @@ class CRMWorkspaceTests(unittest.TestCase):
         visit.update(purchase_intent='Not interested',reason='Too far',explore_consent='Yes')
         summary=journey_summary(visit,now=self.now)
         self.assertEqual(summary['Readiness'],'Declined this property')
-        self.assertEqual(summary['Next step'],'Assist with revised preferences')
+        self.assertEqual(summary['Next step'],'Collect missing attendance confirmation')
         sync_visits([visit,visit],self.db)
         self.assertEqual(len(list_leads(self.db)),2)
 
@@ -89,4 +89,4 @@ class CRMWorkspaceTests(unittest.TestCase):
         self.assertEqual(summary['Attendance'],'Visited')
         self.assertEqual(summary['Reason'],'Need a smaller property')
         self.assertEqual(summary['Revised preferences'],'Smaller plot near school')
-        self.assertEqual(summary['Next step'],'Assist with revised preferences')
+        self.assertEqual(summary['Next step'],'Collect missing attendance confirmation')

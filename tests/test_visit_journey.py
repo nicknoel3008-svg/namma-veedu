@@ -35,7 +35,7 @@ class VisitJourneyTests(unittest.TestCase):
         self.assertEqual(run_visit_worker(self.config,self.db,now=early),(0,0))
         message=self.smtp.return_value.__enter__.return_value.send_message.call_args.args[0]
         self.assertIn('visit is confirmed',message['Subject'])
-        self.assertIn('visit_response=',message.get_content())
+        self.assertIn('visit_response=',message.get_body(preferencelist=('plain',)).get_content())
         self.assertEqual(owner_journeys(self.db)[0]['confirmation email'],'sent')
         self.assertEqual(self.remind(),(1,0))
         self.assertEqual(self.remind(),(0,0))
@@ -77,8 +77,8 @@ class VisitJourneyTests(unittest.TestCase):
         self.assertEqual(run_visit_worker(self.config,self.db,now=self.at-timedelta(hours=1),delivery_test=True),(1,0))
         message=self.smtp.return_value.__enter__.return_value.send_message.call_args.args[0]
         self.assertEqual(message['Subject'],'Namma Veedu email delivery test')
-        self.assertNotIn('visit_response=',message.get_content())
-        self.assertIn('not a property visit booking',message.get_content())
+        self.assertNotIn('visit_response=',message.get_body(preferencelist=('plain',)).get_content())
+        self.assertIn('not a property visit booking',message.get_body(preferencelist=('plain',)).get_content())
 
     def test_delivery_test_refuses_live_queue(self):
         with self.assertRaisesRegex(ValueError,'isolated'):
@@ -125,6 +125,9 @@ class VisitJourneyTests(unittest.TestCase):
         self.assertEqual(row['Purchase interest'],'Strong engagement')
         set_advisor_status(self.id,'Connected',self.db)
         self.assertIn('connection recorded',owner_journeys(self.db)[0]['Evidence'])
+        from visit_attendance import create_register, record_agent_attendance
+        register=create_register(self.id,'Advisor',self.db)
+        record_agent_attendance(register,self.id,'Yes',db_path=self.db,now=now)
         self.assertEqual(run_visit_worker(self.config,self.db,now=now),(1,0))
         self.assertEqual(run_visit_worker(self.config,self.db,now=now),(0,0))
 
@@ -138,7 +141,7 @@ class VisitJourneyTests(unittest.TestCase):
             c.execute("UPDATE property_visit_requests SET visit_email_consent='' WHERE id=?",(self.id,))
             token=c.execute('SELECT token FROM visit_journeys WHERE visit_id=?',(mixed_id,)).fetchone()['token']
         self.config['VISIT_CONFIRMATION_EMAIL_ENABLED']='true'
-        self.assertEqual(run_visit_worker(self.config,self.db,now=self.at-timedelta(days=1)),(0,0))
+        self.assertEqual(run_visit_worker(self.config,self.db,now=self.at-timedelta(days=1)),(1,0))
         self.assertEqual(self.remind(),(1,0))
         message=self.smtp.return_value.__enter__.return_value.send_message.call_args.args[0]
         self.assertEqual(message['To'],'mixed@example.com')
@@ -146,11 +149,14 @@ class VisitJourneyTests(unittest.TestCase):
         self.assertEqual(self.remind(),(0,0))
         after=self.at+timedelta(hours=2)
         self.assertEqual(run_visit_worker(self.config,self.db,now=after),(1,0))
+        from visit_attendance import create_register, record_agent_attendance
+        register=create_register(mixed_id,'Test advisor',self.db)
+        record_agent_attendance(register,mixed_id,'No',db_path=self.db,now=after)
         record_response(token,action='feedback',attended='No',satisfied='Not visited',
                         reason='Work conflict',db_path=self.db,now=after)
         self.assertEqual(run_visit_worker(self.config,self.db,now=after),(1,0))
         message=self.smtp.return_value.__enter__.return_value.send_message.call_args.args[0]
-        self.assertIn('reschedule',message.get_content())
+        self.assertIn('reschedule',message.get_body(preferencelist=('plain',)).get_content())
         self.assertEqual(message['To'],'mixed@example.com')
         self.assertEqual(run_visit_worker(self.config,self.db,now=after),(0,0))
 

@@ -32,6 +32,10 @@ def visit_message(visit, kind, *, now=None, response_url=''):
     elif kind=='reminder':
         text+=f"A reminder about your property visit for {title} at {when}. Will you be attending? Please let us know if you need to cancel or request another time."
     else:
+        from visit_attendance import attendance_state
+        verified=attendance_state(visit)
+        if verified=='Attendance conflict': raise ValueError('Customer and advisor attendance disagree. Resolve the record before preparing an outcome follow-up.')
+        if visit.get('followup_paused')=='Yes': raise ValueError('This customer paused visit follow-ups.')
         text+=f"Did you attend your visit for {title}, scheduled for {when}? Did it meet your preferences, and are you interested in purchasing? If yes, do you need any further assistance? If not, please share your reason and whether you would like assistance or to explore other properties."
     if response_url:
         text+='\nRespond securely here: '+response_url
@@ -76,8 +80,7 @@ def render(lead,visits,actor):
         mixed=bool(visit.get('followup_email') and visit.get('manual_whatsapp_confirmation_consent')=='Yes')
         kinds=(['confirmation'] if mixed else ['confirmation','reminder']) if now<at else ['feedback']
         if mixed and now>=at:
-            st.info('This customer uses email for post-visit follow-ups. No WhatsApp feedback message is needed.')
-            return
+            st.info('Email handles the follow-up. An optional WhatsApp draft requires separate customer permission below.')
         kind=st.selectbox('Message type',kinds,key='crm_wa_kind_'+suffix)
         if mixed:
             st.info('Send this confirmation manually. The scheduled email worker handles the one-hour reminder and later follow-ups independently.')
@@ -87,7 +90,9 @@ def render(lead,visits,actor):
             st.info('Reminder due: '+(at-timedelta(hours=1)).strftime('%d %b %Y, %I:%M %p IST')+'. Refresh this CRM near the due time; it does not run in the background.')
         from run_followup_worker import load_config
         url=response_link(visit,load_config().get('FOLLOWUP_PUBLIC_URL',''))
-        draft=visit_message(visit,kind,now=now,response_url=url)
+        try: draft=visit_message(visit,kind,now=now,response_url=url)
+        except ValueError as error:
+            st.info(str(error));return
         if mixed:
             draft+='\nYour visit reminders and follow-up questions will arrive by email.'
         if not url:

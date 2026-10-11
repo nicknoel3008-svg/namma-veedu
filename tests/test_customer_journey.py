@@ -58,7 +58,7 @@ class CustomerJourneyTests(unittest.TestCase):
         resumed=resume_preferences(self.token,self.db)
         self.assertEqual(resumed['changes'],'Prefer Coimbatore')
         self.assertNotIn('contact_value',resumed)
-        self.assertEqual(set(resumed),{'preferences','changes'})
+        self.assertEqual(set(resumed),{'preferences','changes','exclude_property'})
 
     def test_purchase_outcome_needs_evidence_and_is_audited(self):
         self.booking()
