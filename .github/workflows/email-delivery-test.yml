@@ -1,0 +1,50 @@
+name: Official sender delivery test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-sender-delivery-test
+  cancel-in-progress: false
+
+jobs:
+  test-email:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      FOLLOWUP_SMTP_USERNAME: ${{ secrets.FOLLOWUP_SMTP_USERNAME }}
+      FOLLOWUP_SMTP_PASSWORD: ${{ secrets.FOLLOWUP_SMTP_PASSWORD }}
+      FOLLOWUP_SMTP_FROM: ${{ secrets.FOLLOWUP_SMTP_FROM }}
+    steps:
+      - name: Send one test to the official mailbox
+        run: |
+          python3 - <<'PY'
+          import os
+          import smtplib
+          import ssl
+          from email.message import EmailMessage
+          from email.utils import parseaddr
+
+          recipient = 'propertynm38@gmail.com'
+          username = os.environ.get('FOLLOWUP_SMTP_USERNAME', '').strip()
+          sender = os.environ.get('FOLLOWUP_SMTP_FROM', '').strip()
+          password = os.environ.get('FOLLOWUP_SMTP_PASSWORD', '')
+          if username.lower() != recipient or parseaddr(sender)[1].lower() != recipient or not password:
+              raise SystemExit('Sender settings do not match the official mailbox, or its password is missing. No email sent.')
+          message = EmailMessage()
+          message['From'] = sender
+          message['To'] = recipient
+          message['Subject'] = 'Namma Veedu email delivery test'
+          message.set_content('This is the one authorized delivery test for the new official Namma Veedu sender. No customer booking was created and no action is required.\n\nNamma Veedu')
+          try:
+              with smtplib.SMTP('smtp.gmail.com', 587, timeout=30) as smtp:
+                  smtp.starttls(context=ssl.create_default_context())
+                  smtp.login(username, password)
+                  smtp.send_message(message)
+          except Exception as error:
+              raise SystemExit('Test failed or delivery is uncertain: ' + type(error).__name__ + '. Check the mailbox before retrying.') from None
+          print('Gmail SMTP accepted one test addressed to the official mailbox. Inbox receipt still needs confirmation.')
+          PY
