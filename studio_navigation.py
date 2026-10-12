@@ -1,12 +1,14 @@
 """Owner topic navigation and direct shortcuts for frequent tasks."""
 SECTIONS = {
     'Visits and messaging': ['Approve a visit', 'WhatsApp confirmations', 'Visit records and email status'],
-    'Customers and CRM': ['Customer CRM', 'Customer journey and outcomes'],
+    'Customers and CRM': ['Customer CRM', 'Property advisor setup', 'Team actions', 'Customer journey and outcomes'],
     'Reports and Mira': ['Overview and reports'],
     'Settings and help': ['Team access', 'Health and readiness', 'Website blueprint'],
 }
 
 TOPIC_DETAILS = {
+    'Property advisor setup': 'property advisor assignment email automatic register attendance link setup location',
+    'Team actions': 'manual pending exceptions assistance tasks callback overdue conflict missing advisor customer',
     'Approve a visit': 'approve approval booking appointment schedule property access',
     'WhatsApp confirmations': 'whatsapp message phone number manual send confirmation',
     'Visit records and email status': 'email delivery sent smtp reminder follow up consent attendance visit status',
@@ -45,6 +47,17 @@ def choose_topic():
 
 def render_shortcut(topic):
     import streamlit as st
+    if topic=='Property advisor setup':
+        from property_advisors import render_setup
+        render_setup()
+        return True
+    if topic=='Team actions':
+        from visit_actions import render_queue
+        st.subheader('Team actions')
+        st.session_state.auto_task_queue=True
+        render_queue()
+        st.info('Use Customer CRM to assign or complete advisor tasks. Use Approve a visit for pending bookings and Property advisor setup for missing site assignments.')
+        return True
     if topic=='Approve a visit':
         from visit_approval_ui import render
         render()

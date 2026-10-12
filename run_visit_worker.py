@@ -37,6 +37,10 @@ def main(argv=None, _attempt=0):
         if str(config.get('VISIT_EMAIL_ENABLED','false')).lower()=='true':
             sync_visits(owner_journeys())
         sent,failed=run_visit_worker(config)
+        from property_advisors import run_advisor_worker
+        advisor_sent,advisor_failed=run_advisor_worker(config)
+        print(f'Advisor register emails: {advisor_sent} submitted, {advisor_failed} need review.')
+        failed+=advisor_failed
         from purchase_confirmation import run_purchase_worker
         purchase_sent,purchase_failed=run_purchase_worker(config)
         sent+=purchase_sent;failed+=purchase_failed

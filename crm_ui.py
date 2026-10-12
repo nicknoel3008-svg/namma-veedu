@@ -10,6 +10,10 @@ def render():
     if not st.session_state.get('owner_dashboard_authenticated'):
         return
     st.caption('Manage leads and advisor actions. CRM stages are owner records; Closed won does not verify a purchase or change message consent.')
+    with st.expander('Property advisor setup and automatic register delivery'):
+        if st.checkbox('Open property advisor setup',key='crm_advisor_setup'):
+            from property_advisors import render_setup
+            render_setup()
     refresh = st.button('Load / refresh CRM',key='crm_load')
     if refresh or not st.session_state.get('crm_loaded'):
         from inquiry_log import read_inquiries
