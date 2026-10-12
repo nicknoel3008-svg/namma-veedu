@@ -46,6 +46,7 @@ def _connect(db_path: Path = FOLLOWUP_DB):
                 connection.execute("ALTER TABLE email_followups ENABLE ROW LEVEL SECURITY")
                 connection.commit()
                 _shared_schema_ready.add(_database_url())
+            completed_ddl=set()
             class SharedQueue:
                 shared = True
                 migration = None
@@ -54,9 +55,15 @@ def _connect(db_path: Path = FOLLOWUP_DB):
                     # app. Commit their DDL separately so their table locks do
                     # not survive through CRM reads or email queue processing.
                     if sql.lstrip().upper().startswith(('CREATE ', 'ALTER ')):
+                        # Avoid reacquiring a table lock when nested helpers
+                        # repeat schema setup after this transaction used it.
+                        if sql in completed_ddl:
+                            return None
                         if self.migration is None:
                             self.migration=psycopg.connect(_database_url(), autocommit=True, connect_timeout=8)
-                        return self.migration.execute(sql.replace('?', '%s'), params)
+                        result=self.migration.execute(sql.replace('?', '%s'), params)
+                        completed_ddl.add(sql)
+                        return result
                     return connection.execute(sql.replace("?", "%s"), params)
             queue=SharedQueue()
             try:
