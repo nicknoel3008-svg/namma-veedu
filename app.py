@@ -1444,6 +1444,8 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
     # A successful sign-in now opens a dedicated main-page dashboard. Keeping
     # this out of dynamically inserted tabs makes the export easy to find.
     st.title("Mira Studio")
+    from visit_approval_ui import render as render_visit_approval
+    render_visit_approval()
     with st.expander("Customer relationship management (CRM)", expanded=False):
         from crm_ui import render as render_crm
         try:
