@@ -60,6 +60,24 @@ def assignments(db_path=FOLLOWUP_DB):
         return [dict(r) for r in c.execute('SELECT * FROM property_visit_advisors').fetchall()]
 
 
+def suggested_assignment(property, records):
+    """Use contact fields only on the exact booked property; never guess an agent."""
+    from visit_service import property_key
+    candidates={}
+    for record in records:
+        if property_key(record)!=property['property_key']:continue
+        def value(fields):
+            for field in fields:
+                text=str(record.get(field) or '').strip()
+                if text and text.lower() not in ('nan','none'):return text
+            return ''
+        email=value(('agent_email','listing_contact_email','public_contact_email','contact_email','broker_email'))
+        name=value(('agent_name','listing_contact_name','public_contact_name','contact_person','contact_name','broker_name'))
+        if name and re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',email):
+            candidates[email.lower()]={'advisor':name,'email':email,'source':record.get('source_url') or record.get('source_name') or 'Property dataset'}
+    return next(iter(candidates.values())) if len(candidates)==1 else {}
+
+
 def run_advisor_worker(config, db_path=FOLLOWUP_DB, *, now=None):
     if str(config.get('VISIT_EMAIL_ENABLED','')).lower()!='true':return (0,0)
     if email_config_issues(config):raise ValueError('Advisor email configuration is incomplete.')
@@ -129,7 +147,29 @@ def render_setup():
     saved={r['property_key']:r for r in assignments()}
     key=st.selectbox('Property',list(properties),format_func=lambda k:properties[k],key='advisor_property_setup')
     old=saved.get(key,{})
-    with st.form('property_advisor_'+key):
+    suggestion={}
+    if not old:
+        from property_search import load_properties
+        try:
+            suggestion=suggested_assignment(next(v for v in visits if v['property_key']==key),load_properties().fillna('').to_dict('records'))
+        except (OSError,ValueError):
+            st.warning('The property contact dataset could not be read. Saved advisor contacts remain available.')
+        if suggestion:
+            old=suggestion
+            st.info('Filled from this property’s saved source contact. Check the recipient before approving private register access.')
+            st.caption('Contact source: '+str(suggestion['source']))
+        else:
+            from advisor_directory import advisors
+            directory=[r for r in advisors() if r['role']=='Property agent']
+            st.info('No property-specific advisor name and email are recorded for this property. Choose an existing directory contact below if they handle this site. A general directory contact is not automatically assigned to a location.')
+            if directory:
+                chosen=st.selectbox('Use an existing advisor contact (no typing needed)',range(len(directory)),index=None,
+                    format_func=lambda i:directory[i]['name']+' — '+directory[i]['email'],key='advisor_directory_choice_'+key)
+                if chosen is not None:
+                    old={'advisor':directory[chosen]['name'],'email':directory[chosen]['email']}
+    identity=str(old.get('advisor',''))+'|'+str(old.get('email',''))
+    from hashlib import sha256
+    with st.form('property_advisor_'+key+'_'+sha256(identity.encode()).hexdigest()[:12]):
         name=st.text_input('Property advisor name',value=old.get('advisor',''))
         email=st.text_input('Property advisor email',value=old.get('email',''))
         active=st.checkbox('Prepare private attendance registers for owner approval',value=old.get('active')=='Yes')

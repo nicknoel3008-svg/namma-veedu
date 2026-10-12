@@ -10,6 +10,15 @@ from property_advisors import save_assignment,run_advisor_worker,schema
 from visit_attendance import register_context
 
 class AdvisorAutomationTests(unittest.TestCase):
+    def test_prefill_requires_exact_property_and_unambiguous_contact(self):
+        from property_advisors import suggested_assignment
+        from visit_service import property_key
+        record={'property_id':'site-a','agent_name':'Site A advisor','agent_email':'a@example.com'}
+        visit={'property_key':property_key(record)}
+        self.assertEqual(suggested_assignment(visit,[record])['email'],'a@example.com')
+        self.assertEqual(suggested_assignment(visit,[{**record,'property_id':'site-b'}]),{})
+        self.assertEqual(suggested_assignment(visit,[record,{**record,'agent_email':'other@example.com'}]),{})
+        self.assertEqual(suggested_assignment(visit,[{'property_id':'site-a','source_name':'Builder'}]),{})
     def setUp(self):
         self.tmp=TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.db=Path(self.tmp.name)/'db.sqlite'
         self.now=datetime.now(INDIA_TZ);self.at=self.now+timedelta(days=1)
