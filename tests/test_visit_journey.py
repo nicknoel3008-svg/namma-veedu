@@ -35,6 +35,12 @@ class VisitJourneyTests(unittest.TestCase):
         self.assertEqual(rows[0]['confirmation email'],'Not sent')
         sync_visits(rows,self.db)
         self.assertEqual(list_leads(self.db)[0]['conversation_id'],'visit:'+self.id)
+        with _connect(self.db) as c:
+            c.execute("UPDATE crm_leads SET customer_name='Unnamed customer'")
+        sync_visits(rows,self.db)
+        lead=list_leads(self.db)[0]
+        self.assertEqual(lead['customer_name'],'Test')
+        self.assertEqual(lead['email'],'test@example.com')
         self.assertEqual(owner_journeys(self.db)[0]['visit_id'],self.id)
         self.smtp.return_value.__enter__.return_value.send_message.assert_not_called()
 

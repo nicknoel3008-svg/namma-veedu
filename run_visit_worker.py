@@ -31,6 +31,11 @@ def main(argv=None):
         if args.check:
             print('Visit worker settings are complete. No connection or messages attempted.')
             return 0
+        # CRM discovery is independent of whether any messages are due.
+        from visit_journey import owner_journeys
+        from crm_service import sync_visits
+        if str(config.get('VISIT_EMAIL_ENABLED','false')).lower()=='true':
+            sync_visits(owner_journeys())
         sent,failed=run_visit_worker(config)
         from purchase_confirmation import run_purchase_worker
         purchase_sent,purchase_failed=run_purchase_worker(config)

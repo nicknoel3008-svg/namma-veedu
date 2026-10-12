@@ -10,7 +10,8 @@ def render():
     if not st.session_state.get('owner_dashboard_authenticated'):
         return
     st.caption('Manage leads and advisor actions. CRM stages are owner records; Closed won does not verify a purchase or change message consent.')
-    if st.button('Load / refresh CRM',key='crm_load'):
+    refresh = st.button('Load / refresh CRM',key='crm_load')
+    if refresh or not st.session_state.get('crm_loaded'):
         from inquiry_log import read_inquiries
         from visit_journey import owner_journeys
         from crm_service import sync_visits
@@ -34,6 +35,7 @@ def render():
     from visit_journey import owner_journeys
     from crm_whatsapp import reminder_due
     journeys=owner_journeys()
+    st.caption('Visit records sync automatically when the CRM opens. Use refresh to reload changes made while this screen is open.')
     from visit_attendance import render_owner
     render_owner(journeys)
     reminders=[v for v in journeys if reminder_due(v,now)]

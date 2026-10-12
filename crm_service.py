@@ -279,3 +279,11 @@ def sync_visits(visits, db_path=FOLLOWUP_DB):
             c.execute("""INSERT INTO crm_leads(id,conversation_id,customer_name,source,created_at,updated_at)
                 VALUES(?,?,?,?,?,?) ON CONFLICT(conversation_id) DO NOTHING""",
                 (uuid4().hex,conversation,_redact(visit.get('customer_name') or 'Unnamed customer')[:200],'Property visit',_stamp(),_stamp()))
+            name=_redact(visit.get('customer_name') or '')[:200]
+            email=visit.get('followup_email') or (visit.get('contact_value','') if visit.get('contact_method')=='Email' else '')
+            phone=visit.get('contact_value','') if visit.get('contact_method')=='WhatsApp' else ''
+            c.execute("""UPDATE crm_leads SET
+                customer_name=CASE WHEN customer_name IN ('','Unnamed customer') AND ?<>'' THEN ? ELSE customer_name END,
+                email=CASE WHEN email='' THEN ? ELSE email END,
+                phone=CASE WHEN phone='' THEN ? ELSE phone END
+                WHERE conversation_id=?""",(name,name,email,phone,conversation))
