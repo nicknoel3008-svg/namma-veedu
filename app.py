@@ -1446,11 +1446,11 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
     st.title("Mira Studio")
     from studio_navigation import choose_topic, render_shortcut
     studio_topic = choose_topic()
-    if render_shortcut(studio_topic):
-        st.stop()
     st.markdown('<style>' + (ROOT / 'static' / 'owner-coastal.css').read_text(encoding='utf-8') + '</style>', unsafe_allow_html=True)
     st.markdown('<style>' + (ROOT / 'static' / 'owner-emerald.css').read_text(encoding='utf-8') + '</style>', unsafe_allow_html=True)
     st.markdown('<style>' + (ROOT / 'static' / 'readability.css').read_text(encoding='utf-8') + '</style>', unsafe_allow_html=True)
+    if render_shortcut(studio_topic):
+        st.stop()
     if studio_topic == "Overview and reports":
         st.markdown("""<div class="owner-dashboard-hero"><div class="eyebrow">NAMMA VEEDU · PRIVATE OWNER WORKSPACE</div><h2>Performance overview</h2><p>Website health, Mira contribution and the customer journey</p></div>""", unsafe_allow_html=True)
         if st.button("Refresh dashboard", key="refresh_owner_overview"):

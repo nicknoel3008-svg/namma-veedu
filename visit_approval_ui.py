@@ -1,31 +1,59 @@
-"""Small owner approval panel independent of CRM imports and searches."""
+"""Owner approval dataset with explicit bulk selection."""
+def approve_selected(rows):
+    from visit_service import update_visit_status
+    approved, errors = [], []
+    for row in rows:
+        if not row.get('Approve') or row.get('Status') != 'Requested':
+            continue
+        try:
+            if update_visit_status(row['Request ID'], 'Confirmed'):
+                approved.append(row['Request ID'])
+            else:
+                errors.append(row['Customer'] + ': request no longer exists.')
+        except ValueError as error:
+            errors.append(row['Customer'] + ': ' + str(error))
+    return approved, errors
+
+
 def render():
     import streamlit as st
-    from visit_service import list_visit_requests, update_visit_status
+    from visit_service import list_visit_requests
     if not st.session_state.get('owner_dashboard_authenticated'):
         return
-    st.subheader('Approve a property visit')
+    st.subheader('Approve property visits')
+    result=st.session_state.pop('visit_bulk_result',None)
+    if result:
+        approved,errors=result
+        if approved:
+            st.success(f'{len(approved)} visit(s) approved. Consented emails will be processed automatically. WhatsApp confirmation remains manual.')
+        for error in errors:
+            st.warning(error)
     try:
         visits=list_visit_requests()
-        if not visits:
-            st.info('No visit requests recorded.')
-            return
-        selected=st.selectbox('Select customer visit',[v['id'] for v in visits],
-            format_func=lambda key: next(v['customer_name']+' · '+v['property_title']+' · '+v['visit_at']+' · '+v['status'] for v in visits if v['id']==key),key='quick_visit_selection')
-        visit=next(v for v in visits if v['id']==selected)
-        st.write('Current status: '+visit['status'])
-        st.write('WhatsApp number: '+(visit['contact_value'] if visit['contact_method']=='WhatsApp' and visit['contact_value'] else 'Not provided for this booking'))
-        st.write('Email recipient: '+(visit.get('followup_email') or (visit['contact_value'] if visit['contact_method']=='Email' else '') or 'Not provided'))
-        st.write('Email permission: '+(visit.get('visit_email_consent') or 'No'))
-        if visit['status']=='Confirmed':
-            st.success('Already approved. No further approval is needed. Missing emails require a delivery check.')
+        pending=[v for v in visits if v['status']=='Requested']
+        if pending:
+            st.caption('Tick the visits whose property access and appointment availability you have checked, then approve them together. Past appointments and conflicting slots cannot be approved.')
+            all_selected=st.checkbox('Select all pending requests',key='visit_bulk_all_'+str(st.session_state.get('visit_bulk_revision',0)))
+            rows=[{'Approve':all_selected,'Customer':v['customer_name'],'Property':v['property_title'],
+                   'Visit time':v['visit_at'],'Status':v['status'],
+                   'WhatsApp number':v['contact_value'] if v['contact_method']=='WhatsApp' else '',
+                   'Email':v.get('followup_email') or (v['contact_value'] if v['contact_method']=='Email' else ''),
+                   'Email permission':v.get('visit_email_consent') or 'No','Request ID':v['id']} for v in pending]
+            selected=st.data_editor(rows,hide_index=True,use_container_width=True,
+                disabled=[key for key in rows[0] if key!='Approve'],
+                column_config={'Approve':st.column_config.CheckboxColumn('Approve',default=False),'Request ID':None},
+                key='visit_bulk_editor_'+str(st.session_state.get('visit_bulk_revision',0))+'_'+str(all_selected))
+            count=sum(bool(row['Approve']) for row in selected)
+            if st.button(f'Approve selected visits ({count})',disabled=not count,key='visit_bulk_approve'):
+                st.session_state.visit_bulk_result=approve_selected(selected)
+                st.session_state.visit_bulk_revision=st.session_state.get('visit_bulk_revision',0)+1
+                st.rerun()
         else:
-            checked=st.checkbox('I have checked property access and availability for this appointment.',key='quick_visit_access_'+selected)
-            if st.button('Approve this visit',disabled=not checked or visit['status']!='Requested',key='quick_visit_approve_'+selected):
-                if update_visit_status(selected,'Confirmed'):
-                    st.success('Visit approved. Consented email confirmation will be processed by the hosted worker. WhatsApp must be sent manually.')
-                    st.rerun()
-    except ValueError as error:
-        st.error(str(error))
+            st.info('No pending visit requests to approve.')
+        with st.expander('All visit requests and booking status',expanded=not pending):
+            if visits:
+                st.dataframe([{'Customer':v['customer_name'],'Property':v['property_title'],'Visit time':v['visit_at'],'Status':v['status']} for v in visits],hide_index=True,use_container_width=True)
+            else:
+                st.info('No visit requests recorded.')
     except Exception:
         st.error('Could not load visit approvals. Please retry.')

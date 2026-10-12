@@ -1,8 +1,8 @@
 """Owner topic navigation and direct shortcuts for frequent tasks."""
 SECTIONS = {
+    'Reports and Mira': ['Overview and reports'],
     'Visits and messaging': ['Approve a visit', 'WhatsApp confirmations', 'Visit records and email status'],
     'Customers and CRM': ['Customer CRM', 'Property advisor setup', 'Team actions', 'Customer journey and outcomes'],
-    'Reports and Mira': ['Overview and reports'],
     'Settings and help': ['Team access', 'Health and readiness', 'Website blueprint'],
 }
 
@@ -14,7 +14,7 @@ TOPIC_DETAILS = {
     'Visit records and email status': 'email delivery sent smtp reminder follow up consent attendance visit status',
     'Customer CRM': 'customer lead name advisor contact phone email deals tasks notes',
     'Customer journey and outcomes': 'journey purchase interest satisfaction feedback outcome assistance reschedule',
-    'Overview and reports': 'reports performance analytics downloads excel inquiries conversations mira responses learning feedback ratings',
+    'Overview and reports': 'dashboard kpi metrics reports performance analytics downloads excel inquiries conversations mira responses learning feedback ratings',
     'Team access': 'team manager peer access account permissions',
     'Health and readiness': 'health readiness configuration settings database groq',
     'Website blueprint': 'blueprint documentation flowchart website design',
@@ -29,6 +29,13 @@ def search_topics(query):
 
 def choose_topic():
     import streamlit as st
+    def open_dashboard():
+        st.session_state.studio_search=''
+        st.session_state.studio_topic_search=None
+        st.session_state.studio_navigation_section='Reports and Mira'
+        st.session_state['studio_navigation_topic_Reports and Mira']='Overview and reports'
+        st.session_state.pop('studio_customer_search',None)
+    st.button('Dashboard and KPI metrics',on_click=open_dashboard,key='studio_dashboard_home')
     query=st.text_input('Search Mira Studio',placeholder='Search a topic, or enter a customer name…',key='studio_search').strip()
     if query:
         matches=search_topics(query)
