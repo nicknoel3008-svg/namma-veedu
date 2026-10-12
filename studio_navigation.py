@@ -75,7 +75,9 @@ def render_shortcut(topic):
         if not visits:
             st.info('No confirmed visits. Choose Approve a visit to review pending requests.')
             return True
-        selected=st.selectbox('Choose customer and visit',[v['id'] for v in visits],format_func=lambda key: next(v['customer_name']+' · '+v['property_title']+' · '+v['visit_at'] for v in visits if v['id']==key))
+        selected=st.selectbox('Choose customer and visit',[v['id'] for v in visits],index=None,placeholder='Select a customer to prepare a new message',key='studio_wa_visit',format_func=lambda key: next(v['customer_name']+' · '+v['property_title']+' · '+v['visit_at'] for v in visits if v['id']==key))
+        if selected is None:
+            return True
         visit=next(v for v in visits if v['id']==selected)
         lead=next((r for r in list_leads() if r.get('conversation_id')==(visit.get('conversation_id') or 'visit:'+selected)),None)
         if not lead:

@@ -5,6 +5,38 @@ from agent_runtime import INDIA_TZ
 from whatsapp_followup import normalize_phone
 
 
+def opening_key(lead_id, choice, visit_at, kind):
+    from hashlib import sha256
+    return sha256('\0'.join((lead_id, choice, visit_at, kind)).encode()).hexdigest()
+
+
+def record_chat_open(lead_id, record_key, phone, message, actor, db_path=None):
+    """Persist a click once, without claiming that WhatsApp sent the message."""
+    from followup_service import _connect, FOLLOWUP_DB
+    from crm_service import schema
+    from uuid import uuid4
+    with _connect(db_path or FOLLOWUP_DB) as c:
+        schema(c)
+        c.execute('CREATE TABLE IF NOT EXISTS crm_whatsapp_openings (id TEXT PRIMARY KEY, lead_id TEXT NOT NULL, recipient TEXT NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL)')
+        c.execute('ALTER TABLE crm_whatsapp_openings ENABLE ROW LEVEL SECURITY') if getattr(c, 'shared', False) else None
+        if not c.execute('SELECT id FROM crm_leads WHERE id=?',(lead_id,)).fetchone():
+            raise ValueError('Customer no longer exists. Refresh CRM.')
+        stamp=datetime.now(INDIA_TZ).isoformat(timespec='seconds')
+        inserted=c.execute('INSERT INTO crm_whatsapp_openings VALUES(?,?,?,?,?) ON CONFLICT(id) DO NOTHING',
+                           (record_key,lead_id,normalize_phone(phone),message,stamp)).rowcount
+        if inserted:
+            c.execute('INSERT INTO crm_activity VALUES(?,?,?,?,?,?)',
+                      (uuid4().hex,lead_id,actor[:200],'WhatsApp chat opened','Prepared message opened in WhatsApp. Sending and delivery unverified. Reference: '+record_key,stamp))
+
+
+def chat_opened(record_key, db_path=None):
+    from followup_service import _connect, FOLLOWUP_DB
+    with _connect(db_path or FOLLOWUP_DB) as c:
+        c.execute('CREATE TABLE IF NOT EXISTS crm_whatsapp_openings (id TEXT PRIMARY KEY, lead_id TEXT NOT NULL, recipient TEXT NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL)')
+        c.execute('ALTER TABLE crm_whatsapp_openings ENABLE ROW LEVEL SECURITY') if getattr(c, 'shared', False) else None
+        return bool(c.execute('SELECT id FROM crm_whatsapp_openings WHERE id=?',(record_key,)).fetchone())
+
+
 def chat_link(phone, message):
     phone=normalize_phone(phone)
     if not message.strip():
@@ -102,7 +134,6 @@ def approval_rows(visits, leads, journeys):
 
 def render(lead,visits,actor, *, selected_visit=None):
     import streamlit as st
-    from crm_service import add_note
     now=datetime.now(INDIA_TZ)
     st.caption('No paid messaging API. Review the draft, open WhatsApp, then press Send yourself. Opening WhatsApp does not prove sending or delivery.')
     visit=None
@@ -110,8 +141,6 @@ def render(lead,visits,actor, *, selected_visit=None):
     choice=selected_visit if selected_visit in options else st.selectbox('WhatsApp message context',options,format_func=lambda k: next((v['property_title']+' · '+v['visit_at'] for v in visits if v['visit_id']==k),k),key='crm_wa_context_'+lead['id'])
     visit=next((v for v in visits if v['visit_id']==choice),None)
     suffix=lead['id']+'_'+choice
-    phone=st.text_input('Recipient WhatsApp number (+country code)',value=recipient_number(lead, visits, visit),key='crm_wa_phone_'+suffix)
-    st.caption('Filled automatically from this customer’s saved WhatsApp visit number or CRM phone. If neither is saved, ask the customer for their number.')
     if visit:
         at=datetime.fromisoformat(visit['visit_at'])
         mixed=bool(visit.get('followup_email') and visit.get('manual_whatsapp_confirmation_consent')=='Yes')
@@ -140,19 +169,35 @@ def render(lead,visits,actor, *, selected_visit=None):
         kind='follow-up'
         draft=f"Hello {lead['customer_name']}, this is Namma Veedu. Are you still looking for {lead.get('property_type') or 'a property'}{(' in '+lead['location']) if lead.get('location') else ''}? Please share any changes to your preferences or let us know if you need assistance. If you do not want further WhatsApp follow-ups, please let us know."
     draft_key=suffix+'_'+kind
+    record_key=opening_key(lead['id'],choice,visit['visit_at'] if visit else '',kind)
+    if chat_opened(record_key) and not st.session_state.get('crm_wa_again_'+record_key):
+        st.success('WhatsApp chat opening saved in CRM. Sending and delivery are unverified.')
+        st.info('Choose another customer to prepare a new message.')
+        if st.button('Prepare another message for this customer',key='crm_wa_new_'+record_key):
+            st.session_state['crm_wa_again_'+record_key]=True
+            for prefix in ('crm_wa_draft_','crm_wa_consent_'):
+                st.session_state.pop(prefix+draft_key,None)
+            st.rerun()
+        return
+    phone=st.text_input('Recipient WhatsApp number (+country code)',value=recipient_number(lead, visits, visit),key='crm_wa_phone_'+suffix)
+    st.caption('Filled automatically from this customer’s saved WhatsApp visit number or CRM phone. If neither is saved, ask the customer for their number.')
     message=st.text_area('Review WhatsApp message',value=draft,key='crm_wa_draft_'+draft_key,height=200)
     consent=st.checkbox('I have verified this number belongs to the customer and they agreed to these WhatsApp messages.',key='crm_wa_consent_'+draft_key)
     try: url=chat_link(phone,message) if consent else None
     except ValueError as error:
         st.error(str(error)); url=None
     if url:
-        st.link_button('Send via WhatsApp',url)
+        def save_opening():
+            from uuid import uuid4
+            key=uuid4().hex if st.session_state.get('crm_wa_again_'+record_key) else record_key
+            record_chat_open(lead['id'],key,phone,message,actor)
+            st.session_state.pop('crm_wa_again_'+record_key,None)
+            if selected_visit:
+                st.session_state['studio_wa_visit']=None
+            for prefix in ('crm_wa_draft_','crm_wa_consent_'):
+                st.session_state.pop(prefix+draft_key,None)
+        st.link_button('Send via WhatsApp',url,on_click=save_opening)
         st.caption('Opens the customer chat with this prepared message. Press Send in WhatsApp to finish.')
     else:
         st.link_button('Send via WhatsApp','https://wa.me/',disabled=True)
         st.info('Enter the customer number and confirm permission to enable WhatsApp.')
-    sent=st.checkbox('I personally pressed Send in WhatsApp for this message.',key='crm_wa_sent_'+draft_key)
-    st.caption('The button below only updates the CRM after you send in WhatsApp. It does not send a message.')
-    if st.button('3. Save WhatsApp send record',disabled=not(consent and sent and url),key='crm_wa_record_'+draft_key):
-        add_note(lead['id'],f'WhatsApp {kind} manually marked sent by advisor. Context: {choice}. Visit time: {visit["visit_at"] if visit else "Not applicable"}. Recipient: {normalize_phone(phone)}. Delivery and receipt unverified.',actor=actor)
-        st.success('Saved in CRM: you marked this WhatsApp message as manually sent. Check WhatsApp for delivery ticks; this website cannot verify delivery.')
