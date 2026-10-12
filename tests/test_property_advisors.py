@@ -10,6 +10,20 @@ from property_advisors import save_assignment,run_advisor_worker,schema
 from visit_attendance import register_context
 
 class AdvisorAutomationTests(unittest.TestCase):
+    def test_single_approval_covers_only_reviewed_property_current_registers(self):
+        from owner_approvals import approve_assignment_registers
+        for v in self.visits:
+            save_assignment(v['property_key'],'Advisor '+v['customer_name'],v['customer_name']+'@example.com',db_path=self.db)
+        with patch('property_advisors.smtplib.SMTP') as smtp:
+            self.assertEqual(approve_assignment_registers({self.visits[0]['property_key']},'Owner',self.db),1)
+            smtp.assert_not_called()
+            self.assertEqual(run_advisor_worker(self.cfg,self.db),(1,0))
+            self.assertEqual(run_advisor_worker(self.cfg,self.db),(0,0))
+        vid=request_visit(record={'property_id':'A','title':'A'},user_id='new',visit_at=self.at+timedelta(hours=1),slot_kind='Custom time',customer_name='New customer',contact_method='Email',contact_value='new@example.com',consent=True,db_path=self.db)
+        update_visit_status(vid,'Confirmed',db_path=self.db)
+        with patch('property_advisors.smtplib.SMTP') as smtp:
+            self.assertEqual(run_advisor_worker(self.cfg,self.db),(0,0))
+            smtp.assert_not_called()
     def test_editable_table_select_all_stages_without_saving(self):
         from streamlit.testing.v1 import AppTest
         script="import streamlit as st\nst.session_state.owner_dashboard_authenticated=True\nfrom property_advisors import render_setup\nrender_setup()"

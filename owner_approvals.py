@@ -23,6 +23,22 @@ def approve_messages(items, actor, db_path=FOLLOWUP_DB):
                       (category+':'+identifier,actor,datetime.now(INDIA_TZ).isoformat()))
 
 
+def approve_assignment_registers(property_keys, actor, db_path=FOLLOWUP_DB):
+    """Approve only the current register drafts for assignments just reviewed."""
+    if not property_keys:return 0
+    from property_advisors import run_advisor_worker
+    run_advisor_worker({'VISIT_EMAIL_ENABLED':'true'},db_path,prepare_only=True)
+    with _connect(db_path) as c:
+        rows=c.execute("""SELECT d.id,v.property_key FROM advisor_register_delivery d
+            JOIN property_visit_requests v ON v.id=d.visit_id
+            JOIN property_visit_advisors a ON a.property_key=v.property_key
+            WHERE d.status='queued' AND v.status='Confirmed' AND v.visit_at=d.visit_at
+            AND a.active='Yes' AND a.revision=d.revision AND a.email=d.recipient""").fetchall()
+        items=[('advisor',r['id']) for r in rows if r['property_key'] in property_keys]
+    approve_messages(items,actor,db_path)
+    return len(items)
+
+
 def stage(key, label, callback):
     import streamlit as st
     st.session_state.setdefault('owner_pending_changes',{})[key]=(label,callback)
@@ -37,7 +53,7 @@ def render():
         return
     pending=st.session_state.setdefault('owner_pending_changes',{})
     with st.expander('Owner review — approve all changes',expanded=bool(pending)):
-        st.caption('Edits must first be added to owner review using their section button. Drafts stay in this signed-in session until approved. Review advisor recipients before approving register sharing. Emails require approval individually when they become due; unapproved reminders may expire.')
+        st.caption('Edits must first be added to owner review using their section button. Drafts stay in this signed-in session until approved. Approving advisor assignments also authorizes their register emails for currently confirmed visits in this same click. Review the selected advisor recipients. Future bookings and customer follow-ups require fresh approval; unapproved reminders may expire.')
         for label,_ in pending.values():st.write('• '+label)
         messages=[]
         try:
@@ -72,6 +88,7 @@ def render():
         if not pending and not messages:st.info('No staged changes or queued messages awaiting approval.')
         if st.button('Approve all changes',disabled=not(pending or messages),key='owner_approve_all'):
             failed=False
+            assignment_keys={key.removeprefix('advisor:') for key in pending if key.startswith('advisor:')}
             for key,(label,callback) in list(pending.items()):
                 try:
                     callback()
@@ -82,8 +99,13 @@ def render():
                     st.error(label+': '+str(e))
             # A changed advisor invalidates old queued deliveries; workers revalidate.
             if not failed:
-                approve_messages([(r[0],r[1]) for r in messages],str(st.session_state.get('mira_studio_identity') or 'Owner'))
-                st.success('Reviewed changes saved. Approved emails will be submitted by the hosted worker; new or changed messages need another review.')
+                actor=str(st.session_state.get('mira_studio_identity') or 'Owner')
+                try:
+                    count=approve_assignment_registers(assignment_keys,actor)
+                    approve_messages([(r[0],r[1]) for r in messages],actor)
+                    st.success(f'Reviewed changes saved. {count} corresponding advisor register email(s) approved in the same step. The hosted worker submits approved emails; future bookings and follow-ups need fresh review.')
+                except Exception:
+                    st.error('Changes were saved, but register email approval could not complete. Reload Owner review to approve the prepared emails; no automatic approval was assumed.')
             else:st.warning('Some changes could not be saved. Their drafts remain for correction; message approval was withheld.')
         if pending and st.button('Discard staged changes',key='owner_discard_drafts'):
             pending.clear();st.rerun()
