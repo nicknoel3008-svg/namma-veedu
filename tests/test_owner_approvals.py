@@ -44,7 +44,7 @@ class DashboardApprovalTests(unittest.TestCase):
             db=Path(folder)/'queue.sqlite3'
             callback=Mock()
             script="import streamlit as st\nst.session_state.owner_dashboard_authenticated=True\nfrom owner_approvals import render\nrender()"
-            with patch('owner_approvals._connect',side_effect=lambda *a,**k:_connect(db)):
+            with patch('owner_approvals._connect',side_effect=lambda *a,**k:_connect(db)),patch('property_advisors.run_advisor_worker',return_value=(0,0)):
                 app=AppTest.from_string(script)
                 app.session_state['owner_pending_changes']={'test':('Advisor assignment',callback)}
                 app.run()

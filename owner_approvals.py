@@ -41,6 +41,12 @@ def render():
         for label,_ in pending.values():st.write('• '+label)
         messages=[]
         try:
+            # Prepare register drafts on demand, without waiting for the hosted scheduler.
+            from run_followup_worker import load_config
+            from property_advisors import run_advisor_worker
+            config=load_config()
+            config['VISIT_EMAIL_ENABLED']='true'
+            run_advisor_worker(config,prepare_only=True)
             from property_advisors import schema as advisor_schema
             with _connect() as c:
                 advisor_schema(c)

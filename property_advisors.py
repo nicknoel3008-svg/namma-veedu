@@ -78,13 +78,13 @@ def suggested_assignment(property, records):
     return next(iter(candidates.values())) if len(candidates)==1 else {}
 
 
-def run_advisor_worker(config, db_path=FOLLOWUP_DB, *, now=None):
+def run_advisor_worker(config, db_path=FOLLOWUP_DB, *, now=None, prepare_only=False):
     if str(config.get('VISIT_EMAIL_ENABLED','')).lower()!='true':return (0,0)
-    if email_config_issues(config):raise ValueError('Advisor email configuration is incomplete.')
+    if not prepare_only and email_config_issues(config):raise ValueError('Advisor email configuration is incomplete.')
     base=config.get('FOLLOWUP_PUBLIC_URL','').rstrip('/')
     from urllib.parse import urlsplit
     parsed=urlsplit(base)
-    if parsed.scheme!='https' or not parsed.hostname or parsed.query or parsed.fragment or parsed.username or parsed.password:
+    if not prepare_only and (parsed.scheme!='https' or not parsed.hostname or parsed.query or parsed.fragment or parsed.username or parsed.password):
         raise ValueError('Configure a public HTTPS website address for advisor registers.')
     now=now or datetime.now(INDIA_TZ);stamp=now.isoformat()
     with _connect(db_path) as c:
@@ -105,6 +105,8 @@ def run_advisor_worker(config, db_path=FOLLOWUP_DB, *, now=None):
                 ON CONFLICT(visit_id,visit_at,revision) DO NOTHING''',
                 (uuid4().hex,v['id'],v['visit_at'],v['revision'],token,v['email'],'queued',stamp))
         queued=c.execute("SELECT * FROM advisor_register_delivery WHERE status='queued'").fetchall()
+    if prepare_only:
+        return 0,0
     sent=failed=0
     for item in queued:
         with _connect(db_path) as c:

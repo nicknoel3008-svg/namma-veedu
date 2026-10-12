@@ -76,6 +76,9 @@ class AdvisorAutomationTests(unittest.TestCase):
 
     def test_separate_scopes_dedup_and_reassignment_revokes(self):
         for v in self.visits:save_assignment(v['property_key'],v['customer_name']+' advisor',v['customer_name']+'advisor@example.com',db_path=self.db)
+        with patch('property_advisors.smtplib.SMTP') as smtp:
+            self.assertEqual(run_advisor_worker({'VISIT_EMAIL_ENABLED':'true'},self.db,prepare_only=True),(0,0))
+            smtp.assert_not_called()
         self.approve_ready()
         with patch('property_advisors.smtplib.SMTP') as smtp:
             self.assertEqual(run_advisor_worker(self.cfg,self.db),(2,0))
