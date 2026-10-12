@@ -249,7 +249,7 @@ def resume_preferences(token, db_path=FOLLOWUP_DB):
     return {'preferences':json.loads(context['preferences']), 'changes':context['revised_preferences'],'exclude_property':context['property_key']}
 
 
-def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None, delivery_test=False, only_visit_id=None):
+def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None, delivery_test=False, only_visit_id=None, prepare_only=False):
     if delivery_test:
         from pathlib import Path
         if Path(db_path) == FOLLOWUP_DB:
@@ -257,7 +257,7 @@ def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None, delivery_test=Fal
     """Explicit enable flag required. Invoke every five minutes on a reliable host."""
     if str(config.get('VISIT_EMAIL_ENABLED','')).lower() != 'true':
         return (0,0)
-    if email_config_issues(config):
+    if not prepare_only and email_config_issues(config):
         raise ValueError('Visit email SMTP configuration is incomplete.')
     now = now or datetime.now(INDIA_TZ)
     stamp = now.isoformat(timespec='seconds')
@@ -286,6 +286,7 @@ def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None, delivery_test=Fal
                 c.execute("""INSERT INTO visit_email_outbox(id,visit_id,visit_at,kind,updated_at)
                     VALUES(?,?,?,?,?) ON CONFLICT(visit_id,visit_at,kind) DO NOTHING""", (uuid4().hex,visit['id'],visit['visit_at'],kind,stamp))
         queued = c.execute("SELECT * FROM visit_email_outbox WHERE status='queued'" + (' AND visit_id=?' if only_visit_id else ''), (only_visit_id,) if only_visit_id else ()).fetchall()
+    if prepare_only:return 0,0
     sent=failed=0
     for mail in queued:
         with _connect(db_path) as c:
