@@ -145,9 +145,12 @@ def render(lead,visits,actor):
     try: url=chat_link(phone,message) if consent else None
     except ValueError as error:
         st.error(str(error)); url=None
-    if url: st.link_button('Open WhatsApp — review and send',url)
+    if url:
+        st.link_button('1. Open customer chat in WhatsApp',url)
+        st.info('2. In WhatsApp, check the customer and message, then press Send. Return here afterward to save your send record.')
     else: st.info('Enter the customer number and confirm permission to enable WhatsApp.')
     sent=st.checkbox('I personally pressed Send in WhatsApp for this message.',key='crm_wa_sent_'+draft_key)
-    if st.button('Record manually sent message',disabled=not(consent and sent and url),key='crm_wa_record_'+draft_key):
+    st.caption('The button below only updates the CRM after you send in WhatsApp. It does not send a message.')
+    if st.button('3. Save WhatsApp send record',disabled=not(consent and sent and url),key='crm_wa_record_'+draft_key):
         add_note(lead['id'],f'WhatsApp {kind} manually marked sent by advisor. Context: {choice}. Visit time: {visit["visit_at"] if visit else "Not applicable"}. Recipient: {normalize_phone(phone)}. Delivery and receipt unverified.',actor=actor)
-        st.success('Advisor-reported send recorded. Delivery is unverified.')
+        st.success('Saved in CRM: you marked this WhatsApp message as manually sent. Check WhatsApp for delivery ticks; this website cannot verify delivery.')
