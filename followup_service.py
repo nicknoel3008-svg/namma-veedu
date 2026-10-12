@@ -48,9 +48,22 @@ def _connect(db_path: Path = FOLLOWUP_DB):
                 _shared_schema_ready.add(_database_url())
             class SharedQueue:
                 shared = True
+                migration = None
                 def execute(self, sql, params=()):
+                    # Schema helpers run before ordinary queries throughout the
+                    # app. Commit their DDL separately so their table locks do
+                    # not survive through CRM reads or email queue processing.
+                    if sql.lstrip().upper().startswith(('CREATE ', 'ALTER ')):
+                        if self.migration is None:
+                            self.migration=psycopg.connect(_database_url(), autocommit=True, connect_timeout=8)
+                        return self.migration.execute(sql.replace('?', '%s'), params)
                     return connection.execute(sql.replace("?", "%s"), params)
-            yield SharedQueue()
+            queue=SharedQueue()
+            try:
+                yield queue
+            finally:
+                if queue.migration is not None:
+                    queue.migration.close()
         return
     db_path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(db_path, timeout=15)

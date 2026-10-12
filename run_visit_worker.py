@@ -6,7 +6,7 @@ from visit_journey import run_visit_worker, schema
 from followup_service import email_config_issues, _connect, FOLLOWUP_DB
 
 
-def main(argv=None):
+def main(argv=None, _attempt=0):
     parser=argparse.ArgumentParser(description='Process consented visit reminder and review emails.')
     parser.add_argument('--check',action='store_true',help='Validate settings without connecting or sending.')
     parser.add_argument('--prepare-storage',action='store_true',help='Prepare shared visit tables without sending messages.')
@@ -43,6 +43,9 @@ def main(argv=None):
         print(f'Visit emails: {sent} submitted, {failed} need review. SMTP acceptance is not delivery confirmation.')
         return 1 if failed else 0
     except Exception as error:
+        if getattr(error,'sqlstate',None)=='40P01' and _attempt<2:
+            print('Database deadlock rolled back; retrying safely from saved email states.')
+            return main(argv, _attempt+1)
         print('Visit worker stopped: '+type(error).__name__)
         return 1
 
