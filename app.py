@@ -1444,583 +1444,585 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
     # A successful sign-in now opens a dedicated main-page dashboard. Keeping
     # this out of dynamically inserted tabs makes the export easy to find.
     st.title("Mira Studio")
-    from visit_approval_ui import render as render_visit_approval
-    render_visit_approval()
-    with st.expander("Customer relationship management (CRM)", expanded=False):
-        from crm_ui import render as render_crm
-        try:
-            render_crm()
-        except Exception:
-            logging.exception("Could not load CRM")
-            st.error("CRM could not be loaded. Please refresh and try again.")
+    from studio_navigation import choose_topic, render_shortcut
+    studio_topic = choose_topic()
+    if render_shortcut(studio_topic):
+        st.stop()
     st.markdown('<style>' + (ROOT / 'static' / 'owner-coastal.css').read_text(encoding='utf-8') + '</style>', unsafe_allow_html=True)
     st.markdown('<style>' + (ROOT / 'static' / 'owner-emerald.css').read_text(encoding='utf-8') + '</style>', unsafe_allow_html=True)
     st.markdown('<style>' + (ROOT / 'static' / 'readability.css').read_text(encoding='utf-8') + '</style>', unsafe_allow_html=True)
-    st.markdown("""<div class="owner-dashboard-hero"><div class="eyebrow">NAMMA VEEDU · PRIVATE OWNER WORKSPACE</div><h2>Performance overview</h2><p>Website health, Mira contribution and the customer journey</p></div>""", unsafe_allow_html=True)
-    if st.button("Refresh dashboard", key="refresh_owner_overview"):
-        cached_inquiries.clear()
-        st.rerun()
-    if st.session_state.get("mira_studio_role") == "Owner":
-        with st.expander("Mira Studio peer access", expanded=False):
-            st.caption("Create individual manager access for a colleague. Codes are stored only as secure hashes. Share the generated code privately; it cannot be displayed again.")
-            generated_code = st.session_state.setdefault("new_peer_access_code", generate_access_code())
-            with st.form("mira_studio_peer_form"):
-                peer_name = st.text_input("Peer name")
-                peer_email = st.text_input("Peer email")
-                peer_access_code = st.text_input("Temporary access code", value=generated_code)
-                create_peer = st.form_submit_button("Create or reset manager access")
-            if create_peer:
+    if studio_topic == "Overview and reports":
+        st.markdown("""<div class="owner-dashboard-hero"><div class="eyebrow">NAMMA VEEDU · PRIVATE OWNER WORKSPACE</div><h2>Performance overview</h2><p>Website health, Mira contribution and the customer journey</p></div>""", unsafe_allow_html=True)
+        if st.button("Refresh dashboard", key="refresh_owner_overview"):
+            cached_inquiries.clear()
+            st.rerun()
+    if studio_topic == "Team access":
+        if st.session_state.get("mira_studio_role") == "Owner":
+            with st.expander("Mira Studio peer access", expanded=True):
+                st.caption("Create individual manager access for a colleague. Codes are stored only as secure hashes. Share the generated code privately; it cannot be displayed again.")
+                generated_code = st.session_state.setdefault("new_peer_access_code", generate_access_code())
+                with st.form("mira_studio_peer_form"):
+                    peer_name = st.text_input("Peer name")
+                    peer_email = st.text_input("Peer email")
+                    peer_access_code = st.text_input("Temporary access code", value=generated_code)
+                    create_peer = st.form_submit_button("Create or reset manager access")
+                if create_peer:
+                    try:
+                        account = save_manager(peer_email, peer_name, peer_access_code)
+                    except ValueError as error:
+                        st.error(str(error))
+                    except Exception:
+                        logging.exception("Could not save Mira Studio peer")
+                        st.error("Peer access could not be saved. Please try again.")
+                    else:
+                        st.session_state["new_peer_access_code"] = generate_access_code()
+                        st.success(f"Manager access saved for {account['display_name']}. Copy and share the displayed code now; it will not be recoverable after this page refresh.")
+                        st.code(peer_access_code)
                 try:
-                    account = save_manager(peer_email, peer_name, peer_access_code)
+                    managers = list_managers()
+                except Exception:
+                    logging.exception("Could not load Mira Studio peers")
+                    st.error("Peer accounts could not be loaded.")
+                    managers = []
+                if managers:
+                    st.dataframe(pd.DataFrame(managers), hide_index=True, use_container_width=True)
+                    selected_peer = st.selectbox("Manager account", [row["Email"] for row in managers])
+                    selected_record = next(row for row in managers if row["Email"] == selected_peer)
+                    desired_active = not bool(selected_record["Active"])
+                    if st.button(("Restore" if desired_active else "Revoke") + " manager access", key="toggle_peer_access"):
+                        try:
+                            set_manager_active(selected_peer, desired_active)
+                        except Exception:
+                            logging.exception("Could not update Mira Studio peer")
+                            st.error("Peer access could not be updated.")
+                        else:
+                            st.success("Manager access restored." if desired_active else "Manager access revoked.")
+                            st.rerun()
+                else:
+                    st.info("No peer managers have been added yet.")
+    overview_slot = st.container()
+    if studio_topic == "Health and readiness":
+        with st.expander("Mira Studio health and readiness", expanded=True):
+            health_cols = st.columns(3)
+            health_cols[0].metric("AI provider", AI_PROVIDER.title())
+            health_cols[1].metric("Hosted AI", "Configured" if bool(AI_API_KEY) else "Local fallback")
+            health_cols[2].metric("Persistent storage", "Connected" if storage_backend.is_configured() else "Fallback files")
+            if not AI_API_KEY:
+                st.info("Add GROQ_API_KEY in Streamlit Secrets when you want hosted Mira reasoning. Local property search and safety flows remain available without it.")
+            if not storage_backend.is_configured():
+                st.info("Add DATABASE_URL in Streamlit Secrets to keep hosted chat records and approved Learning Library rules across restarts.")
+            st.caption("Email follow-ups are intentionally excluded from this readiness view.")
+    blueprint_path = ROOT / "WEBSITE_BLUEPRINT.md"
+    if studio_topic == "Visit records and email status":
+        with st.expander("Property visit requests", expanded=True):
+            st.caption("Confirm a visit only after checking access with the listing source. For email contacts who opted in, the scheduled email worker sends a confirmation after approval, a reminder within the hour before the visit, and a feedback request two hours afterward. Saving a decision does not itself deliver email.")
+            from run_followup_worker import load_config as load_visit_email_config
+            from followup_service import email_config_issues
+            visit_email_issues = email_config_issues(load_visit_email_config())
+            if visit_email_issues:
+                st.warning("Visit emails need configuration: " + "; ".join(visit_email_issues))
+            else:
+                st.info("The sender email is configured. The hosted background schedule sends reminders and follow-ups when they become due; delivery can be delayed between runs. ‘Sent’ means the email server accepted the message, not that it reached the customer’s inbox.")
+            st.session_state.visit_requests_loaded = True
+            if st.session_state.get("visit_requests_loaded"):
+                try:
+                    visits = list_visit_requests()
+                    if visits:
+                        from visit_journey import owner_journeys, set_advisor_status
+                        from crm_service import sync_visits, list_leads
+                        from crm_whatsapp import approval_rows
+                        journey_rows = owner_journeys()
+                        sync_visits(journey_rows)
+                        visit_frame = pd.DataFrame(approval_rows(visits,list_leads(),journey_rows))
+                        first_columns=['customer_name','property_title','visit_at','status','WhatsApp number','Email recipient','visit_email_consent','Confirmation email']
+                        visit_frame=visit_frame[first_columns+[col for col in visit_frame.columns if col not in first_columns]]
+                        st.caption('WhatsApp numbers fill automatically from saved customer details. A missing number must be supplied by the customer. WhatsApp confirmations are sent manually; email status appears beside each approval.')
+                        edited_visits = st.data_editor(visit_frame, key="visit_requests_editor", hide_index=True,
+                            disabled=[column for column in visit_frame.columns if column != "status"],
+                            column_config={"status":st.column_config.SelectboxColumn("Visit status",options=list(VISIT_STATUSES),required=True)})
+                        if st.button("Save visit decisions",key="save_visit_decisions"):
+                            for original, updated in zip(visits,edited_visits.to_dict("records")):
+                                if original["status"] != updated["status"]:
+                                    update_visit_status(original["id"],updated["status"])
+                            st.success("Visit decisions saved. Eligible email confirmations will be processed by the scheduled visit worker.")
+                            st.rerun()
+                        st.download_button("Download visit requests (.csv)",visit_frame.to_csv(index=False),file_name="namma_veedu_visit_requests.csv",mime="text/csv")
+                        from visit_journey import owner_journeys, set_advisor_status
+                        st.markdown("##### Visit responses and advisor requests")
+                        st.caption("Purchase interest reflects engagement only, not a calibrated purchase prediction. Advisor requests require manual contact and recorded consent.")
+                        if journey_rows:
+                            journey_frame = pd.DataFrame(journey_rows)
+                            journey_edited = st.data_editor(journey_frame, key="visit_journey_editor", hide_index=True,
+                                disabled=[column for column in journey_frame.columns if column != "advisor_status"],
+                                column_config={"advisor_status": st.column_config.SelectboxColumn("Advisor status", options=["", "Requested", "Contacting", "Connected", "Closed"])})
+                            if st.button("Save advisor progress", key="save_visit_advisor_progress"):
+                                for original, updated in zip(journey_rows, journey_edited.to_dict("records")):
+                                    if original["advisor_status"] != updated["advisor_status"]:
+                                        set_advisor_status(original["visit_id"], updated["advisor_status"])
+                                st.success("Advisor progress saved. No messages sent.")
+                                st.rerun()
+                        else:
+                            st.info("No visit email journeys yet. The scheduled worker creates them for confirmed visits with email consent.")
+
+                    else:
+                        st.info("No property visit requests yet.")
                 except ValueError as error:
                     st.error(str(error))
                 except Exception:
-                    logging.exception("Could not save Mira Studio peer")
-                    st.error("Peer access could not be saved. Please try again.")
-                else:
-                    st.session_state["new_peer_access_code"] = generate_access_code()
-                    st.success(f"Manager access saved for {account['display_name']}. Copy and share the displayed code now; it will not be recoverable after this page refresh.")
-                    st.code(peer_access_code)
-            try:
-                managers = list_managers()
-            except Exception:
-                logging.exception("Could not load Mira Studio peers")
-                st.error("Peer accounts could not be loaded.")
-                managers = []
-            if managers:
-                st.dataframe(pd.DataFrame(managers), hide_index=True, use_container_width=True)
-                selected_peer = st.selectbox("Manager account", [row["Email"] for row in managers])
-                selected_record = next(row for row in managers if row["Email"] == selected_peer)
-                desired_active = not bool(selected_record["Active"])
-                if st.button(("Restore" if desired_active else "Revoke") + " manager access", key="toggle_peer_access"):
-                    try:
-                        set_manager_active(selected_peer, desired_active)
-                    except Exception:
-                        logging.exception("Could not update Mira Studio peer")
-                        st.error("Peer access could not be updated.")
-                    else:
-                        st.success("Manager access restored." if desired_active else "Manager access revoked.")
-                        st.rerun()
+                    st.error("Visit requests could not be loaded or saved. Please retry.")
+    if studio_topic == "Customer journey and outcomes":
+        with st.expander("Complete customer journey", expanded=True):
+            st.caption("Search preferences → property selection → visit → purchase decision → assistance → recorded outcome. No purchase probability is claimed without a validated model.")
+            st.image(str(ROOT / "static" / "customer-journey.svg"))
+            if st.button("Load customer journey", key="load_complete_journey"):
+                st.session_state.complete_journey_loaded = True
+            if st.session_state.get("complete_journey_loaded"):
+                try:
+                    from customer_journey import choices, timeline
+                    from visit_journey import owner_journeys, record_purchase_outcome
+                    selections = choices()
+                    journeys = owner_journeys()
+                    events = timeline()
+                    from purchase_confirmation import reports
+                    purchase_reports=reports()
+                    if purchase_reports:
+                        st.markdown("##### Customer-reported purchases, final ratings and email status")
+                        st.dataframe(pd.DataFrame(purchase_reports),hide_index=True)
+                    if selections:
+                        st.markdown("##### Preferred properties and search preferences")
+                        st.dataframe(pd.DataFrame(selections), hide_index=True)
+                    if journeys:
+                        st.markdown("##### Visit decisions, assistance and purchase outcomes")
+                        st.dataframe(pd.DataFrame(journeys), hide_index=True)
+                        stages = {
+                            "Selected properties": sum(row["status"]=="Selected" for row in selections),
+                            "Visit requests": len(journeys),
+                            "Confirmed visits": sum(row["status"]=="Confirmed" for row in journeys),
+                            "Attended": sum(row["attended"]=="Yes" for row in journeys),
+                            "Interested in purchasing": sum(row["purchase_intent"]=="Interested" for row in journeys),
+                            "Advisor requests": sum(row["advisor_consent"]=="Yes" for row in journeys),
+                            "Purchased (owner recorded)": sum(row["purchase_outcome"]=="Purchased" for row in journeys),
+                        }
+                        st.bar_chart(pd.DataFrame({"Stage":list(stages),"Records":list(stages.values())}).set_index("Stage"))
+                        st.caption("Counts describe records at each stage, not unique customers or conversion probabilities. Historical data may have missing stages.")
+                        visit_choice = st.selectbox("Record a verified purchase outcome", [row["visit_id"] for row in journeys],format_func=lambda value: next(row["customer_name"]+" · "+row["property_title"]+" · "+value[:8] for row in journeys if row["visit_id"]==value))
+                        with st.form("purchase_outcome_form"):
+                            outcome=st.selectbox("Outcome",["Unknown","Still deciding","Purchased","Did not purchase"])
+                            note=st.text_area("Evidence or source of confirmation (no bank or identity details)")
+                            if st.form_submit_button("Save purchase outcome"):
+                                record_purchase_outcome(visit_choice,outcome,note)
+                                st.success("Outcome and evidence saved. No messages sent.")
+                    st.markdown("##### Advisor directory and handoff drafts")
+                    from advisor_directory import save_advisor, advisors, prepare_handoff
+                    with st.form("advisor_directory_form"):
+                        advisor_role=st.selectbox("Advisor role",["Property agent","Loan advisor"])
+                        advisor_name=st.text_input("Advisor name")
+                        advisor_email=st.text_input("Advisor email")
+                        if st.form_submit_button("Save advisor contact"):
+                            save_advisor(advisor_role,advisor_name,advisor_email)
+                            st.success("Advisor contact saved privately. No message sent.")
+                    directory=advisors()
+                    if directory:
+                        st.dataframe(pd.DataFrame(directory),hide_index=True)
+                    eligible=[row for row in journeys if row["advisor_consent"]=="Yes"]
+                    if eligible:
+                        request_id=st.selectbox("Consented callback request",[row["visit_id"] for row in eligible])
+                        role=st.selectbox("Prepare handoff to",["Property agent","Loan advisor"])
+                        if st.button("Prepare handoff draft",key="prepare_journey_handoff"):
+                            draft=prepare_handoff(request_id,role)
+                            st.session_state.owner_handoff_draft=draft
+                        if st.session_state.get("owner_handoff_draft"):
+                            draft=st.session_state.owner_handoff_draft
+                            st.write("To: "+draft["to"])
+                            st.text_area("Handoff draft — review before contacting the advisor",draft["body"],height=180)
+                            st.caption("No email is sent. Contact the advisor manually after review, then update advisor progress in the visit panel.")
+                    if events:
+                        conversation = st.selectbox("Conversation timeline", sorted({row["conversation_id"] or "Unlinked legacy record" for row in events}))
+                        selected_events=[row for row in events if (row["conversation_id"] or "Unlinked legacy record")==conversation]
+                        st.dataframe(pd.DataFrame(selected_events), hide_index=True)
+                        if conversation!="Unlinked legacy record":
+                            history=[row for row in read_inquiries() if str(row.get("Conversation ID") or row.get("conversation_id") or "")==conversation]
+                            if history:
+                                st.markdown("##### Linked Mira inquiry history")
+                                st.dataframe(pd.DataFrame(history),hide_index=True)
+                    if not selections and not journeys:
+                        st.info("No linked customer journey records yet. Older inquiries remain in the existing reports.")
+                except ValueError as error:
+                    st.error(str(error))
+                except Exception:
+                    st.error("Customer journey could not be loaded or saved. Please retry.")
+    if studio_topic == "Website blueprint":
+        with st.expander("Website Blueprint", expanded=True):
+            st.caption("Private product and engineering map. It contains no passwords, API keys, or customer conversation text.")
+            flowchart_path = ROOT / "static" / "mira-blueprint-flowchart.svg"
+            st.image(str(flowchart_path), caption="Namma Veedu: idea → implementation → customer options → results → shared owner review → approved Mira learning", use_container_width=True)
+            st.download_button("Download flowchart", data=flowchart_path.read_bytes(), file_name="namma_veedu_complete_blueprint.svg", mime="image/svg+xml", key="download_blueprint_flowchart")
+            if blueprint_path.exists():
+                blueprint_text = blueprint_path.read_text(encoding="utf-8")
+                with st.expander("Read the complete blueprint", expanded=False):
+                    st.markdown(blueprint_text)
+                st.download_button("Download blueprint", data=blueprint_text, file_name="namma_veedu_website_blueprint.md", mime="text/markdown", key="download_website_blueprint")
             else:
-                st.info("No peer managers have been added yet.")
-    overview_slot = st.container()
-    with st.expander("Mira Studio health and readiness", expanded=False):
-        health_cols = st.columns(3)
-        health_cols[0].metric("AI provider", AI_PROVIDER.title())
-        health_cols[1].metric("Hosted AI", "Configured" if bool(AI_API_KEY) else "Local fallback")
-        health_cols[2].metric("Persistent storage", "Connected" if storage_backend.is_configured() else "Fallback files")
-        if not AI_API_KEY:
-            st.info("Add GROQ_API_KEY in Streamlit Secrets when you want hosted Mira reasoning. Local property search and safety flows remain available without it.")
-        if not storage_backend.is_configured():
-            st.info("Add DATABASE_URL in Streamlit Secrets to keep hosted chat records and approved Learning Library rules across restarts.")
-        st.caption("Email follow-ups are intentionally excluded from this readiness view.")
-    blueprint_path = ROOT / "WEBSITE_BLUEPRINT.md"
-    with st.expander("Property visit requests", expanded=False):
-        st.caption("Confirm a visit only after checking access with the listing source. For email contacts who opted in, the scheduled email worker sends a confirmation after approval, a reminder within the hour before the visit, and a feedback request two hours afterward. Saving a decision does not itself deliver email.")
-        from run_followup_worker import load_config as load_visit_email_config
-        from followup_service import email_config_issues
-        visit_email_issues = email_config_issues(load_visit_email_config())
-        if visit_email_issues:
-            st.warning("Visit emails need configuration: " + "; ".join(visit_email_issues))
-        else:
-            st.info("The sender email is configured. The hosted background schedule sends reminders and follow-ups when they become due; delivery can be delayed between runs. ‘Sent’ means the email server accepted the message, not that it reached the customer’s inbox.")
-        st.session_state.visit_requests_loaded = True
-        if st.session_state.get("visit_requests_loaded"):
-            try:
-                visits = list_visit_requests()
-                if visits:
-                    from visit_journey import owner_journeys, set_advisor_status
-                    from crm_service import sync_visits, list_leads
-                    from crm_whatsapp import approval_rows
-                    journey_rows = owner_journeys()
-                    sync_visits(journey_rows)
-                    visit_frame = pd.DataFrame(approval_rows(visits,list_leads(),journey_rows))
-                    first_columns=['customer_name','property_title','visit_at','status','WhatsApp number','Email recipient','visit_email_consent','Confirmation email']
-                    visit_frame=visit_frame[first_columns+[col for col in visit_frame.columns if col not in first_columns]]
-                    st.caption('WhatsApp numbers fill automatically from saved customer details. A missing number must be supplied by the customer. WhatsApp confirmations are sent manually; email status appears beside each approval.')
-                    edited_visits = st.data_editor(visit_frame, key="visit_requests_editor", hide_index=True,
-                        disabled=[column for column in visit_frame.columns if column != "status"],
-                        column_config={"status":st.column_config.SelectboxColumn("Visit status",options=list(VISIT_STATUSES),required=True)})
-                    if st.button("Save visit decisions",key="save_visit_decisions"):
-                        for original, updated in zip(visits,edited_visits.to_dict("records")):
-                            if original["status"] != updated["status"]:
-                                update_visit_status(original["id"],updated["status"])
-                        st.success("Visit decisions saved. Eligible email confirmations will be processed by the scheduled visit worker.")
-                        st.rerun()
-                    st.download_button("Download visit requests (.csv)",visit_frame.to_csv(index=False),file_name="namma_veedu_visit_requests.csv",mime="text/csv")
-                    from visit_journey import owner_journeys, set_advisor_status
-                    st.markdown("##### Visit responses and advisor requests")
-                    st.caption("Purchase interest reflects engagement only, not a calibrated purchase prediction. Advisor requests require manual contact and recorded consent.")
-                    if journey_rows:
-                        journey_frame = pd.DataFrame(journey_rows)
-                        journey_edited = st.data_editor(journey_frame, key="visit_journey_editor", hide_index=True,
-                            disabled=[column for column in journey_frame.columns if column != "advisor_status"],
-                            column_config={"advisor_status": st.column_config.SelectboxColumn("Advisor status", options=["", "Requested", "Contacting", "Connected", "Closed"])})
-                        if st.button("Save advisor progress", key="save_visit_advisor_progress"):
-                            for original, updated in zip(journey_rows, journey_edited.to_dict("records")):
-                                if original["advisor_status"] != updated["advisor_status"]:
-                                    set_advisor_status(original["visit_id"], updated["advisor_status"])
-                            st.success("Advisor progress saved. No messages sent.")
-                            st.rerun()
-                    else:
-                        st.info("No visit email journeys yet. The scheduled worker creates them for confirmed visits with email consent.")
+                st.info("The blueprint file is not available in this deployment yet.")
 
+    if studio_topic == "Overview and reports":
+        with overview_slot:
+            try:
+                inquiry_stat = INQUIRY_LOG_PATH.stat() if INQUIRY_LOG_PATH.exists() else None
+                inquiry_rows = cached_inquiries(
+                    storage_backend.revision(inquiry_stat.st_mtime_ns if inquiry_stat else 0),
+                    inquiry_stat.st_size if inquiry_stat else 0,
+                )
+                today = datetime.now(INDIA_TZ).date()
+                # Refresh journey evidence independently of the cached inquiry history.
+                # Assessments describe current evidence even in date-filtered exports.
+                try:
+                    from customer_journey import choices as assessment_choices
+                    from visit_journey import owner_journeys as assessment_journeys
+                    linked_choices, linked_journeys = assessment_choices(), assessment_journeys()
+                    history_by_user = {}
+                    for row in sorted(inquiry_rows, key=lambda r: str(r.get("Timestamp (Asia/Kolkata)") or "")):
+                        if row.get("User ID"):
+                            history_by_user.setdefault(row["User ID"], []).append(row)
+                    inquiry_rows = [dict(row, _assessment_choices=linked_choices,
+                                         _assessment_history=history_by_user.get(row.get("User ID"), ()),
+                                         _assessment_journeys=linked_journeys) for row in inquiry_rows]
+                except Exception:
+                    st.warning("Journey evidence could not be loaded. Purchase assessments use chat evidence only.")
+
+                def inquiry_date(row):
+                    value = pd.to_datetime(row.get("Timestamp (Asia/Calcutta)") or row.get("Timestamp (Asia/Kolkata)"), errors="coerce")
+                    if pd.isna(value):
+                        return None
+                    value = value.tz_localize(INDIA_TZ) if value.tzinfo is None else value.tz_convert(INDIA_TZ)
+                    return value.date()
+
+                dated_rows = [(row, inquiry_date(row)) for row in inquiry_rows]
+                available_dates = [date_value for _, date_value in dated_rows if date_value]
+                period_col, value_col = st.columns([1, 2])
+                with period_col:
+                    date_filter_mode = st.selectbox("Filter inquiry data by", ["All time", "Day", "Month", "Year"], key="dashboard_date_filter_mode")
+                filter_start, filter_end = None, None
+                if date_filter_mode == "Day":
+                    with value_col:
+                        selected_day = st.date_input("Choose a day", value=today, key="dashboard_filter_day")
+                    filter_start = filter_end = selected_day
+                    period_label = selected_day.strftime("%d %B %Y")
+                elif date_filter_mode == "Month":
+                    month_keys = sorted({date_value.strftime("%Y-%m") for date_value in available_dates} | {today.strftime("%Y-%m")})
+                    with value_col:
+                        selected_month = st.selectbox("Choose a month", month_keys, index=month_keys.index(today.strftime("%Y-%m")), format_func=lambda value: datetime.strptime(value, "%Y-%m").strftime("%B %Y"), key="dashboard_filter_month")
+                    month_start = datetime.strptime(selected_month, "%Y-%m").date()
+                    next_month = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
+                    filter_start, filter_end = month_start, next_month - timedelta(days=1)
+                    period_label = month_start.strftime("%B %Y")
+                elif date_filter_mode == "Year":
+                    years = sorted({date_value.year for date_value in available_dates} | {today.year}, reverse=True)
+                    with value_col:
+                        selected_year = st.selectbox("Choose a year", years, index=years.index(today.year), key="dashboard_filter_year")
+                    filter_start, filter_end = datetime(int(selected_year), 1, 1).date(), datetime(int(selected_year), 12, 31).date()
+                    period_label = str(selected_year)
                 else:
-                    st.info("No property visit requests yet.")
-            except ValueError as error:
-                st.error(str(error))
-            except Exception:
-                st.error("Visit requests could not be loaded or saved. Please retry.")
-    with st.expander("Complete customer journey", expanded=False):
-        st.caption("Search preferences → property selection → visit → purchase decision → assistance → recorded outcome. No purchase probability is claimed without a validated model.")
-        st.image(str(ROOT / "static" / "customer-journey.svg"))
-        if st.button("Load customer journey", key="load_complete_journey"):
-            st.session_state.complete_journey_loaded = True
-        if st.session_state.get("complete_journey_loaded"):
-            try:
-                from customer_journey import choices, timeline
-                from visit_journey import owner_journeys, record_purchase_outcome
-                selections = choices()
-                journeys = owner_journeys()
-                events = timeline()
-                from purchase_confirmation import reports
-                purchase_reports=reports()
-                if purchase_reports:
-                    st.markdown("##### Customer-reported purchases, final ratings and email status")
-                    st.dataframe(pd.DataFrame(purchase_reports),hide_index=True)
-                if selections:
-                    st.markdown("##### Preferred properties and search preferences")
-                    st.dataframe(pd.DataFrame(selections), hide_index=True)
-                if journeys:
-                    st.markdown("##### Visit decisions, assistance and purchase outcomes")
-                    st.dataframe(pd.DataFrame(journeys), hide_index=True)
-                    stages = {
-                        "Selected properties": sum(row["status"]=="Selected" for row in selections),
-                        "Visit requests": len(journeys),
-                        "Confirmed visits": sum(row["status"]=="Confirmed" for row in journeys),
-                        "Attended": sum(row["attended"]=="Yes" for row in journeys),
-                        "Interested in purchasing": sum(row["purchase_intent"]=="Interested" for row in journeys),
-                        "Advisor requests": sum(row["advisor_consent"]=="Yes" for row in journeys),
-                        "Purchased (owner recorded)": sum(row["purchase_outcome"]=="Purchased" for row in journeys),
-                    }
-                    st.bar_chart(pd.DataFrame({"Stage":list(stages),"Records":list(stages.values())}).set_index("Stage"))
-                    st.caption("Counts describe records at each stage, not unique customers or conversion probabilities. Historical data may have missing stages.")
-                    visit_choice = st.selectbox("Record a verified purchase outcome", [row["visit_id"] for row in journeys],format_func=lambda value: next(row["customer_name"]+" · "+row["property_title"]+" · "+value[:8] for row in journeys if row["visit_id"]==value))
-                    with st.form("purchase_outcome_form"):
-                        outcome=st.selectbox("Outcome",["Unknown","Still deciding","Purchased","Did not purchase"])
-                        note=st.text_area("Evidence or source of confirmation (no bank or identity details)")
-                        if st.form_submit_button("Save purchase outcome"):
-                            record_purchase_outcome(visit_choice,outcome,note)
-                            st.success("Outcome and evidence saved. No messages sent.")
-                st.markdown("##### Advisor directory and handoff drafts")
-                from advisor_directory import save_advisor, advisors, prepare_handoff
-                with st.form("advisor_directory_form"):
-                    advisor_role=st.selectbox("Advisor role",["Property agent","Loan advisor"])
-                    advisor_name=st.text_input("Advisor name")
-                    advisor_email=st.text_input("Advisor email")
-                    if st.form_submit_button("Save advisor contact"):
-                        save_advisor(advisor_role,advisor_name,advisor_email)
-                        st.success("Advisor contact saved privately. No message sent.")
-                directory=advisors()
-                if directory:
-                    st.dataframe(pd.DataFrame(directory),hide_index=True)
-                eligible=[row for row in journeys if row["advisor_consent"]=="Yes"]
-                if eligible:
-                    request_id=st.selectbox("Consented callback request",[row["visit_id"] for row in eligible])
-                    role=st.selectbox("Prepare handoff to",["Property agent","Loan advisor"])
-                    if st.button("Prepare handoff draft",key="prepare_journey_handoff"):
-                        draft=prepare_handoff(request_id,role)
-                        st.session_state.owner_handoff_draft=draft
-                    if st.session_state.get("owner_handoff_draft"):
-                        draft=st.session_state.owner_handoff_draft
-                        st.write("To: "+draft["to"])
-                        st.text_area("Handoff draft — review before contacting the advisor",draft["body"],height=180)
-                        st.caption("No email is sent. Contact the advisor manually after review, then update advisor progress in the visit panel.")
-                if events:
-                    conversation = st.selectbox("Conversation timeline", sorted({row["conversation_id"] or "Unlinked legacy record" for row in events}))
-                    selected_events=[row for row in events if (row["conversation_id"] or "Unlinked legacy record")==conversation]
-                    st.dataframe(pd.DataFrame(selected_events), hide_index=True)
-                    if conversation!="Unlinked legacy record":
-                        history=[row for row in read_inquiries() if str(row.get("Conversation ID") or row.get("conversation_id") or "")==conversation]
-                        if history:
-                            st.markdown("##### Linked Mira inquiry history")
-                            st.dataframe(pd.DataFrame(history),hide_index=True)
-                if not selections and not journeys:
-                    st.info("No linked customer journey records yet. Older inquiries remain in the existing reports.")
-            except ValueError as error:
-                st.error(str(error))
-            except Exception:
-                st.error("Customer journey could not be loaded or saved. Please retry.")
-    with st.expander("Website Blueprint", expanded=False):
-        st.caption("Private product and engineering map. It contains no passwords, API keys, or customer conversation text.")
-        flowchart_path = ROOT / "static" / "mira-blueprint-flowchart.svg"
-        st.image(str(flowchart_path), caption="Namma Veedu: idea → implementation → customer options → results → shared owner review → approved Mira learning", use_container_width=True)
-        st.download_button("Download flowchart", data=flowchart_path.read_bytes(), file_name="namma_veedu_complete_blueprint.svg", mime="image/svg+xml", key="download_blueprint_flowchart")
-        if blueprint_path.exists():
-            blueprint_text = blueprint_path.read_text(encoding="utf-8")
-            with st.expander("Read the complete blueprint", expanded=False):
-                st.markdown(blueprint_text)
-            st.download_button("Download blueprint", data=blueprint_text, file_name="namma_veedu_website_blueprint.md", mime="text/markdown", key="download_website_blueprint")
-        else:
-            st.info("The blueprint file is not available in this deployment yet.")
+                    period_label = "All available dates"
 
-    with overview_slot:
-        try:
-            inquiry_stat = INQUIRY_LOG_PATH.stat() if INQUIRY_LOG_PATH.exists() else None
-            inquiry_rows = cached_inquiries(
-                storage_backend.revision(inquiry_stat.st_mtime_ns if inquiry_stat else 0),
-                inquiry_stat.st_size if inquiry_stat else 0,
-            )
-            today = datetime.now(INDIA_TZ).date()
-            # Refresh journey evidence independently of the cached inquiry history.
-            # Assessments describe current evidence even in date-filtered exports.
-            try:
-                from customer_journey import choices as assessment_choices
-                from visit_journey import owner_journeys as assessment_journeys
-                linked_choices, linked_journeys = assessment_choices(), assessment_journeys()
-                history_by_user = {}
-                for row in sorted(inquiry_rows, key=lambda r: str(r.get("Timestamp (Asia/Kolkata)") or "")):
-                    if row.get("User ID"):
-                        history_by_user.setdefault(row["User ID"], []).append(row)
-                inquiry_rows = [dict(row, _assessment_choices=linked_choices,
-                                     _assessment_history=history_by_user.get(row.get("User ID"), ()),
-                                     _assessment_journeys=linked_journeys) for row in inquiry_rows]
-            except Exception:
-                st.warning("Journey evidence could not be loaded. Purchase assessments use chat evidence only.")
-
-            def inquiry_date(row):
-                value = pd.to_datetime(row.get("Timestamp (Asia/Calcutta)") or row.get("Timestamp (Asia/Kolkata)"), errors="coerce")
-                if pd.isna(value):
-                    return None
-                value = value.tz_localize(INDIA_TZ) if value.tzinfo is None else value.tz_convert(INDIA_TZ)
-                return value.date()
-
-            dated_rows = [(row, inquiry_date(row)) for row in inquiry_rows]
-            available_dates = [date_value for _, date_value in dated_rows if date_value]
-            period_col, value_col = st.columns([1, 2])
-            with period_col:
-                date_filter_mode = st.selectbox("Filter inquiry data by", ["All time", "Day", "Month", "Year"], key="dashboard_date_filter_mode")
-            filter_start, filter_end = None, None
-            if date_filter_mode == "Day":
-                with value_col:
-                    selected_day = st.date_input("Choose a day", value=today, key="dashboard_filter_day")
-                filter_start = filter_end = selected_day
-                period_label = selected_day.strftime("%d %B %Y")
-            elif date_filter_mode == "Month":
-                month_keys = sorted({date_value.strftime("%Y-%m") for date_value in available_dates} | {today.strftime("%Y-%m")})
-                with value_col:
-                    selected_month = st.selectbox("Choose a month", month_keys, index=month_keys.index(today.strftime("%Y-%m")), format_func=lambda value: datetime.strptime(value, "%Y-%m").strftime("%B %Y"), key="dashboard_filter_month")
-                month_start = datetime.strptime(selected_month, "%Y-%m").date()
-                next_month = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
-                filter_start, filter_end = month_start, next_month - timedelta(days=1)
-                period_label = month_start.strftime("%B %Y")
-            elif date_filter_mode == "Year":
-                years = sorted({date_value.year for date_value in available_dates} | {today.year}, reverse=True)
-                with value_col:
-                    selected_year = st.selectbox("Choose a year", years, index=years.index(today.year), key="dashboard_filter_year")
-                filter_start, filter_end = datetime(int(selected_year), 1, 1).date(), datetime(int(selected_year), 12, 31).date()
-                period_label = str(selected_year)
-            else:
-                period_label = "All available dates"
-
-            filtered_rows = inquiry_rows if filter_start is None else [row for row, date_value in dated_rows if date_value and filter_start <= date_value <= filter_end]
-            start_label = filter_start.isoformat() if filter_start else "All available dates"
-            end_label = filter_end.isoformat() if filter_end else "All available dates"
-            st.caption(f"Showing {len(filtered_rows):,} inquiry turns for {period_label}. The Excel download below uses this same date filter.")
-            unique_users = {str(row.get("User ID") or "").strip() for row in filtered_rows if str(row.get("User ID") or "").strip()}
-            conversations = {str(row.get("Conversation ID") or "").strip() for row in filtered_rows if str(row.get("Conversation ID") or "").strip()}
-            matched_inquiries = sum(
-                pd.notna(pd.to_numeric(row.get("Matching records"), errors="coerce"))
-                and pd.to_numeric(row.get("Matching records"), errors="coerce") > 0
-                for row in filtered_rows
-            )
-            def field_count(field: str, accepted: set[str]) -> int:
-                return sum(str(row.get(field) or "").strip().casefold() in accepted for row in filtered_rows)
-
-            followup_requests = field_count("Follow-up requested signal", {"yes"})
-            handoff_requests = field_count("Human handoff requested signal", {"yes"})
-            from followup_reporting import followup_metrics
-            followup_counts = followup_metrics(filtered_rows)
-            followups_completed = followup_counts["completed"]
-            followups_open = followup_counts["open"]
-            ended_conversations = len({
-                str(row.get("Conversation ID") or "").strip()
-                for row in filtered_rows
-                if str(row.get("Conversation status") or "").strip().casefold() == "ended"
-                and str(row.get("Conversation ID") or "").strip()
-            })
-            tracked_sold = field_count("Sale outcome (owner)", {"sold"})
-            live_listings = field_count("Listing status (owner)", {"live"})
-            satisfied_count = field_count("Customer satisfaction (owner)", {"satisfied"})
-            dissatisfied_count = field_count("Customer satisfaction (owner)", {"dissatisfied", "needs follow-up"})
-            interested_count = field_count("Customer interest (owner)", {"interested"})
-            budget_count = field_count("Budget mentioned signal", {"yes"})
-            rating_summary = customer_summary_rows(filtered_rows)
-            ratings = [
-                pd.to_numeric(summary.get("Mira performance rating (1-5)"), errors="coerce")
-                for summary in rating_summary
-            ]
-            ratings = [float(rating) for rating in ratings if pd.notna(rating) and 1 <= rating <= 5]
-            from owner_dashboard_ui import render as render_performance_overview
-            from site_analytics import sessions as analytics_sessions, delivery_records
-            telemetry_available = True
-            try:
-                website_sessions = analytics_sessions()
-            except Exception:
-                website_sessions = []
-                telemetry_available = False
-                st.warning("Website session measurements could not be loaded.")
-            try:
-                email_delivery_rows = delivery_records()
-            except Exception:
-                email_delivery_rows = []
-                st.warning("Email acceptance measurements could not be loaded.")
-            refresh_learning_library_drafts(force=True)
-            learning_rules = load_learning_rules()
-            automatic_drafts = suggested_draft_rules(filtered_rows)
-            learning_rules, drafts_added = merge_suggested_drafts(learning_rules, automatic_drafts)
-            if drafts_added:
-                learning_rules = save_learning_rules(learning_rules)
-            render_performance_overview(filtered_rows, sessions=website_sessions, deliveries=email_delivery_rows,
-                                        visits=locals().get("linked_journeys", []), selections=locals().get("linked_choices", []),
-                                        rules=learning_rules, history_rows=inquiry_rows, start=filter_start, end=filter_end,
-                                        telemetry_available=telemetry_available)
-            satisfaction_ratings = [pd.to_numeric(summary.get("User satisfaction rating (1-5)"), errors="coerce") for summary in rating_summary]
-            satisfaction_ratings = [float(value) for value in satisfaction_ratings if pd.notna(value) and 1 <= value <= 5]
-            if satisfaction_ratings:
-                st.caption(f"Customer satisfaction: {sum(satisfaction_ratings) / len(satisfaction_ratings):.1f} / 5 from {len(satisfaction_ratings)} rated conversations. Mira rating uses the separate performance-rating field.")
-            st.markdown("---")
-            st.subheader("Reports & owner review")
-            st.caption(f"Storage: {storage_backend.mode()}. Purchase likelihood is provisional, not a validated probability. Date-filtered downloads include current linked visit evidence. Unknown outcomes and silence are not rejection.")
-            if filtered_rows:
-                manual_export = build_inquiry_export(filtered_rows, period_label, start_label, end_label)
-                st.download_button(
-                    f"Download {period_label} inquiry data (.xlsx)",
-                    data=manual_export,
-                    file_name=f"namma_veedu_inquiries_{period_label.lower().replace(' ', '_')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True,
-                    key="download_inquiry_history",
-                    on_click=archive_inquiry_export,
-                    args=(manual_export, "manual", period_label),
+                filtered_rows = inquiry_rows if filter_start is None else [row for row, date_value in dated_rows if date_value and filter_start <= date_value <= filter_end]
+                start_label = filter_start.isoformat() if filter_start else "All available dates"
+                end_label = filter_end.isoformat() if filter_end else "All available dates"
+                st.caption(f"Showing {len(filtered_rows):,} inquiry turns for {period_label}. The Excel download below uses this same date filter.")
+                unique_users = {str(row.get("User ID") or "").strip() for row in filtered_rows if str(row.get("User ID") or "").strip()}
+                conversations = {str(row.get("Conversation ID") or "").strip() for row in filtered_rows if str(row.get("Conversation ID") or "").strip()}
+                matched_inquiries = sum(
+                    pd.notna(pd.to_numeric(row.get("Matching records"), errors="coerce"))
+                    and pd.to_numeric(row.get("Matching records"), errors="coerce") > 0
+                    for row in filtered_rows
                 )
-                complete_chat_export = build_conversation_transcript_export(filtered_rows, period_label)
-                st.download_button(
-                    f"Download every complete chat for {period_label} (.xlsx)",
-                    data=complete_chat_export,
-                    file_name=f"namma_veedu_complete_chats_{period_label.lower().replace(' ', '_')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True,
-                    key="download_complete_chat_archive",
-                )
-                st.caption("Private owner download: one row per conversation, including the saved customer messages, Mira replies, and any submitted rating.")
-                st.caption("Automatic snapshots refresh from the shared inquiry records when Mira Studio loads. Snapshot dates use India time. Older file archives remain available.")
-                archived_daily_exports = sorted(
-                    INQUIRY_ARCHIVE_DIR.glob("*/automatic_inquiries_*.xlsx"),
-                    key=lambda item: item.parent.name,
-                    reverse=True,
-                ) if INQUIRY_ARCHIVE_DIR.exists() else []
-                from inquiry_log import inquiry_snapshot_groups
-                snapshot_groups = inquiry_snapshot_groups(inquiry_rows)
-                archived_by_date = {item.parent.name: item for item in archived_daily_exports}
-                snapshot_dates = sorted(set(snapshot_groups) | set(archived_by_date), reverse=True)
-                if snapshot_dates:
-                    if st.session_state.get("latest_automatic_snapshot_date") != snapshot_dates[0]:
-                        st.session_state.latest_automatic_snapshot_date = snapshot_dates[0]
-                        st.session_state.pop("shared_automatic_snapshot_date", None)
-                    selected_snapshot_date = st.selectbox(
-                        "Automatic snapshot date",
-                        snapshot_dates,
-                        key="shared_automatic_snapshot_date",
-                    )
-                    snapshot_data = (build_inquiry_export(snapshot_groups[selected_snapshot_date], selected_snapshot_date, selected_snapshot_date, selected_snapshot_date)
-                                     if selected_snapshot_date in snapshot_groups else structured_archive_export(archived_by_date[selected_snapshot_date]))
+                def field_count(field: str, accepted: set[str]) -> int:
+                    return sum(str(row.get(field) or "").strip().casefold() in accepted for row in filtered_rows)
+
+                followup_requests = field_count("Follow-up requested signal", {"yes"})
+                handoff_requests = field_count("Human handoff requested signal", {"yes"})
+                from followup_reporting import followup_metrics
+                followup_counts = followup_metrics(filtered_rows)
+                followups_completed = followup_counts["completed"]
+                followups_open = followup_counts["open"]
+                ended_conversations = len({
+                    str(row.get("Conversation ID") or "").strip()
+                    for row in filtered_rows
+                    if str(row.get("Conversation status") or "").strip().casefold() == "ended"
+                    and str(row.get("Conversation ID") or "").strip()
+                })
+                tracked_sold = field_count("Sale outcome (owner)", {"sold"})
+                live_listings = field_count("Listing status (owner)", {"live"})
+                satisfied_count = field_count("Customer satisfaction (owner)", {"satisfied"})
+                dissatisfied_count = field_count("Customer satisfaction (owner)", {"dissatisfied", "needs follow-up"})
+                interested_count = field_count("Customer interest (owner)", {"interested"})
+                budget_count = field_count("Budget mentioned signal", {"yes"})
+                rating_summary = customer_summary_rows(filtered_rows)
+                ratings = [
+                    pd.to_numeric(summary.get("Mira performance rating (1-5)"), errors="coerce")
+                    for summary in rating_summary
+                ]
+                ratings = [float(rating) for rating in ratings if pd.notna(rating) and 1 <= rating <= 5]
+                from owner_dashboard_ui import render as render_performance_overview
+                from site_analytics import sessions as analytics_sessions, delivery_records
+                telemetry_available = True
+                try:
+                    website_sessions = analytics_sessions()
+                except Exception:
+                    website_sessions = []
+                    telemetry_available = False
+                    st.warning("Website session measurements could not be loaded.")
+                try:
+                    email_delivery_rows = delivery_records()
+                except Exception:
+                    email_delivery_rows = []
+                    st.warning("Email acceptance measurements could not be loaded.")
+                refresh_learning_library_drafts(force=True)
+                learning_rules = load_learning_rules()
+                automatic_drafts = suggested_draft_rules(filtered_rows)
+                learning_rules, drafts_added = merge_suggested_drafts(learning_rules, automatic_drafts)
+                if drafts_added:
+                    learning_rules = save_learning_rules(learning_rules)
+                render_performance_overview(filtered_rows, sessions=website_sessions, deliveries=email_delivery_rows,
+                                            visits=locals().get("linked_journeys", []), selections=locals().get("linked_choices", []),
+                                            rules=learning_rules, history_rows=inquiry_rows, start=filter_start, end=filter_end,
+                                            telemetry_available=telemetry_available)
+                satisfaction_ratings = [pd.to_numeric(summary.get("User satisfaction rating (1-5)"), errors="coerce") for summary in rating_summary]
+                satisfaction_ratings = [float(value) for value in satisfaction_ratings if pd.notna(value) and 1 <= value <= 5]
+                if satisfaction_ratings:
+                    st.caption(f"Customer satisfaction: {sum(satisfaction_ratings) / len(satisfaction_ratings):.1f} / 5 from {len(satisfaction_ratings)} rated conversations. Mira rating uses the separate performance-rating field.")
+                st.markdown("---")
+                st.subheader("Reports & owner review")
+                st.caption(f"Storage: {storage_backend.mode()}. Purchase likelihood is provisional, not a validated probability. Date-filtered downloads include current linked visit evidence. Unknown outcomes and silence are not rejection.")
+                if filtered_rows:
+                    manual_export = build_inquiry_export(filtered_rows, period_label, start_label, end_label)
                     st.download_button(
-                        f"Download automatic snapshot for {selected_snapshot_date} (.xlsx)",
-                        data=snapshot_data,
-                        file_name=f"automatic_inquiries_{selected_snapshot_date.replace('-', '')}.xlsx",
+                        f"Download {period_label} inquiry data (.xlsx)",
+                        data=manual_export,
+                        file_name=f"namma_veedu_inquiries_{period_label.lower().replace(' ', '_')}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         use_container_width=True,
-                        key="download_automatic_inquiry_snapshot",
+                        key="download_inquiry_history",
+                        on_click=archive_inquiry_export,
+                        args=(manual_export, "manual", period_label),
                     )
-            else:
-                st.info("No inquiry workbook exists yet. It will be created after the next completed chat turn.")
-            if filtered_rows:
-                st.markdown("#### Update follow-up and listing outcomes")
-                st.caption("Downloads and customer summaries show structured preferences and Yes/No indicators. No means not recorded; confirm inferred interest with the customer.")
-                owner_fields = ["Follow-up status (owner)", "Follow-up date (owner)", "Next follow-up action (owner)", "Customer satisfaction (owner)", "Lead priority (owner)", "Listing status (owner)", "Sale outcome (owner)", "Advisor notes (owner)"]
-                tracked_records = pd.DataFrame(filtered_rows).tail(50).iloc[::-1].reset_index(drop=True).fillna("")
-                interest_display = []
-                for _, record in tracked_records.iterrows():
-                    owner_interest = str(record.get("Customer interest (owner)") or "").strip()
-                    if owner_interest in {"Interested", "Not interested", "Undecided"}:
-                        interest_display.append(owner_interest)
-                    else:
-                        interest_signal = str(record.get("Customer interest signal") or "")
-                        interest_display.append({"Interested signal": "Interested", "Not interested signal": "Not interested"}.get(interest_signal, "Not stated"))
-                editable_rows = pd.DataFrame({
-                    "Inquiry ID": tracked_records.get("Inquiry ID", ""),
-                    "Timestamp (Asia/Kolkata)": tracked_records.get("Timestamp (Asia/Kolkata)", ""),
-                    "Customer interest": interest_display,
-                })
-                for field in owner_fields:
-                    editable_rows[field] = tracked_records[field] if field in tracked_records else ""
-                default_values = {
-                    "Follow-up status (owner)": "Not updated", "Customer satisfaction (owner)": "Not recorded",
-                    "Lead priority (owner)": "Not rated", "Listing status (owner)": "Not updated",
-                    "Sale outcome (owner)": "Not updated",
-                }
-                for field, default in default_values.items():
-                    editable_rows[field] = editable_rows[field].replace("", default)
-                editor_key = f"owner_tracking_{re.sub(r'[^A-Za-z0-9]+', '_', period_label)}_{INQUIRY_LOG_PATH.stat().st_mtime_ns if INQUIRY_LOG_PATH.exists() else 0}"
-                with st.form("owner_outcome_tracker"):
-                    edited = st.data_editor(
-                        editable_rows,
-                        hide_index=True,
+                    complete_chat_export = build_conversation_transcript_export(filtered_rows, period_label)
+                    st.download_button(
+                        f"Download every complete chat for {period_label} (.xlsx)",
+                        data=complete_chat_export,
+                        file_name=f"namma_veedu_complete_chats_{period_label.lower().replace(' ', '_')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         use_container_width=True,
-                        num_rows="fixed",
-                        disabled=["Inquiry ID", "Timestamp (Asia/Kolkata)"],
-                        column_config={
-                            "Inquiry ID": st.column_config.TextColumn("Inquiry ID", width="medium"),
-                            "Timestamp (Asia/Kolkata)": st.column_config.TextColumn("Time", width="small"),
-                            "Customer interest": st.column_config.SelectboxColumn("Customer interest", options=["Interested", "Not interested", "Not stated", "Undecided"], required=True),
-                            "Follow-up status (owner)": st.column_config.SelectboxColumn("Follow-up", options=["Not updated", "Needed", "Scheduled", "Completed", "Not needed"], required=True),
-                            "Follow-up date (owner)": st.column_config.TextColumn("Follow-up date", help="Enter a date such as 2026-10-15"),
-                            "Next follow-up action (owner)": st.column_config.TextColumn("Next action", width="medium"),
-                            "Customer satisfaction (owner)": st.column_config.SelectboxColumn("Satisfaction", options=["Not recorded", "Satisfied", "Needs follow-up", "Dissatisfied"], required=True),
-                            "Customer interest (owner)": st.column_config.SelectboxColumn("Interest", options=["Not recorded", "Interested", "Undecided", "Not interested"], required=True),
-                            "Lead priority (owner)": st.column_config.SelectboxColumn("Priority", options=["Not rated", "High", "Medium", "Low"], required=True),
-                            "Listing status (owner)": st.column_config.SelectboxColumn("Listing", options=["Not updated", "Not listed", "Draft", "Live", "Paused", "Sold", "Withdrawn"], required=True),
-                            "Sale outcome (owner)": st.column_config.SelectboxColumn("Sale outcome", options=["Not updated", "Unknown", "Sold", "Not sold", "Withdrawn"], required=True),
-                            "Advisor notes (owner)": st.column_config.TextColumn("Advisor notes", width="large"),
-                        },
-                        key=editor_key,
+                        key="download_complete_chat_archive",
                     )
-                    save_tracking = st.form_submit_button("Save outcome updates", type="primary")
-                if save_tracking:
-                    saved = 0
-                    for _, tracked_row in edited.iterrows():
-                        fields = {field: tracked_row.get(field, "") for field in owner_fields}
-                        fields["Customer interest (owner)"] = tracked_row.get("Customer interest", "Not stated")
-                        saved += bool(update_inquiry_fields(str(tracked_row.get("Inquiry ID", "")), fields))
-                    st.success(f"Saved updates for {saved:,} inquiry rows.")
-                    st.rerun()
-
-                st.markdown("#### Mira quality review")
-                st.caption("Review flagged conversations, record the intended handling, and use your notes to guide Mira improvements. Flags are review cues, not a verdict that Mira was wrong.")
-                review_rows = []
-                for record in reversed(filtered_rows):
-                    flags = quality_flags(record)
-                    review_status = str(record.get("Mira review status (owner)") or "").strip()
-                    if not flags and review_status in {"", "Not reviewed"}:
-                        continue
-                    review_rows.append({
-                        "Inquiry ID": record.get("Inquiry ID", ""),
-                        "Timestamp (Asia/Kolkata)": record.get("Timestamp (Asia/Kolkata)", ""),
-                        "Customer message": record.get("User inquiry", ""),
-                        "Mira response": record.get("Assistant response", ""),
-                        "Response type": record.get("Response type", ""),
-                        "Review cues": "; ".join(flags) or "Owner-saved review",
-                        "Review status": review_status or "Not reviewed",
-                        "Correct intent": str(record.get("Mira corrected intent (owner)") or "").strip() or "Not set",
-                        "Review notes": record.get("Mira review notes (owner)", ""),
+                    st.caption("Private owner download: one row per conversation, including the saved customer messages, Mira replies, and any submitted rating.")
+                    st.caption("Automatic snapshots refresh from the shared inquiry records when Mira Studio loads. Snapshot dates use India time. Older file archives remain available.")
+                    archived_daily_exports = sorted(
+                        INQUIRY_ARCHIVE_DIR.glob("*/automatic_inquiries_*.xlsx"),
+                        key=lambda item: item.parent.name,
+                        reverse=True,
+                    ) if INQUIRY_ARCHIVE_DIR.exists() else []
+                    from inquiry_log import inquiry_snapshot_groups
+                    snapshot_groups = inquiry_snapshot_groups(inquiry_rows)
+                    archived_by_date = {item.parent.name: item for item in archived_daily_exports}
+                    snapshot_dates = sorted(set(snapshot_groups) | set(archived_by_date), reverse=True)
+                    if snapshot_dates:
+                        if st.session_state.get("latest_automatic_snapshot_date") != snapshot_dates[0]:
+                            st.session_state.latest_automatic_snapshot_date = snapshot_dates[0]
+                            st.session_state.pop("shared_automatic_snapshot_date", None)
+                        selected_snapshot_date = st.selectbox(
+                            "Automatic snapshot date",
+                            snapshot_dates,
+                            key="shared_automatic_snapshot_date",
+                        )
+                        snapshot_data = (build_inquiry_export(snapshot_groups[selected_snapshot_date], selected_snapshot_date, selected_snapshot_date, selected_snapshot_date)
+                                         if selected_snapshot_date in snapshot_groups else structured_archive_export(archived_by_date[selected_snapshot_date]))
+                        st.download_button(
+                            f"Download automatic snapshot for {selected_snapshot_date} (.xlsx)",
+                            data=snapshot_data,
+                            file_name=f"automatic_inquiries_{selected_snapshot_date.replace('-', '')}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True,
+                            key="download_automatic_inquiry_snapshot",
+                        )
+                else:
+                    st.info("No inquiry workbook exists yet. It will be created after the next completed chat turn.")
+                if filtered_rows:
+                    st.markdown("#### Update follow-up and listing outcomes")
+                    st.caption("Downloads and customer summaries show structured preferences and Yes/No indicators. No means not recorded; confirm inferred interest with the customer.")
+                    owner_fields = ["Follow-up status (owner)", "Follow-up date (owner)", "Next follow-up action (owner)", "Customer satisfaction (owner)", "Lead priority (owner)", "Listing status (owner)", "Sale outcome (owner)", "Advisor notes (owner)"]
+                    tracked_records = pd.DataFrame(filtered_rows).tail(50).iloc[::-1].reset_index(drop=True).fillna("")
+                    interest_display = []
+                    for _, record in tracked_records.iterrows():
+                        owner_interest = str(record.get("Customer interest (owner)") or "").strip()
+                        if owner_interest in {"Interested", "Not interested", "Undecided"}:
+                            interest_display.append(owner_interest)
+                        else:
+                            interest_signal = str(record.get("Customer interest signal") or "")
+                            interest_display.append({"Interested signal": "Interested", "Not interested signal": "Not interested"}.get(interest_signal, "Not stated"))
+                    editable_rows = pd.DataFrame({
+                        "Inquiry ID": tracked_records.get("Inquiry ID", ""),
+                        "Timestamp (Asia/Kolkata)": tracked_records.get("Timestamp (Asia/Kolkata)", ""),
+                        "Customer interest": interest_display,
                     })
-                if review_rows:
-                    review_frame = pd.DataFrame(review_rows[:50])
-                    with st.form("mira_quality_review"):
-                        reviewed = st.data_editor(
-                            review_frame,
+                    for field in owner_fields:
+                        editable_rows[field] = tracked_records[field] if field in tracked_records else ""
+                    default_values = {
+                        "Follow-up status (owner)": "Not updated", "Customer satisfaction (owner)": "Not recorded",
+                        "Lead priority (owner)": "Not rated", "Listing status (owner)": "Not updated",
+                        "Sale outcome (owner)": "Not updated",
+                    }
+                    for field, default in default_values.items():
+                        editable_rows[field] = editable_rows[field].replace("", default)
+                    editor_key = f"owner_tracking_{re.sub(r'[^A-Za-z0-9]+', '_', period_label)}_{INQUIRY_LOG_PATH.stat().st_mtime_ns if INQUIRY_LOG_PATH.exists() else 0}"
+                    with st.form("owner_outcome_tracker"):
+                        edited = st.data_editor(
+                            editable_rows,
                             hide_index=True,
                             use_container_width=True,
                             num_rows="fixed",
-                            disabled=["Inquiry ID", "Timestamp (Asia/Kolkata)", "Customer message", "Mira response", "Response type", "Review cues"],
+                            disabled=["Inquiry ID", "Timestamp (Asia/Kolkata)"],
                             column_config={
                                 "Inquiry ID": st.column_config.TextColumn("Inquiry ID", width="medium"),
                                 "Timestamp (Asia/Kolkata)": st.column_config.TextColumn("Time", width="small"),
-                                "Customer message": st.column_config.TextColumn("Customer message", width="large"),
-                                "Mira response": st.column_config.TextColumn("Mira response", width="large"),
-                                "Response type": st.column_config.TextColumn("Response type", width="small"),
-                                "Review cues": st.column_config.TextColumn("Why flagged", width="medium"),
-                                "Review status": st.column_config.SelectboxColumn("Review status", options=["Not reviewed", "Reviewed", "Improvement needed", "No issue"], required=True),
-                                "Correct intent": st.column_config.SelectboxColumn("Correct intent", options=["Not set", "Search listings", "Update preferences", "Answer property details", "Follow-up or reminder", "Language change", "General conversation", "Safety guidance"], required=True),
-                                "Review notes": st.column_config.TextColumn("Owner feedback", width="large"),
+                                "Customer interest": st.column_config.SelectboxColumn("Customer interest", options=["Interested", "Not interested", "Not stated", "Undecided"], required=True),
+                                "Follow-up status (owner)": st.column_config.SelectboxColumn("Follow-up", options=["Not updated", "Needed", "Scheduled", "Completed", "Not needed"], required=True),
+                                "Follow-up date (owner)": st.column_config.TextColumn("Follow-up date", help="Enter a date such as 2026-10-15"),
+                                "Next follow-up action (owner)": st.column_config.TextColumn("Next action", width="medium"),
+                                "Customer satisfaction (owner)": st.column_config.SelectboxColumn("Satisfaction", options=["Not recorded", "Satisfied", "Needs follow-up", "Dissatisfied"], required=True),
+                                "Customer interest (owner)": st.column_config.SelectboxColumn("Interest", options=["Not recorded", "Interested", "Undecided", "Not interested"], required=True),
+                                "Lead priority (owner)": st.column_config.SelectboxColumn("Priority", options=["Not rated", "High", "Medium", "Low"], required=True),
+                                "Listing status (owner)": st.column_config.SelectboxColumn("Listing", options=["Not updated", "Not listed", "Draft", "Live", "Paused", "Sold", "Withdrawn"], required=True),
+                                "Sale outcome (owner)": st.column_config.SelectboxColumn("Sale outcome", options=["Not updated", "Unknown", "Sold", "Not sold", "Withdrawn"], required=True),
+                                "Advisor notes (owner)": st.column_config.TextColumn("Advisor notes", width="large"),
                             },
-                            key=f"mira_quality_{editor_key}",
+                            key=editor_key,
                         )
-                        save_review = st.form_submit_button("Save Mira review", type="primary")
-                    if save_review:
+                        save_tracking = st.form_submit_button("Save outcome updates", type="primary")
+                    if save_tracking:
                         saved = 0
-                        for _, review_row in reviewed.iterrows():
-                            saved += bool(update_inquiry_fields(str(review_row.get("Inquiry ID", "")), {
-                                "Mira review status (owner)": review_row.get("Review status", "Not reviewed"),
-                                "Mira corrected intent (owner)": review_row.get("Correct intent", "Not set"),
-                                "Mira review notes (owner)": review_row.get("Review notes", ""),
-                            }))
-                        st.success(f"Saved {saved:,} Mira review item(s).")
+                        for _, tracked_row in edited.iterrows():
+                            fields = {field: tracked_row.get(field, "") for field in owner_fields}
+                            fields["Customer interest (owner)"] = tracked_row.get("Customer interest", "Not stated")
+                            saved += bool(update_inquiry_fields(str(tracked_row.get("Inquiry ID", "")), fields))
+                        st.success(f"Saved updates for {saved:,} inquiry rows.")
                         st.rerun()
-                else:
-                    st.info("No conversations in this period are currently flagged for review.")
 
-                st.markdown("#### Mira Learning Library")
-                customer_feedback = [row for row in filtered_rows if row.get("Feedback ID")]
-                st.markdown("##### Customer feedback")
-                st.metric("Feedback submissions", len(customer_feedback))
-                if customer_feedback:
-                    st.dataframe(pd.DataFrame(customer_feedback).reindex(columns=FEEDBACK_HEADERS).fillna(""), hide_index=True, use_container_width=True)
-                else:
-                    st.caption("No feedback was submitted in this period.")
-                st.caption("Each feedback submission creates a Draft linked by Feedback ID. Review the comment, edit the guidance, then approve or reject it. Only Approved rules guide Mira; feedback never changes her automatically.")
-                if automatic_drafts:
-                    st.info(f"{len(automatic_drafts):,} feedback or recurring-quality suggestion(s) are linked to learning drafts. Review and edit the guidance; choose Approved only when you want Mira to use it.")
-                else:
-                    st.caption("Each submitted feedback creates a draft. Other quality cues need at least two occurrences. All drafts wait for owner approval before affecting Mira.")
-                active_rule_count = len(active_learning_guidance(learning_rules))
-                library_metric, library_note = st.columns([1, 4])
-                library_metric.metric("Active learning rules", active_rule_count)
-                library_note.info("Use recurring quality-review findings to add a concise scenario and instruction. Approve only guidance you want Mira to apply in similar future conversations.")
-                library_frame = pd.DataFrame(learning_rules)
-                with st.form("mira_learning_library"):
-                    updated_rules = st.data_editor(
-                        library_frame,
-                        hide_index=True,
-                        use_container_width=True,
-                        num_rows="dynamic",
-                        column_config={
-                            "Rule ID": st.column_config.TextColumn("Rule ID", disabled=True, width="medium"),
-                            "Scenario": st.column_config.TextColumn("When this happens", width="large", required=True),
-                            "Guidance": st.column_config.TextColumn("Mira should do this", width="large", required=True),
-                            "Status": st.column_config.SelectboxColumn("Status", options=["Draft", "Approved", "Rejected", "Paused", "Retired"], required=True),
-                            "Source": st.column_config.TextColumn("Origin", width="medium"),
-                        },
-                        key=f"mira_learning_library_{editor_key}",
-                    )
-                    save_library = st.form_submit_button("Save Learning Library", type="primary")
-                if save_library:
-                    saved_rules = save_learning_rules(updated_rules.to_dict("records"))
-                    st.success(f"Saved {len(saved_rules):,} learning rule(s); {len(active_learning_guidance(saved_rules)):,} approved rule(s) will guide future AI replies.")
-                    st.rerun()
+                    st.markdown("#### Mira quality review")
+                    st.caption("Review flagged conversations, record the intended handling, and use your notes to guide Mira improvements. Flags are review cues, not a verdict that Mira was wrong.")
+                    review_rows = []
+                    for record in reversed(filtered_rows):
+                        flags = quality_flags(record)
+                        review_status = str(record.get("Mira review status (owner)") or "").strip()
+                        if not flags and review_status in {"", "Not reviewed"}:
+                            continue
+                        review_rows.append({
+                            "Inquiry ID": record.get("Inquiry ID", ""),
+                            "Timestamp (Asia/Kolkata)": record.get("Timestamp (Asia/Kolkata)", ""),
+                            "Customer message": record.get("User inquiry", ""),
+                            "Mira response": record.get("Assistant response", ""),
+                            "Response type": record.get("Response type", ""),
+                            "Review cues": "; ".join(flags) or "Owner-saved review",
+                            "Review status": review_status or "Not reviewed",
+                            "Correct intent": str(record.get("Mira corrected intent (owner)") or "").strip() or "Not set",
+                            "Review notes": record.get("Mira review notes (owner)", ""),
+                        })
+                    if review_rows:
+                        review_frame = pd.DataFrame(review_rows[:50])
+                        with st.form("mira_quality_review"):
+                            reviewed = st.data_editor(
+                                review_frame,
+                                hide_index=True,
+                                use_container_width=True,
+                                num_rows="fixed",
+                                disabled=["Inquiry ID", "Timestamp (Asia/Kolkata)", "Customer message", "Mira response", "Response type", "Review cues"],
+                                column_config={
+                                    "Inquiry ID": st.column_config.TextColumn("Inquiry ID", width="medium"),
+                                    "Timestamp (Asia/Kolkata)": st.column_config.TextColumn("Time", width="small"),
+                                    "Customer message": st.column_config.TextColumn("Customer message", width="large"),
+                                    "Mira response": st.column_config.TextColumn("Mira response", width="large"),
+                                    "Response type": st.column_config.TextColumn("Response type", width="small"),
+                                    "Review cues": st.column_config.TextColumn("Why flagged", width="medium"),
+                                    "Review status": st.column_config.SelectboxColumn("Review status", options=["Not reviewed", "Reviewed", "Improvement needed", "No issue"], required=True),
+                                    "Correct intent": st.column_config.SelectboxColumn("Correct intent", options=["Not set", "Search listings", "Update preferences", "Answer property details", "Follow-up or reminder", "Language change", "General conversation", "Safety guidance"], required=True),
+                                    "Review notes": st.column_config.TextColumn("Owner feedback", width="large"),
+                                },
+                                key=f"mira_quality_{editor_key}",
+                            )
+                            save_review = st.form_submit_button("Save Mira review", type="primary")
+                        if save_review:
+                            saved = 0
+                            for _, review_row in reviewed.iterrows():
+                                saved += bool(update_inquiry_fields(str(review_row.get("Inquiry ID", "")), {
+                                    "Mira review status (owner)": review_row.get("Review status", "Not reviewed"),
+                                    "Mira corrected intent (owner)": review_row.get("Correct intent", "Not set"),
+                                    "Mira review notes (owner)": review_row.get("Review notes", ""),
+                                }))
+                            st.success(f"Saved {saved:,} Mira review item(s).")
+                            st.rerun()
+                    else:
+                        st.info("No conversations in this period are currently flagged for review.")
 
-                preview_columns = ["User ID", "Customer name", "Preferred form of address", "Details shared by customer", "Inquiry ID", "Conversation ID", "Conversation status", "Chat ended at (Asia/Kolkata)", "Conversation close reason", "Final conversation transcript", "Timestamp (Asia/Kolkata)", "Language", "Conversation topic", "Customer tone signal", "Customer satisfaction signal", "Customer interest signal", "Budget mentioned signal", "Customer budget / price stated", "Purchase value / offer stated", "Property type mentioned", "Location mentioned", "Preferred size stated", "Follow-up requested signal", "Follow-up method", "Follow-up methods", "Follow-up summary", "Follow-up schedule status", "Follow-up cadence", "Follow-up consent timestamp (Asia/Kolkata)", "Next follow-up time (Asia/Kolkata)", "Human handoff requested signal", "Listing status asked signal", "Sale outcome mentioned signal", "User inquiry", "Assistant response", "Response type", "Matching records", *owner_fields]
-                preview = pd.DataFrame(customer_summary_rows(filtered_rows)).tail(10).iloc[::-1]
-                with st.expander("Purchase assessments and recorded outcomes", expanded=False):
-                    from purchase_assessment import HEADERS as assessment_headers
-                    assessment_table = pd.DataFrame(customer_summary_rows(filtered_rows)).reindex(
-                        columns=["User ID", "Customer name", "Conversation ID", *assessment_headers])
-                    st.caption("One row per conversation; evidence includes this customer's linked chat and visit history. Owner-recorded outcomes are kept separate from customer reports. No validated purchase probability is available yet.")
-                    st.dataframe(assessment_table, hide_index=True, use_container_width=True)
-                with st.expander("Customer response summaries", expanded=False):
-                    st.dataframe(preview, hide_index=True, use_container_width=True)
-                response_preview_columns = ["Inquiry ID", "Conversation ID", "Timestamp (Asia/Kolkata)", "Language", "Response type", "Assistant response"]
-                response_preview = pd.DataFrame(filtered_rows).reindex(columns=response_preview_columns).fillna("")
-                response_preview = response_preview[response_preview["Assistant response"].astype(str).str.strip().ne("")].tail(25).iloc[::-1]
-                with st.expander("Mira responses", expanded=False):
-                    st.caption("Owner-only review of Mira's replies. Customer messages remain outside this view.")
-                    st.dataframe(response_preview.rename(columns={"Assistant response": "Mira response"}), hide_index=True, use_container_width=True)
-            else:
-                st.info("No inquiries have been saved yet. Completed chat turns will appear here automatically.")
-        except Exception:
-            logging.exception("Could not load the private inquiry workbook")
-            st.error("The inquiry workbook could not be opened. Close it in Excel if it is open, then refresh this dashboard.")
+                    st.markdown("#### Mira Learning Library")
+                    customer_feedback = [row for row in filtered_rows if row.get("Feedback ID")]
+                    st.markdown("##### Customer feedback")
+                    st.metric("Feedback submissions", len(customer_feedback))
+                    if customer_feedback:
+                        st.dataframe(pd.DataFrame(customer_feedback).reindex(columns=FEEDBACK_HEADERS).fillna(""), hide_index=True, use_container_width=True)
+                    else:
+                        st.caption("No feedback was submitted in this period.")
+                    st.caption("Each feedback submission creates a Draft linked by Feedback ID. Review the comment, edit the guidance, then approve or reject it. Only Approved rules guide Mira; feedback never changes her automatically.")
+                    if automatic_drafts:
+                        st.info(f"{len(automatic_drafts):,} feedback or recurring-quality suggestion(s) are linked to learning drafts. Review and edit the guidance; choose Approved only when you want Mira to use it.")
+                    else:
+                        st.caption("Each submitted feedback creates a draft. Other quality cues need at least two occurrences. All drafts wait for owner approval before affecting Mira.")
+                    active_rule_count = len(active_learning_guidance(learning_rules))
+                    library_metric, library_note = st.columns([1, 4])
+                    library_metric.metric("Active learning rules", active_rule_count)
+                    library_note.info("Use recurring quality-review findings to add a concise scenario and instruction. Approve only guidance you want Mira to apply in similar future conversations.")
+                    library_frame = pd.DataFrame(learning_rules)
+                    with st.form("mira_learning_library"):
+                        updated_rules = st.data_editor(
+                            library_frame,
+                            hide_index=True,
+                            use_container_width=True,
+                            num_rows="dynamic",
+                            column_config={
+                                "Rule ID": st.column_config.TextColumn("Rule ID", disabled=True, width="medium"),
+                                "Scenario": st.column_config.TextColumn("When this happens", width="large", required=True),
+                                "Guidance": st.column_config.TextColumn("Mira should do this", width="large", required=True),
+                                "Status": st.column_config.SelectboxColumn("Status", options=["Draft", "Approved", "Rejected", "Paused", "Retired"], required=True),
+                                "Source": st.column_config.TextColumn("Origin", width="medium"),
+                            },
+                            key=f"mira_learning_library_{editor_key}",
+                        )
+                        save_library = st.form_submit_button("Save Learning Library", type="primary")
+                    if save_library:
+                        saved_rules = save_learning_rules(updated_rules.to_dict("records"))
+                        st.success(f"Saved {len(saved_rules):,} learning rule(s); {len(active_learning_guidance(saved_rules)):,} approved rule(s) will guide future AI replies.")
+                        st.rerun()
+
+                    preview_columns = ["User ID", "Customer name", "Preferred form of address", "Details shared by customer", "Inquiry ID", "Conversation ID", "Conversation status", "Chat ended at (Asia/Kolkata)", "Conversation close reason", "Final conversation transcript", "Timestamp (Asia/Kolkata)", "Language", "Conversation topic", "Customer tone signal", "Customer satisfaction signal", "Customer interest signal", "Budget mentioned signal", "Customer budget / price stated", "Purchase value / offer stated", "Property type mentioned", "Location mentioned", "Preferred size stated", "Follow-up requested signal", "Follow-up method", "Follow-up methods", "Follow-up summary", "Follow-up schedule status", "Follow-up cadence", "Follow-up consent timestamp (Asia/Kolkata)", "Next follow-up time (Asia/Kolkata)", "Human handoff requested signal", "Listing status asked signal", "Sale outcome mentioned signal", "User inquiry", "Assistant response", "Response type", "Matching records", *owner_fields]
+                    preview = pd.DataFrame(customer_summary_rows(filtered_rows)).tail(10).iloc[::-1]
+                    with st.expander("Purchase assessments and recorded outcomes", expanded=False):
+                        from purchase_assessment import HEADERS as assessment_headers
+                        assessment_table = pd.DataFrame(customer_summary_rows(filtered_rows)).reindex(
+                            columns=["User ID", "Customer name", "Conversation ID", *assessment_headers])
+                        st.caption("One row per conversation; evidence includes this customer's linked chat and visit history. Owner-recorded outcomes are kept separate from customer reports. No validated purchase probability is available yet.")
+                        st.dataframe(assessment_table, hide_index=True, use_container_width=True)
+                    with st.expander("Customer response summaries", expanded=False):
+                        st.dataframe(preview, hide_index=True, use_container_width=True)
+                    response_preview_columns = ["Inquiry ID", "Conversation ID", "Timestamp (Asia/Kolkata)", "Language", "Response type", "Assistant response"]
+                    response_preview = pd.DataFrame(filtered_rows).reindex(columns=response_preview_columns).fillna("")
+                    response_preview = response_preview[response_preview["Assistant response"].astype(str).str.strip().ne("")].tail(25).iloc[::-1]
+                    with st.expander("Mira responses", expanded=False):
+                        st.caption("Owner-only review of Mira's replies. Customer messages remain outside this view.")
+                        st.dataframe(response_preview.rename(columns={"Assistant response": "Mira response"}), hide_index=True, use_container_width=True)
+                else:
+                    st.info("No inquiries have been saved yet. Completed chat turns will appear here automatically.")
+            except Exception:
+                logging.exception("Could not load the private inquiry workbook")
+                st.error("The inquiry workbook could not be opened. Close it in Excel if it is open, then refresh this dashboard.")
     st.stop()
 
 st.session_state.setdefault("expand_mira_chat", False)
