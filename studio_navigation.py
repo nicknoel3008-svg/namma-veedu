@@ -41,6 +41,13 @@ def choose_topic():
             st.session_state.studio_customer_search=query
         if st.session_state.get('studio_customer_search')==query:
             return 'Customer CRM'
+    else:
+        topic=st.selectbox('Search available Mira Studio topics',list(TOPIC_DETAILS),
+                           index=None,placeholder='Click to see all topics, or type to search…',
+                           key='studio_topic_search',
+                           help='Choose any topic to open it directly. Use Search Mira Studio above for keywords or customer names.')
+        if topic:
+            return topic
     section=st.selectbox('Choose a section',list(SECTIONS),key='studio_navigation_section')
     return st.selectbox('Choose a topic',SECTIONS[section],key='studio_navigation_topic_'+section)
 

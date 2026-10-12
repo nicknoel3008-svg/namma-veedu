@@ -19,11 +19,18 @@ class NavigationTests(unittest.TestCase):
     def test_sections_and_topics(self):
         app=AppTest.from_string('from studio_navigation import choose_topic\nimport streamlit as st\nst.write(choose_topic())').run()
         self.assertFalse(app.exception)
-        self.assertEqual(app.selectbox[1].value,'Approve a visit')
+        self.assertEqual(app.selectbox[2].value,'Approve a visit')
         for section,topics in SECTIONS.items():
-            app.selectbox[0].select(section).run()
-            self.assertEqual(app.selectbox[1].options,topics)
+            app.selectbox[1].select(section).run()
+            self.assertEqual(app.selectbox[2].options,topics)
             self.assertFalse(app.exception)
+
+    def test_all_topics_available_in_search_dropdown(self):
+        app=AppTest.from_string('from studio_navigation import choose_topic\nimport streamlit as st\nst.write(choose_topic())').run()
+        self.assertEqual(set(app.selectbox[0].options),{topic for topics in SECTIONS.values() for topic in topics})
+        app.selectbox[0].select('Property advisor setup').run()
+        self.assertIn('Property advisor setup',app.markdown[-1].value)
+        self.assertFalse(app.exception)
 
     def test_approval_shortcut(self):
         with patch('visit_approval_ui.render') as render:
