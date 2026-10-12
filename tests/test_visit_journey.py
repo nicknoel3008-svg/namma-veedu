@@ -28,6 +28,16 @@ class VisitJourneyTests(unittest.TestCase):
     def remind(self):
         return run_visit_worker(self.config,self.db,now=self.at-timedelta(hours=1))
 
+    def test_crm_discovers_booking_before_email_worker_runs(self):
+        from crm_service import sync_visits, list_leads
+        rows=owner_journeys(self.db)
+        self.assertEqual(rows[0]['visit_id'],self.id)
+        self.assertEqual(rows[0]['confirmation email'],'Not sent')
+        sync_visits(rows,self.db)
+        self.assertEqual(list_leads(self.db)[0]['conversation_id'],'visit:'+self.id)
+        self.assertEqual(owner_journeys(self.db)[0]['visit_id'],self.id)
+        self.smtp.return_value.__enter__.return_value.send_message.assert_not_called()
+
     def test_confirmation_reminder_and_review_sequence(self):
         self.config['VISIT_CONFIRMATION_EMAIL_ENABLED']='true'
         early=self.at-timedelta(days=1)

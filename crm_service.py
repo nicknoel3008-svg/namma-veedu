@@ -274,7 +274,8 @@ def sync_visits(visits, db_path=FOLLOWUP_DB):
         schema(c)
         for visit in visits:
             conversation=str(visit.get('conversation_id') or '').strip()
-            if not conversation: continue
+            if not conversation:
+                conversation='visit:'+visit['visit_id']
             c.execute("""INSERT INTO crm_leads(id,conversation_id,customer_name,source,created_at,updated_at)
                 VALUES(?,?,?,?,?,?) ON CONFLICT(conversation_id) DO NOTHING""",
                 (uuid4().hex,conversation,_redact(visit.get('customer_name') or 'Unnamed customer')[:200],'Property visit',_stamp(),_stamp()))

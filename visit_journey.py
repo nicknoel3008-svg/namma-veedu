@@ -193,6 +193,11 @@ def owner_journeys(db_path=FOLLOWUP_DB):
         schema(c)
         from visit_whatsapp import outbox_schema
         outbox_schema(c)
+        # CRM visibility must not depend on the email worker creating a journey.
+        visits = c.execute('SELECT * FROM property_visit_requests').fetchall()
+        stamp = datetime.now(INDIA_TZ).isoformat(timespec='seconds')
+        for visit in visits:
+            ensure_journey(c, dict(visit), stamp)
         whatsapp_states = {(m['visit_id'],m['visit_at'],m['kind']):m['status'] for m in c.execute('SELECT visit_id,visit_at,kind,status FROM visit_whatsapp_outbox').fetchall()}
         rows = c.execute("""SELECT j.visit_id,j.visit_at,j.attendance,j.reason,j.attended,j.satisfied,
             j.assistance,j.assistance_details,j.advisor_consent,j.advisor_status,j.explore_consent,
