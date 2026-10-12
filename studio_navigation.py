@@ -6,9 +6,39 @@ SECTIONS = {
     'Settings and help': ['Team access', 'Health and readiness', 'Website blueprint'],
 }
 
+TOPIC_DETAILS = {
+    'Approve a visit': 'approve approval booking appointment schedule property access',
+    'WhatsApp confirmations': 'whatsapp message phone number manual send confirmation',
+    'Visit records and email status': 'email delivery sent smtp reminder follow up consent attendance visit status',
+    'Customer CRM': 'customer lead name advisor contact phone email deals tasks notes',
+    'Customer journey and outcomes': 'journey purchase interest satisfaction feedback outcome assistance reschedule',
+    'Overview and reports': 'reports performance analytics downloads excel inquiries conversations mira responses learning feedback ratings',
+    'Team access': 'team manager peer access account permissions',
+    'Health and readiness': 'health readiness configuration settings database groq',
+    'Website blueprint': 'blueprint documentation flowchart website design',
+}
+
+
+def search_topics(query):
+    words=query.casefold().split()
+    return [topic for topic,details in TOPIC_DETAILS.items()
+            if all(word in (topic+' '+details).casefold() for word in words)]
+
 
 def choose_topic():
     import streamlit as st
+    query=st.text_input('Search Mira Studio',placeholder='Search a topic, or enter a customer name…',key='studio_search').strip()
+    if query:
+        matches=search_topics(query)
+        if matches:
+            st.caption('Select a matching topic to open its details. Clear the search to browse all sections.')
+            return st.selectbox('Search results',matches,key='studio_search_result_'+query.casefold())
+        st.caption('No topic matches. Open the customer CRM to search saved customer names, locations or assigned advisors.')
+        if st.button('Search customer records for “'+query+'”',key='studio_search_customers'):
+            st.session_state.crm_search=query
+            st.session_state.studio_customer_search=query
+        if st.session_state.get('studio_customer_search')==query:
+            return 'Customer CRM'
     section=st.selectbox('Choose a section',list(SECTIONS),key='studio_navigation_section')
     return st.selectbox('Choose a topic',SECTIONS[section],key='studio_navigation_topic_'+section)
 
