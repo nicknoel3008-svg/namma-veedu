@@ -71,6 +71,18 @@ def response_link(visit,public_url,db_path=None):
     return public_url.rstrip('/')+'/?'+urlencode({'visit_response':row['token']}) if row else ''
 
 
+def recipient_number(lead, visits, visit=None):
+    """Reuse this customer's saved number; never infer it from another customer."""
+    if visit and visit.get('contact_method') == 'WhatsApp' and visit.get('contact_value'):
+        return visit['contact_value']
+    if lead.get('phone'):
+        return lead['phone']
+    for saved in sorted(visits, key=lambda v: v.get('visit_at', ''), reverse=True):
+        if saved.get('contact_method') == 'WhatsApp' and saved.get('contact_value'):
+            return saved['contact_value']
+    return ''
+
+
 def render(lead,visits,actor):
     import streamlit as st
     from crm_service import add_note
@@ -81,7 +93,8 @@ def render(lead,visits,actor):
     choice=st.selectbox('WhatsApp message context',options,format_func=lambda k: next((v['property_title']+' · '+v['visit_at'] for v in visits if v['visit_id']==k),k),key='crm_wa_context_'+lead['id'])
     visit=next((v for v in visits if v['visit_id']==choice),None)
     suffix=lead['id']+'_'+choice
-    phone=st.text_input('Recipient WhatsApp number (+country code)',value=visit['contact_value'] if visit and visit['contact_method']=='WhatsApp' else lead.get('phone',''),key='crm_wa_phone_'+suffix)
+    phone=st.text_input('Recipient WhatsApp number (+country code)',value=recipient_number(lead, visits, visit),key='crm_wa_phone_'+suffix)
+    st.caption('Filled automatically from this customer’s saved WhatsApp visit number or CRM phone. If neither is saved, ask the customer for their number.')
     if visit:
         at=datetime.fromisoformat(visit['visit_at'])
         mixed=bool(visit.get('followup_email') and visit.get('manual_whatsapp_confirmation_consent')=='Yes')

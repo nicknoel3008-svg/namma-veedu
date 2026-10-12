@@ -1521,7 +1521,7 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
         if visit_email_issues:
             st.warning("Visit emails need configuration: " + "; ".join(visit_email_issues))
         else:
-            st.info("Email settings are complete. Automatic sending also requires the visit worker to be running. Email statuses below show SMTP submission, not inbox delivery.")
+            st.info("The sender email is configured. The hosted background schedule sends reminders and follow-ups when they become due; delivery can be delayed between runs. ‘Sent’ means the email server accepted the message, not that it reached the customer’s inbox.")
         if st.button("Load visit requests", key="load_visit_requests"):
             st.session_state.visit_requests_loaded = True
         if st.session_state.get("visit_requests_loaded"):
@@ -5725,10 +5725,11 @@ def visit_request_dialog():
         visit_time = datetime.strptime(selected_time,"%H:%M").time()
     else:
         visit_time = st.time_input("Requested time (IST)",value=datetime.strptime("10:00","%H:%M").time(),step=1800,key="visit_custom_time")
+    # Channel selection must rerun immediately; widgets inside a form do not.
+    contact_method = st.selectbox("Contact for visit confirmation",["Email","WhatsApp"],key="visit_contact_method")
     with st.form("property_visit_request_form"):
         visit_name = st.text_input("உங்கள் பெயர்" if language == "தமிழ்" else "Your name",value=str(st.session_state.get("customer_name", "")),key="visit_customer_name")
-        contact_method = st.selectbox("Contact for visit confirmation",["Email","WhatsApp"],key="visit_contact_method")
-        contact_value = st.text_input("Email address or WhatsApp number with country code",key="visit_contact_value")
+        contact_value = st.text_input("WhatsApp number with country code (for example +91…)" if contact_method == "WhatsApp" else "Email address",key="visit_contact_value")
         consent = st.checkbox("இந்தப் பார்வைக் கோரிக்கைக்காக என் தொடர்பு விவரங்களை உரிமையாளருடன் பகிர ஒப்புக்கொள்கிறேன்." if language == "தமிழ்" else "I agree to share my contact with the Namma Veedu owner for this property visit request.",key="visit_consent")
         followup_email = st.text_input("Email for automatic visit confirmation, reminders and follow-ups (required if opting in)", key="visit_followup_email")
         visit_email_reminders = st.checkbox("I agree to email visit confirmation, reminders, attendance and property feedback requests, an additional attendance check, assistance acknowledgments and one outcome follow-up.", key="visit_email_reminders")
