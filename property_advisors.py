@@ -135,6 +135,24 @@ def run_advisor_worker(config, db_path=FOLLOWUP_DB, *, now=None):
     return sent,failed
 
 
+def apply_assignment_edits(rows, edits, contacts):
+    updated=[dict(row) for row in rows]
+    for index,changes in edits.items():
+        row=updated[int(index)]
+        row.update({key:value for key,value in changes.items() if key in ('Select','Saved CRM advisor','Advisor','Advisor email','Prepare register')})
+        if 'Saved CRM advisor' in changes:
+            contact=contacts.get(changes['Saved CRM advisor'])
+            if contact:
+                row['Advisor']=contact['name'];row['Advisor email']=contact['email']
+                row['Assignment']='Temporary - actual site advisor pending'
+            else:
+                row['Assignment']='Owner / property source - verify before approval'
+        elif 'Advisor' in changes or 'Advisor email' in changes:
+            row['Saved CRM advisor']='Custom / property source'
+            row['Assignment']='Owner edited - verify before approval'
+    return updated
+
+
 def render_setup():
     import streamlit as st
     import pandas as pd
@@ -145,42 +163,61 @@ def render_setup():
     if not properties:
         st.info('Properties appear here when their first visit request is saved.');return
     saved={r['property_key']:r for r in assignments()}
-    key=st.selectbox('Property',list(properties),format_func=lambda k:properties[k],key='advisor_property_setup')
-    old=saved.get(key,{})
-    suggestion={}
-    if not old:
-        from property_search import load_properties
-        try:
-            suggestion=suggested_assignment(next(v for v in visits if v['property_key']==key),load_properties().fillna('').to_dict('records'))
-        except (OSError,ValueError):
-            st.warning('The property contact dataset could not be read. Saved advisor contacts remain available.')
-        if suggestion:
-            old=suggestion
-            st.info('Filled from this property’s saved source contact. Check the recipient before approving private register access.')
-            st.caption('Contact source: '+str(suggestion['source']))
-        else:
-            from advisor_directory import advisors
-            directory=[r for r in advisors() if r['role']=='Property agent']
-            st.info('No property-specific advisor name and email are recorded for this property. Choose an existing directory contact below if they handle this site. A general directory contact is not automatically assigned to a location.')
-            if directory:
-                chosen=st.selectbox('Use an existing advisor contact (no typing needed)',range(len(directory)),index=None,
-                    format_func=lambda i:directory[i]['name']+' — '+directory[i]['email'],key='advisor_directory_choice_'+key)
-                if chosen is not None:
-                    old={'advisor':directory[chosen]['name'],'email':directory[chosen]['email']}
-    identity=str(old.get('advisor',''))+'|'+str(old.get('email',''))
+    from advisor_directory import advisors
+    from property_search import load_properties
+    from functools import partial
     from hashlib import sha256
-    with st.form('property_advisor_'+key+'_'+sha256(identity.encode()).hexdigest()[:12]):
-        name=st.text_input('Property advisor name',value=old.get('advisor',''))
-        email=st.text_input('Property advisor email',value=old.get('email',''))
-        active=st.checkbox('Prepare private attendance registers for owner approval',value=old.get('active')=='Yes')
-        st.caption('Enabling delivery grants this advisor access to customer names and appointment times for this property. Changing or disabling the assignment revokes its existing register links.')
-        if st.form_submit_button('Add advisor changes to owner review'):
-            try:
-                from owner_approvals import stage
-                stage('advisor:'+key,'Advisor for '+properties[key]+': '+name+' — '+email,
-                      lambda: save_assignment(key,name,email,active=active,actor=str(st.session_state.get('mira_studio_identity') or 'Owner')))
-            except ValueError as e:st.error(str(e))
-    st.dataframe(pd.DataFrame([{'Property':title,'Advisor':saved.get(k,{}).get('advisor',''),'Email':saved.get(k,{}).get('email',''),'Status':'Owner approval required before sharing' if saved.get(k,{}).get('active')=='Yes' else 'Register preparation disabled'} for k,title in properties.items()]),hide_index=True)
+    directory=[r for r in advisors() if r['role']=='Property agent']
+    contacts={r['name']+' | '+r['email']:r for r in directory}
+    try:
+        records=load_properties().fillna('').to_dict('records')
+    except (OSError,ValueError):
+        records=[]
+        st.warning('Property contact data could not be read. Saved CRM contacts remain available.')
+    fingerprint=sha256(repr((properties,saved,directory)).encode()).hexdigest()
+    if st.session_state.get('advisor_table_fingerprint')!=fingerprint:
+        rows=[]
+        for key,title in properties.items():
+            old=saved.get(key) or suggested_assignment(next(v for v in visits if v['property_key']==key),records)
+            # User authorized CRM contacts as temporary assignments; never send before approval.
+            if not old and directory:
+                old={'advisor':directory[0]['name'],'email':directory[0]['email']}
+            choice=next((label for label,r in contacts.items() if r['name']==old.get('advisor') and r['email']==old.get('email')),'Custom / property source')
+            rows.append({'Select':False,'Property':title,'Saved CRM advisor':choice,
+                'Advisor':old.get('advisor',''),'Advisor email':old.get('email',''),
+                'Prepare register':old.get('active','Yes')=='Yes',
+                'Assignment':'Temporary - actual site advisor pending' if choice in contacts else 'Owner / property source - verify before approval',
+                'Property key':key})
+        st.session_state.advisor_table_rows=rows
+        st.session_state.advisor_table_fingerprint=fingerprint
+        st.session_state.advisor_table_revision=st.session_state.get('advisor_table_revision',0)+1
+    def select_all_rows():
+        for row in st.session_state.advisor_table_rows:row['Select']=st.session_state.advisor_table_all
+        st.session_state.advisor_table_revision+=1
+    st.caption('Review and edit advisors directly in this table. Saved CRM contacts are temporary suggestions until actual site contacts are available. Choosing a saved advisor fills their name and email. Selected rows are staged for Owner approval; no register is shared here.')
+    st.checkbox('Select all properties',key='advisor_table_all',on_change=select_all_rows)
+    editor_key='advisor_assignment_table_'+str(st.session_state.advisor_table_revision)
+    def apply_edits():
+        edits=st.session_state.get(editor_key,{}).get('edited_rows',{})
+        st.session_state.advisor_table_rows=apply_assignment_edits(st.session_state.advisor_table_rows,edits,contacts)
+        st.session_state.advisor_table_revision+=1
+    edited=st.data_editor(st.session_state.advisor_table_rows,hide_index=True,use_container_width=True,
+        disabled=['Property','Property key','Assignment'],key=editor_key,on_change=apply_edits,
+        column_config={'Property key':None,'Select':st.column_config.CheckboxColumn('Select'),
+            'Saved CRM advisor':st.column_config.SelectboxColumn('Saved CRM advisor',options=['Custom / property source',*contacts]),
+            'Prepare register':st.column_config.CheckboxColumn('Prepare register')})
+    selected=[r for r in edited if r['Select']]
+    if st.button('Add selected changes to owner review',disabled=not selected,key='advisor_table_stage'):
+        invalid=[r['Property'] for r in selected if not str(r['Advisor']).strip() or not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',str(r['Advisor email']).strip())]
+        if invalid:
+            st.error('A valid advisor name and email are missing for: '+', '.join(invalid))
+        else:
+            from owner_approvals import stage
+            actor=str(st.session_state.get('mira_studio_identity') or 'Owner')
+            for row in selected:
+                stage('advisor:'+row['Property key'],'Advisor for '+row['Property']+': '+row['Advisor']+' - '+row['Advisor email'],
+                    partial(save_assignment,row['Property key'],row['Advisor'],row['Advisor email'],active=bool(row['Prepare register']),actor=actor))
+            st.info('Open Owner review at the top, review your selected assignments, then Approve all changes.')
     with _connect() as c:
         schema(c)
         delivery=[dict(r) for r in c.execute('''SELECT v.customer_name,v.property_title,v.visit_at,d.recipient,d.status,d.updated_at

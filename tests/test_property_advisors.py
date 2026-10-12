@@ -10,6 +10,29 @@ from property_advisors import save_assignment,run_advisor_worker,schema
 from visit_attendance import register_context
 
 class AdvisorAutomationTests(unittest.TestCase):
+    def test_editable_table_select_all_stages_without_saving(self):
+        from streamlit.testing.v1 import AppTest
+        script="import streamlit as st\nst.session_state.owner_dashboard_authenticated=True\nfrom property_advisors import render_setup\nrender_setup()"
+        with patch('visit_service.list_visit_requests',return_value=self.visits),patch('property_advisors.assignments',return_value=[]),patch('advisor_directory.advisors',return_value=[{'role':'Property agent','name':'Temporary advisor','email':'temporary@example.com'}]),patch('property_search.load_properties') as load,patch('property_advisors._connect',side_effect=lambda *a,**k:_connect(self.db)),patch('property_advisors.save_assignment') as save:
+            load.return_value.fillna.return_value.to_dict.return_value=[]
+            app=AppTest.from_string(script).run()
+            self.assertFalse(app.exception)
+            self.assertEqual(len(app.text_input),0)
+            self.assertTrue(app.button[0].disabled)
+            app.checkbox[0].check().run()
+            self.assertFalse(app.button[0].disabled)
+            app.button[0].click().run()
+            self.assertFalse(app.exception)
+            save.assert_not_called()
+            self.assertEqual(len(app.session_state['owner_pending_changes']),2)
+
+    def test_table_contact_selection_fills_only_edited_property(self):
+        from property_advisors import apply_assignment_edits
+        rows=[{'Property':'A','Advisor':'Old','Advisor email':'old@example.com'},{'Property':'B','Advisor':'Other','Advisor email':'other@example.com'}]
+        result=apply_assignment_edits(rows,{0:{'Saved CRM advisor':'New'}},{'New':{'name':'New advisor','email':'new@example.com'}})
+        self.assertEqual(result[0]['Advisor email'],'new@example.com')
+        self.assertEqual(result[1],rows[1])
+        self.assertEqual(rows[0]['Advisor'],'Old')
     def test_prefill_requires_exact_property_and_unambiguous_contact(self):
         from property_advisors import suggested_assignment
         from visit_service import property_key
