@@ -4,6 +4,8 @@ import csv
 import io
 import pandas as pd
 import streamlit as st
+from functools import partial
+from owner_approvals import stage as queue_change
 from agent_runtime import INDIA_TZ
 from crm_service import (create_lead,save_profile,list_records,save_task,save_deal,
                          DEAL_STAGES,TASK_STATUSES,PRIORITIES,report)
@@ -28,11 +30,10 @@ def create_customer():
             location=st.text_input('Preferred location')
             budget=st.text_input('Stated budget')
             source=st.text_input('Lead source',value='Manual')
-            submit=st.form_submit_button('Create customer')
+            submit=st.form_submit_button('Add to owner review - Create customer')
         if submit:
             try:
-                create_lead(name,email=email,phone=phone,location=location,budget=budget,source=source,actor=str(st.session_state.get('mira_studio_identity') or 'Owner'))
-                st.session_state.crm_loaded=True; st.rerun()
+                queue_change('new_customer:'+email+':'+name,'New customer: '+name,partial(create_lead,name,email=email,phone=phone,location=location,budget=budget,source=source,actor=str(st.session_state.get('mira_studio_identity') or 'Owner')))
             except ValueError as error: st.error(str(error))
 
 
@@ -50,10 +51,10 @@ def render_workspace(lead,leads,actor):
             kind=st.text_input('Property preference',value=lead['property_type'])
             budget=st.text_input('Customer budget',value=lead['budget'])
             source=st.text_input('Profile source',value=lead.get('source',''))
-            save=st.form_submit_button('Save customer profile')
+            save=st.form_submit_button('Add to owner review - Save customer profile')
         if save:
             try:
-                save_profile(lead['id'],version=lead['version'],name=name,email=email,phone=phone,location=location,property_type=kind,budget=budget,source=source,actor=actor); st.rerun()
+                queue_change('profile:'+lead['id'],'Customer profile: '+name,partial(save_profile,lead['id'],version=lead['version'],name=name,email=email,phone=phone,location=location,property_type=kind,budget=budget,source=source,actor=actor))
             except ValueError as error: st.error(str(error))
     with deal_tab:
         linked=[r for r in deals if r['lead_id']==lead['id']]
@@ -68,10 +69,10 @@ def render_workspace(lead,leads,actor):
             advisor=st.text_input('Deal advisor',value=current.get('assigned_to',lead['assigned_to']))
             close=st.text_input('Expected close date (YYYY-MM-DD, optional)',value=current.get('expected_close',''))
             reason=st.text_area('Reason if lost',value=current.get('loss_reason',''))
-            save=st.form_submit_button('Save property deal')
+            save=st.form_submit_button('Add to owner review - Save property deal')
         if save:
             try:
-                save_deal(lead['id'],title,property_reference=reference,value_inr=value,stage=stage,assigned_to=advisor,expected_close=close,loss_reason=reason,record_id=current.get('id'),version=current.get('version',0),actor=actor); st.rerun()
+                queue_change('deal:'+lead['id']+':'+selected,'Property deal: '+title,partial(save_deal,lead['id'],title,property_reference=reference,value_inr=value,stage=stage,assigned_to=advisor,expected_close=close,loss_reason=reason,record_id=current.get('id'),version=current.get('version',0),actor=actor))
             except ValueError as error: st.error(str(error))
         st.caption('Won is a team-recorded sales stage. Record purchase verification separately in visit management.')
     with task_tab:
@@ -87,10 +88,10 @@ def render_workspace(lead,leads,actor):
             clock=st.time_input('Task time (IST)',value=when.time().replace(tzinfo=None))
             status=st.selectbox('Task status',TASK_STATUSES,index=TASK_STATUSES.index(current.get('status','Open')))
             priority=st.selectbox('Task priority',PRIORITIES,index=PRIORITIES.index(current.get('priority','Normal')))
-            save=st.form_submit_button('Save advisor task')
+            save=st.form_submit_button('Add to owner review - Save advisor task')
         if save:
             try:
-                save_task(lead['id'],title,datetime.combine(day,clock,tzinfo=INDIA_TZ).isoformat(),assigned_to=advisor,status=status,priority=priority,record_id=current.get('id'),version=current.get('version',0),actor=actor); st.rerun()
+                queue_change('task:'+lead['id']+':'+selected,'Advisor task: '+title,partial(save_task,lead['id'],title,datetime.combine(day,clock,tzinfo=INDIA_TZ).isoformat(),assigned_to=advisor,status=status,priority=priority,record_id=current.get('id'),version=current.get('version',0),actor=actor))
             except ValueError as error: st.error(str(error))
         st.caption('Tasks are internal work reminders; they do not send customer messages.')
     with reports:

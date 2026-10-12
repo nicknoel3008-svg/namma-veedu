@@ -20,8 +20,19 @@ class AdvisorAutomationTests(unittest.TestCase):
         with _connect(self.db) as c:self.visits=[dict(r) for r in c.execute('SELECT * FROM property_visit_requests').fetchall()]
         self.cfg=dict(VISIT_EMAIL_ENABLED='true',FOLLOWUP_SMTP_HOST='smtp.example.com',FOLLOWUP_SMTP_USERNAME='sender',FOLLOWUP_SMTP_PASSWORD='test',FOLLOWUP_SMTP_FROM='sender@example.com',FOLLOWUP_PUBLIC_URL='https://example.com')
 
+
+    def approve_ready(self):
+        from owner_approvals import approve_messages
+        with patch('property_advisors.smtplib.SMTP') as smtp:
+            self.assertEqual(run_advisor_worker(self.cfg,self.db),(0,0))
+            smtp.assert_not_called()
+        with _connect(self.db) as c:
+            ids=[r['id'] for r in c.execute("SELECT id FROM advisor_register_delivery WHERE status='queued'")]
+        approve_messages([('advisor',identifier) for identifier in ids],'Owner',self.db)
+
     def test_separate_scopes_dedup_and_reassignment_revokes(self):
         for v in self.visits:save_assignment(v['property_key'],v['customer_name']+' advisor',v['customer_name']+'advisor@example.com',db_path=self.db)
+        self.approve_ready()
         with patch('property_advisors.smtplib.SMTP') as smtp:
             self.assertEqual(run_advisor_worker(self.cfg,self.db),(2,0))
             self.assertEqual(run_advisor_worker(self.cfg,self.db),(0,0))
@@ -33,6 +44,7 @@ class AdvisorAutomationTests(unittest.TestCase):
         v=self.visits[0];old=next(r for r in rows if r['visit_id']==v['id'])
         save_assignment(v['property_key'],'Replacement','replacement@example.com',db_path=self.db)
         self.assertIsNone(register_context(old['token'],self.db))
+        self.approve_ready()
         with patch('property_advisors.smtplib.SMTP'):
             self.assertEqual(run_advisor_worker(self.cfg,self.db),(1,0))
 
@@ -43,6 +55,7 @@ class AdvisorAutomationTests(unittest.TestCase):
         save_assignment(v['property_key'],'Advisor','advisor@example.com',active=False,db_path=self.db)
         self.assertEqual(run_advisor_worker(self.cfg,self.db),(0,0))
         save_assignment(v['property_key'],'Advisor','advisor@example.com',db_path=self.db)
+        self.approve_ready()
         with patch('property_advisors.smtplib.SMTP',side_effect=TimeoutError):
             self.assertEqual(run_advisor_worker(self.cfg,self.db),(0,1))
             self.assertEqual(run_advisor_worker(self.cfg,self.db),(0,0))

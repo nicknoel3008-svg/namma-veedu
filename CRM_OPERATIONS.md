@@ -12,3 +12,11 @@ Mira Studio uses section/topic dropdowns and topic search.
 - Actual attendance, professional assistance and unresolved factual disputes still require the responsible person. No attendance is inferred from silence.
 
 No advisor assignments or contacts are invented. Until an active assignment is saved, no advisor email is sent. Customer email reminders and feedback continue independently.
+
+Owner approval workflow
+-----------------------
+Mira Studio now has an Owner review panel with Approve all changes. Use each supported section's Add to owner review button first; unsubmitted form edits are not included. Staged dashboard edits remain in the signed-in browser session and should be approved before signing out. Advisor assignments, visit decisions, customer profiles, leads, deals, tasks, notes, customer outcomes, advisor progress, Mira reviews and learning edits use this review step. Learning rules retain the approval status chosen in the editor.
+
+The hosted workers prepare advisor-register and visit-email queues, but each queued message requires explicit Owner approval before submission. Scheduled general email follow-ups and purchase receipts also require approval. Review recipients in the panel. Changing an advisor revokes old links and cancels queued deliveries to the old assignment; newly prepared messages require fresh review. Approving an assignment alone does not authorize future register sharing.
+
+Only reviewed pending items are approved; future reminders and follow-ups appear when due. Expired visit reminders are skipped by the worker. The worker performs actual email submission after approval. WhatsApp sending still requires pressing Send in WhatsApp. Team access/security changes and customer-submitted responses retain their dedicated controls. Successful items save individually; a failed item remains pending and withholds the batch's email approvals.

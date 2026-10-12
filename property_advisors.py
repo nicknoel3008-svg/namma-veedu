@@ -1,4 +1,4 @@
-"""Property advisor assignments and durable automatic register delivery."""
+"""Property advisor assignments and owner-approved register delivery."""
 from datetime import datetime, timedelta
 from uuid import uuid4
 import re
@@ -51,7 +51,7 @@ def save_assignment(property_key, advisor, email, *, active=True, actor='Owner',
             revision=excluded.revision,updated_at=excluded.updated_at''',
             (property_key,advisor[:120],email,'Yes' if active else 'No',uuid4().hex,stamp))
         c.execute('INSERT INTO advisor_assignment_history VALUES(?,?,?,?,?)',
-            (uuid4().hex,property_key,actor,'Advisor assignment saved; automatic delivery '+('enabled' if active else 'disabled'),stamp))
+            (uuid4().hex,property_key,actor,'Advisor assignment saved; register preparation '+('enabled' if active else 'disabled')+'; owner approval required before delivery',stamp))
 
 
 def assignments(db_path=FOLLOWUP_DB):
@@ -90,6 +90,8 @@ def run_advisor_worker(config, db_path=FOLLOWUP_DB, *, now=None):
     sent=failed=0
     for item in queued:
         with _connect(db_path) as c:
+            from owner_approvals import is_approved
+            if not is_approved(c,'advisor',item['id']):continue
             v=c.execute('''SELECT v.*,a.advisor,a.email,a.revision,a.active,r.revoked,r.expires_at
                 FROM property_visit_requests v JOIN property_advisors a ON a.property_key=v.property_key
                 JOIN advisor_visit_registers r ON r.token=? WHERE v.id=?''',(item['token'],item['visit_id'])).fetchone()
@@ -120,7 +122,7 @@ def render_setup():
     import pandas as pd
     from visit_service import list_visit_requests
     if not st.session_state.get('owner_dashboard_authenticated'):return
-    st.subheader('Property advisors and automatic registers')
+    st.subheader('Property advisors and register approval')
     visits=list_visit_requests();properties={v['property_key']:v['property_title'] for v in visits}
     if not properties:
         st.info('Properties appear here when their first visit request is saved.');return
@@ -130,14 +132,15 @@ def render_setup():
     with st.form('property_advisor_'+key):
         name=st.text_input('Property advisor name',value=old.get('advisor',''))
         email=st.text_input('Property advisor email',value=old.get('email',''))
-        active=st.checkbox('Automatically email private attendance registers to this assigned advisor',value=old.get('active')=='Yes')
+        active=st.checkbox('Prepare private attendance registers for owner approval',value=old.get('active')=='Yes')
         st.caption('Enabling delivery grants this advisor access to customer names and appointment times for this property. Changing or disabling the assignment revokes its existing register links.')
-        if st.form_submit_button('Save property advisor'):
+        if st.form_submit_button('Add advisor changes to owner review'):
             try:
-                save_assignment(key,name,email,active=active,actor=str(st.session_state.get('mira_studio_identity') or 'Owner'))
-                st.success('Saved. The hosted worker creates and emails registers for confirmed visits automatically.');st.rerun()
+                from owner_approvals import stage
+                stage('advisor:'+key,'Advisor for '+properties[key]+': '+name+' — '+email,
+                      lambda: save_assignment(key,name,email,active=active,actor=str(st.session_state.get('mira_studio_identity') or 'Owner')))
             except ValueError as e:st.error(str(e))
-    st.dataframe(pd.DataFrame([{'Property':title,'Advisor':saved.get(k,{}).get('advisor',''),'Email':saved.get(k,{}).get('email',''),'Status':'Automatic delivery enabled' if saved.get(k,{}).get('active')=='Yes' else 'Advisor setup required'} for k,title in properties.items()]),hide_index=True)
+    st.dataframe(pd.DataFrame([{'Property':title,'Advisor':saved.get(k,{}).get('advisor',''),'Email':saved.get(k,{}).get('email',''),'Status':'Owner approval required before sharing' if saved.get(k,{}).get('active')=='Yes' else 'Register preparation disabled'} for k,title in properties.items()]),hide_index=True)
     with _connect() as c:
         schema(c)
         delivery=[dict(r) for r in c.execute('''SELECT v.customer_name,v.property_title,v.visit_at,d.recipient,d.status,d.updated_at

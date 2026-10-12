@@ -74,19 +74,22 @@ def render():
         existing=datetime.fromisoformat(lead['due_at']) if lead['due_at'] else now
         day=st.date_input('Action date',value=existing.date())
         clock=st.time_input('Action time (IST)',value=existing.time().replace(tzinfo=None))
-        save=st.form_submit_button('Save lead')
+        save=st.form_submit_button('Add lead changes to owner review')
     if save:
         try:
-            save_lead(lead_id,version=lead['version'],stage=selected_stage,priority=priority,assigned_to=advisor,next_action=action,due_at=datetime.combine(day,clock,tzinfo=INDIA_TZ).isoformat() if has_due else '',actor=actor)
-            st.rerun()
+            from functools import partial
+            from owner_approvals import stage as queue_change
+            queue_change('lead:'+lead_id,'Lead changes: '+lead['customer_name'],partial(save_lead,lead_id,version=lead['version'],stage=selected_stage,priority=priority,assigned_to=advisor,next_action=action,due_at=datetime.combine(day,clock,tzinfo=INDIA_TZ).isoformat() if has_due else '',actor=actor))
         except ValueError as error:
             st.error(str(error))
     with st.form('crm_note_'+lead_id):
         note=st.text_area('Add an advisor note')
-        note_save=st.form_submit_button('Save note')
+        note_save=st.form_submit_button('Add note to owner review')
     if note_save:
         try:
-            add_note(lead_id,note,actor=actor); st.rerun()
+            from functools import partial
+            from owner_approvals import stage as queue_change
+            queue_change('note:'+lead_id,'Advisor note: '+lead['customer_name'],partial(add_note,lead_id,note,actor=actor))
         except ValueError as error:
             st.error(str(error))
     st.write('Activity history')

@@ -289,6 +289,8 @@ def run_visit_worker(config, db_path=FOLLOWUP_DB, *, now=None, delivery_test=Fal
     sent=failed=0
     for mail in queued:
         with _connect(db_path) as c:
+            from owner_approvals import is_approved
+            if not delivery_test and not is_approved(c,'visit',mail['id']):continue
             visit = c.execute('SELECT * FROM property_visit_requests WHERE id=?', (mail['visit_id'],)).fetchone()
             j = c.execute('SELECT * FROM visit_journeys WHERE visit_id=?',(mail['visit_id'],)).fetchone()
             at = datetime.fromisoformat(mail['visit_at'])

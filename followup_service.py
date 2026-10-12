@@ -259,6 +259,9 @@ def send_due_followups(config: dict[str, str], db_path: Path = FOLLOWUP_DB, *, s
             continue
         delivery_id = row["id"]
         with _connect(db_path) as connection:
+            from owner_approvals import is_approved
+            approval_id=delivery_id+':'+str(row['sent_count'])+':'+row['next_send_at']
+            if not is_approved(connection,'followup',approval_id):continue
             claimed = connection.execute(
                 "UPDATE email_followups SET status='sending', updated_at=? WHERE id=? AND status='scheduled'",
                 (now.isoformat(timespec="seconds"), delivery_id),

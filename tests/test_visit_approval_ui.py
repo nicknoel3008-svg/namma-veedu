@@ -26,5 +26,7 @@ class ApprovalTests(unittest.TestCase):
             self.assertFalse(app.button[0].disabled)
             app.button[0].click().run()
             self.assertFalse(app.exception)
+            save.assert_not_called()
+            pending=app.session_state['owner_pending_changes']
+            pending['visit_approvals'][1]()
             save.assert_called_once_with('v','Confirmed')
-            self.assertIn('1 visit(s) approved',app.success[0].value)

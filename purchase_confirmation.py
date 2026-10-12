@@ -95,6 +95,8 @@ def run_purchase_worker(config,db_path=FOLLOWUP_DB):
             state=target+'_mail';address=row[target+'_email']
             if row[state]!='queued':continue
             with _connect(db_path) as c:
+                from owner_approvals import is_approved
+                if not is_approved(c,'purchase',row['id']+':'+target):continue
                 if not address:
                     c.execute(f"UPDATE purchase_receipts SET {state}='needs_review' WHERE id=? AND {state}='queued'",(row['id'],));failed+=1;continue
                 claim=c.execute(f"UPDATE purchase_receipts SET {state}='sending' WHERE id=? AND {state}='queued'",(row['id'],))

@@ -44,10 +44,13 @@ def render():
                 column_config={'Approve':st.column_config.CheckboxColumn('Approve',default=False),'Request ID':None},
                 key='visit_bulk_editor_'+str(st.session_state.get('visit_bulk_revision',0))+'_'+str(all_selected))
             count=sum(bool(row['Approve']) for row in selected)
-            if st.button(f'Approve selected visits ({count})',disabled=not count,key='visit_bulk_approve'):
-                st.session_state.visit_bulk_result=approve_selected(selected)
-                st.session_state.visit_bulk_revision=st.session_state.get('visit_bulk_revision',0)+1
-                st.rerun()
+            if st.button(f'Add selected visits to owner review ({count})',disabled=not count,key='visit_bulk_approve'):
+                from owner_approvals import stage
+                chosen=[dict(row) for row in selected if row['Approve']]
+                def save_visits():
+                    approved,errors=approve_selected(chosen)
+                    if errors:raise ValueError('; '.join(errors))
+                stage('visit_approvals',str(count)+' selected visit approval(s)',save_visits)
         else:
             st.info('No pending visit requests to approve.')
         with st.expander('All visit requests and booking status',expanded=not pending):

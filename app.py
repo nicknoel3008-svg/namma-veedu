@@ -1444,6 +1444,8 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
     # A successful sign-in now opens a dedicated main-page dashboard. Keeping
     # this out of dynamically inserted tabs makes the export easy to find.
     st.title("Mira Studio")
+    from owner_approvals import render as render_owner_approvals
+    render_owner_approvals()
     from studio_navigation import choose_topic, render_shortcut
     studio_topic = choose_topic()
     st.markdown('<style>' + (ROOT / 'static' / 'owner-coastal.css').read_text(encoding='utf-8') + '</style>', unsafe_allow_html=True)
@@ -1540,12 +1542,13 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
                         edited_visits = st.data_editor(visit_frame, key="visit_requests_editor", hide_index=True,
                             disabled=[column for column in visit_frame.columns if column != "status"],
                             column_config={"status":st.column_config.SelectboxColumn("Visit status",options=list(VISIT_STATUSES),required=True)})
-                        if st.button("Save visit decisions",key="save_visit_decisions"):
-                            for original, updated in zip(visits,edited_visits.to_dict("records")):
-                                if original["status"] != updated["status"]:
-                                    update_visit_status(original["id"],updated["status"])
-                            st.success("Visit decisions saved. Eligible email confirmations will be processed by the scheduled visit worker.")
-                            st.rerun()
+                        if st.button("Add visit decisions to owner review",key="save_visit_decisions"):
+                            from owner_approvals import stage
+                            changes=[(old["id"],new["status"]) for old,new in zip(visits,edited_visits.to_dict("records")) if old["status"]!=new["status"]]
+                            def apply_visits(rows=changes):
+                                from visit_service import update_visit_status
+                                for identifier,status in rows:update_visit_status(identifier,status)
+                            stage('visit_decisions','Visit booking status changes',apply_visits)
                         st.download_button("Download visit requests (.csv)",visit_frame.to_csv(index=False),file_name="namma_veedu_visit_requests.csv",mime="text/csv")
                         from visit_journey import owner_journeys, set_advisor_status
                         st.markdown("##### Visit responses and advisor requests")
@@ -1555,12 +1558,13 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
                             journey_edited = st.data_editor(journey_frame, key="visit_journey_editor", hide_index=True,
                                 disabled=[column for column in journey_frame.columns if column != "advisor_status"],
                                 column_config={"advisor_status": st.column_config.SelectboxColumn("Advisor status", options=["", "Requested", "Contacting", "Connected", "Closed"])})
-                            if st.button("Save advisor progress", key="save_visit_advisor_progress"):
-                                for original, updated in zip(journey_rows, journey_edited.to_dict("records")):
-                                    if original["advisor_status"] != updated["advisor_status"]:
-                                        set_advisor_status(original["visit_id"], updated["advisor_status"])
-                                st.success("Advisor progress saved. No messages sent.")
-                                st.rerun()
+                            if st.button("Add advisor progress to owner review",key="save_visit_advisor_progress"):
+                                from owner_approvals import stage
+                                changes=[(old["visit_id"],new["advisor_status"]) for old,new in zip(journey_rows,journey_edited.to_dict("records")) if old["advisor_status"]!=new["advisor_status"]]
+                                def apply_progress(rows=changes):
+                                    from visit_journey import set_advisor_status
+                                    for identifier,status in rows:set_advisor_status(identifier,status)
+                                stage('advisor_progress','Advisor request progress changes',apply_progress)
                         else:
                             st.info("No visit email journeys yet. The scheduled worker creates them for confirmed visits with email consent.")
 
@@ -1609,18 +1613,20 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
                         with st.form("purchase_outcome_form"):
                             outcome=st.selectbox("Outcome",["Unknown","Still deciding","Purchased","Did not purchase"])
                             note=st.text_area("Evidence or source of confirmation (no bank or identity details)")
-                            if st.form_submit_button("Save purchase outcome"):
-                                record_purchase_outcome(visit_choice,outcome,note)
-                                st.success("Outcome and evidence saved. No messages sent.")
+                            if st.form_submit_button("Add purchase outcome to owner review"):
+                                from owner_approvals import stage
+                                from functools import partial
+                                stage('purchase:'+visit_choice,'Verified purchase outcome: '+outcome,partial(record_purchase_outcome,visit_choice,outcome,note))
                     st.markdown("##### Advisor directory and handoff drafts")
                     from advisor_directory import save_advisor, advisors, prepare_handoff
                     with st.form("advisor_directory_form"):
                         advisor_role=st.selectbox("Advisor role",["Property agent","Loan advisor"])
                         advisor_name=st.text_input("Advisor name")
                         advisor_email=st.text_input("Advisor email")
-                        if st.form_submit_button("Save advisor contact"):
-                            save_advisor(advisor_role,advisor_name,advisor_email)
-                            st.success("Advisor contact saved privately. No message sent.")
+                        if st.form_submit_button("Add advisor contact to owner review"):
+                            from owner_approvals import stage
+                            from functools import partial
+                            stage('directory:'+advisor_role+':'+advisor_email,'Advisor contact: '+advisor_name+' - '+advisor_email,partial(save_advisor,advisor_role,advisor_name,advisor_email))
                     directory=advisors()
                     if directory:
                         st.dataframe(pd.DataFrame(directory),hide_index=True)
@@ -1898,15 +1904,19 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
                             },
                             key=editor_key,
                         )
-                        save_tracking = st.form_submit_button("Save outcome updates", type="primary")
+                        save_tracking = st.form_submit_button("Add outcome updates to owner review", type="primary")
                     if save_tracking:
-                        saved = 0
+                        from owner_approvals import stage
+                        changes=[]
                         for _, tracked_row in edited.iterrows():
                             fields = {field: tracked_row.get(field, "") for field in owner_fields}
                             fields["Customer interest (owner)"] = tracked_row.get("Customer interest", "Not stated")
-                            saved += bool(update_inquiry_fields(str(tracked_row.get("Inquiry ID", "")), fields))
-                        st.success(f"Saved updates for {saved:,} inquiry rows.")
-                        st.rerun()
+                            changes.append((str(tracked_row.get("Inquiry ID", "")),fields))
+                        def apply_outcomes(rows=changes):
+                            for identifier,fields in rows:
+                                if not update_inquiry_fields(identifier,fields):
+                                    raise ValueError('An inquiry could not be updated: '+identifier)
+                        stage('outcomes','Customer and listing outcome updates',apply_outcomes)
 
                     st.markdown("#### Mira quality review")
                     st.caption("Review flagged conversations, record the intended handling, and use your notes to guide Mira improvements. Flags are review cues, not a verdict that Mira was wrong.")
@@ -1949,17 +1959,18 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
                                 },
                                 key=f"mira_quality_{editor_key}",
                             )
-                            save_review = st.form_submit_button("Save Mira review", type="primary")
+                            save_review = st.form_submit_button("Add Mira review changes to owner review", type="primary")
                         if save_review:
-                            saved = 0
-                            for _, review_row in reviewed.iterrows():
-                                saved += bool(update_inquiry_fields(str(review_row.get("Inquiry ID", "")), {
-                                    "Mira review status (owner)": review_row.get("Review status", "Not reviewed"),
-                                    "Mira corrected intent (owner)": review_row.get("Correct intent", "Not set"),
-                                    "Mira review notes (owner)": review_row.get("Review notes", ""),
-                                }))
-                            st.success(f"Saved {saved:,} Mira review item(s).")
-                            st.rerun()
+                            from owner_approvals import stage
+                            changes=[(str(row.get("Inquiry ID", "")),{
+                                "Mira review status (owner)":row.get("Review status", "Not reviewed"),
+                                "Mira corrected intent (owner)":row.get("Correct intent", "Not set"),
+                                "Mira review notes (owner)":row.get("Review notes", "")}) for _,row in reviewed.iterrows()]
+                            def apply_reviews(rows=changes):
+                                for identifier,fields in rows:
+                                    if not update_inquiry_fields(identifier,fields):
+                                        raise ValueError('An inquiry could not be updated: '+identifier)
+                            stage('mira_reviews','Mira quality review updates',apply_reviews)
                     else:
                         st.info("No conversations in this period are currently flagged for review.")
 
@@ -1996,11 +2007,12 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
                             },
                             key=f"mira_learning_library_{editor_key}",
                         )
-                        save_library = st.form_submit_button("Save Learning Library", type="primary")
+                        save_library = st.form_submit_button("Add learning changes to owner review", type="primary")
                     if save_library:
-                        saved_rules = save_learning_rules(updated_rules.to_dict("records"))
-                        st.success(f"Saved {len(saved_rules):,} learning rule(s); {len(active_learning_guidance(saved_rules)):,} approved rule(s) will guide future AI replies.")
-                        st.rerun()
+                        from owner_approvals import stage
+                        rules=updated_rules.to_dict("records")
+                        stage('learning','Mira Learning Library changes (including selected approval statuses)',
+                              lambda rows=rules: save_learning_rules(rows))
 
                     preview_columns = ["User ID", "Customer name", "Preferred form of address", "Details shared by customer", "Inquiry ID", "Conversation ID", "Conversation status", "Chat ended at (Asia/Kolkata)", "Conversation close reason", "Final conversation transcript", "Timestamp (Asia/Kolkata)", "Language", "Conversation topic", "Customer tone signal", "Customer satisfaction signal", "Customer interest signal", "Budget mentioned signal", "Customer budget / price stated", "Purchase value / offer stated", "Property type mentioned", "Location mentioned", "Preferred size stated", "Follow-up requested signal", "Follow-up method", "Follow-up methods", "Follow-up summary", "Follow-up schedule status", "Follow-up cadence", "Follow-up consent timestamp (Asia/Kolkata)", "Next follow-up time (Asia/Kolkata)", "Human handoff requested signal", "Listing status asked signal", "Sale outcome mentioned signal", "User inquiry", "Assistant response", "Response type", "Matching records", *owner_fields]
                     preview = pd.DataFrame(customer_summary_rows(filtered_rows)).tail(10).iloc[::-1]
