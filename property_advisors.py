@@ -14,7 +14,7 @@ from agent_runtime import INDIA_TZ
 def schema(c):
     from visit_attendance import schema as attendance_schema
     attendance_schema(c)
-    c.execute("""CREATE TABLE IF NOT EXISTS property_advisors (
+    c.execute("""CREATE TABLE IF NOT EXISTS property_visit_advisors (
         property_key TEXT PRIMARY KEY, advisor TEXT NOT NULL, email TEXT NOT NULL,
         active TEXT NOT NULL, revision TEXT NOT NULL, updated_at TEXT NOT NULL)""")
     c.execute("""CREATE TABLE IF NOT EXISTS advisor_register_delivery (
@@ -26,7 +26,7 @@ def schema(c):
         id TEXT PRIMARY KEY, property_key TEXT NOT NULL, actor TEXT NOT NULL,
         detail TEXT NOT NULL, updated_at TEXT NOT NULL)""")
     if getattr(c,'shared',False):
-        for table in ('property_advisors','advisor_register_delivery','advisor_assignment_history'):
+        for table in ('property_visit_advisors','advisor_register_delivery','advisor_assignment_history'):
             c.execute('ALTER TABLE '+table+' ENABLE ROW LEVEL SECURITY')
 
 
@@ -38,14 +38,14 @@ def save_assignment(property_key, advisor, email, *, active=True, actor='Owner',
         schema(c)
         if not c.execute('SELECT id FROM property_visit_requests WHERE property_key=?',(property_key,)).fetchone():
             raise ValueError('Choose a property from the recorded visits.')
-        old=c.execute('SELECT * FROM property_advisors WHERE property_key=?',(property_key,)).fetchone()
+        old=c.execute('SELECT * FROM property_visit_advisors WHERE property_key=?',(property_key,)).fetchone()
         if old and (old['advisor'],old['email'],old['active'])==(advisor,email,'Yes' if active else 'No'):
             return
         stamp=datetime.now(INDIA_TZ).isoformat()
         # Withdraw existing bearer access when assignment changes or is disabled.
         c.execute("UPDATE advisor_visit_registers SET revoked='Yes' WHERE property_key=?",(property_key,))
         c.execute("UPDATE advisor_register_delivery SET status='cancelled' WHERE token IN (SELECT token FROM advisor_visit_registers WHERE property_key=?) AND status='queued'",(property_key,))
-        c.execute('''INSERT INTO property_advisors(property_key,advisor,email,active,revision,updated_at)
+        c.execute('''INSERT INTO property_visit_advisors(property_key,advisor,email,active,revision,updated_at)
             VALUES(?,?,?,?,?,?) ON CONFLICT(property_key) DO UPDATE SET
             advisor=excluded.advisor,email=excluded.email,active=excluded.active,
             revision=excluded.revision,updated_at=excluded.updated_at''',
@@ -57,7 +57,7 @@ def save_assignment(property_key, advisor, email, *, active=True, actor='Owner',
 def assignments(db_path=FOLLOWUP_DB):
     with _connect(db_path) as c:
         schema(c)
-        return [dict(r) for r in c.execute('SELECT * FROM property_advisors').fetchall()]
+        return [dict(r) for r in c.execute('SELECT * FROM property_visit_advisors').fetchall()]
 
 
 def run_advisor_worker(config, db_path=FOLLOWUP_DB, *, now=None):
@@ -72,7 +72,7 @@ def run_advisor_worker(config, db_path=FOLLOWUP_DB, *, now=None):
     with _connect(db_path) as c:
         schema(c)
         rows=c.execute("""SELECT v.*,a.advisor,a.email,a.revision FROM property_visit_requests v
-            JOIN property_advisors a ON a.property_key=v.property_key
+            JOIN property_visit_advisors a ON a.property_key=v.property_key
             WHERE v.status='Confirmed' AND a.active='Yes'""").fetchall()
         for v in rows:
             at=datetime.fromisoformat(v['visit_at']);expiry=at.replace(hour=23,minute=59,second=59)+timedelta(days=7)
@@ -93,7 +93,7 @@ def run_advisor_worker(config, db_path=FOLLOWUP_DB, *, now=None):
             from owner_approvals import is_approved
             if not is_approved(c,'advisor',item['id']):continue
             v=c.execute('''SELECT v.*,a.advisor,a.email,a.revision,a.active,r.revoked,r.expires_at
-                FROM property_visit_requests v JOIN property_advisors a ON a.property_key=v.property_key
+                FROM property_visit_requests v JOIN property_visit_advisors a ON a.property_key=v.property_key
                 JOIN advisor_visit_registers r ON r.token=? WHERE v.id=?''',(item['token'],item['visit_id'])).fetchone()
             valid=v and v['status']=='Confirmed' and v['visit_at']==item['visit_at'] and v['active']=='Yes' and v['revision']==item['revision'] and v['email']==item['recipient'] and not v['revoked'] and now<=datetime.fromisoformat(v['expires_at'])
             if not valid:

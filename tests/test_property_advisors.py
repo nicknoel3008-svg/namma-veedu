@@ -20,6 +20,18 @@ class AdvisorAutomationTests(unittest.TestCase):
         with _connect(self.db) as c:self.visits=[dict(r) for r in c.execute('SELECT * FROM property_visit_requests').fetchall()]
         self.cfg=dict(VISIT_EMAIL_ENABLED='true',FOLLOWUP_SMTP_HOST='smtp.example.com',FOLLOWUP_SMTP_USERNAME='sender',FOLLOWUP_SMTP_PASSWORD='test',FOLLOWUP_SMTP_FROM='sender@example.com',FOLLOWUP_PUBLIC_URL='https://example.com')
 
+    def test_directory_and_property_assignments_use_separate_storage(self):
+        from advisor_directory import save_advisor,advisors
+        from property_advisors import assignments
+        save_advisor('Property agent','Directory advisor','directory@example.com',self.db)
+        visit=self.visits[0]
+        save_assignment(visit['property_key'],'Site advisor','site@example.com',db_path=self.db)
+        self.assertEqual(assignments(self.db)[0]['property_key'],visit['property_key'])
+        self.assertEqual(advisors(self.db)[0]['name'],'Directory advisor')
+        save_advisor('Loan advisor','Loan advisor','loan@example.com',self.db)
+        self.assertEqual(len(assignments(self.db)),1)
+        self.assertEqual(len(advisors(self.db)),2)
+
 
     def approve_ready(self):
         from owner_approvals import approve_messages
