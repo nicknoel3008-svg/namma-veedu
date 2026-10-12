@@ -1522,13 +1522,20 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
             st.warning("Visit emails need configuration: " + "; ".join(visit_email_issues))
         else:
             st.info("The sender email is configured. The hosted background schedule sends reminders and follow-ups when they become due; delivery can be delayed between runs. ‘Sent’ means the email server accepted the message, not that it reached the customer’s inbox.")
-        if st.button("Load visit requests", key="load_visit_requests"):
-            st.session_state.visit_requests_loaded = True
+        st.session_state.visit_requests_loaded = True
         if st.session_state.get("visit_requests_loaded"):
             try:
                 visits = list_visit_requests()
                 if visits:
-                    visit_frame = pd.DataFrame(visits)
+                    from visit_journey import owner_journeys, set_advisor_status
+                    from crm_service import sync_visits, list_leads
+                    from crm_whatsapp import approval_rows
+                    journey_rows = owner_journeys()
+                    sync_visits(journey_rows)
+                    visit_frame = pd.DataFrame(approval_rows(visits,list_leads(),journey_rows))
+                    first_columns=['customer_name','property_title','visit_at','status','WhatsApp number','Email recipient','visit_email_consent','Confirmation email']
+                    visit_frame=visit_frame[first_columns+[col for col in visit_frame.columns if col not in first_columns]]
+                    st.caption('WhatsApp numbers fill automatically from saved customer details. A missing number must be supplied by the customer. WhatsApp confirmations are sent manually; email status appears beside each approval.')
                     edited_visits = st.data_editor(visit_frame, key="visit_requests_editor", hide_index=True,
                         disabled=[column for column in visit_frame.columns if column != "status"],
                         column_config={"status":st.column_config.SelectboxColumn("Visit status",options=list(VISIT_STATUSES),required=True)})
@@ -1540,7 +1547,6 @@ if owner_console_requested and st.session_state.owner_dashboard_authenticated:
                         st.rerun()
                     st.download_button("Download visit requests (.csv)",visit_frame.to_csv(index=False),file_name="namma_veedu_visit_requests.csv",mime="text/csv")
                     from visit_journey import owner_journeys, set_advisor_status
-                    journey_rows = owner_journeys()
                     st.markdown("##### Visit responses and advisor requests")
                     st.caption("Purchase interest reflects engagement only, not a calibrated purchase prediction. Advisor requests require manual contact and recorded consent.")
                     if journey_rows:

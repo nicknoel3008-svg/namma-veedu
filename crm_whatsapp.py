@@ -83,6 +83,23 @@ def recipient_number(lead, visits, visit=None):
     return ''
 
 
+def approval_rows(visits, leads, journeys):
+    """Display saved contacts and mail state beside the owner's decision."""
+    profiles={r.get('conversation_id'):r for r in leads if r.get('conversation_id')}
+    states={r['visit_id']:r for r in journeys}
+    rows=[]
+    for visit in visits:
+        lead=profiles.get(visit.get('conversation_id') or 'visit:'+visit['id'],{})
+        linked=[r for r in visits if r['user_id']==visit['user_id']]
+        phone=recipient_number(lead,linked,visit)
+        row=dict(visit)
+        row['WhatsApp number']=phone or 'Not provided — ask customer'
+        row['Confirmation email']=states.get(visit['id'],{}).get('confirmation email','Not sent')
+        row['Email recipient']=visit.get('followup_email') or (visit['contact_value'] if visit['contact_method']=='Email' else '')
+        rows.append(row)
+    return rows
+
+
 def render(lead,visits,actor):
     import streamlit as st
     from crm_service import add_note
