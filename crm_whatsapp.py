@@ -100,14 +100,14 @@ def approval_rows(visits, leads, journeys):
     return rows
 
 
-def render(lead,visits,actor):
+def render(lead,visits,actor, *, selected_visit=None):
     import streamlit as st
     from crm_service import add_note
     now=datetime.now(INDIA_TZ)
     st.caption('No paid messaging API. Review the draft, open WhatsApp, then press Send yourself. Opening WhatsApp does not prove sending or delivery.')
     visit=None
     options=['General follow-up']+[v['visit_id'] for v in visits if v['status']=='Confirmed' and not v.get('customer_purchase_confirmed_at')]
-    choice=st.selectbox('WhatsApp message context',options,format_func=lambda k: next((v['property_title']+' · '+v['visit_at'] for v in visits if v['visit_id']==k),k),key='crm_wa_context_'+lead['id'])
+    choice=selected_visit if selected_visit in options else st.selectbox('WhatsApp message context',options,format_func=lambda k: next((v['property_title']+' · '+v['visit_at'] for v in visits if v['visit_id']==k),k),key='crm_wa_context_'+lead['id'])
     visit=next((v for v in visits if v['visit_id']==choice),None)
     suffix=lead['id']+'_'+choice
     phone=st.text_input('Recipient WhatsApp number (+country code)',value=recipient_number(lead, visits, visit),key='crm_wa_phone_'+suffix)
@@ -118,7 +118,7 @@ def render(lead,visits,actor):
         kinds=(['confirmation'] if mixed else ['confirmation','reminder']) if now<at else ['feedback']
         if mixed and now>=at:
             st.info('Email handles the follow-up. An optional WhatsApp draft requires separate customer permission below.')
-        kind=st.selectbox('Message type',kinds,key='crm_wa_kind_'+suffix)
+        kind=('confirmation' if now<at else 'feedback') if selected_visit else st.selectbox('Message type',kinds,key='crm_wa_kind_'+suffix)
         if mixed:
             st.info('Send this confirmation manually. The scheduled email worker handles the one-hour reminder and later follow-ups independently.')
         elif reminder_due(visit,now):
@@ -146,9 +146,11 @@ def render(lead,visits,actor):
     except ValueError as error:
         st.error(str(error)); url=None
     if url:
-        st.link_button('1. Open customer chat in WhatsApp',url)
-        st.info('2. In WhatsApp, check the customer and message, then press Send. Return here afterward to save your send record.')
-    else: st.info('Enter the customer number and confirm permission to enable WhatsApp.')
+        st.link_button('Send via WhatsApp',url)
+        st.caption('Opens the customer chat with this prepared message. Press Send in WhatsApp to finish.')
+    else:
+        st.link_button('Send via WhatsApp','https://wa.me/',disabled=True)
+        st.info('Enter the customer number and confirm permission to enable WhatsApp.')
     sent=st.checkbox('I personally pressed Send in WhatsApp for this message.',key='crm_wa_sent_'+draft_key)
     st.caption('The button below only updates the CRM after you send in WhatsApp. It does not send a message.')
     if st.button('3. Save WhatsApp send record',disabled=not(consent and sent and url),key='crm_wa_record_'+draft_key):

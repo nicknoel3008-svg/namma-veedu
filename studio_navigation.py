@@ -70,9 +70,8 @@ def render_shortcut(topic):
             sync_visits([{**visit,'visit_id':selected}])
             lead=next(r for r in list_leads() if r['conversation_id']==(visit.get('conversation_id') or 'visit:'+selected))
         # Default straight to the selected booking rather than General follow-up.
-        st.session_state['crm_wa_context_'+lead['id']]=selected
         from visit_journey import owner_journeys
         journey=next(r for r in owner_journeys() if r['visit_id']==selected)
-        render(lead,[journey],str(st.session_state.get('mira_studio_identity') or 'Owner'))
+        render(lead,[journey],str(st.session_state.get('mira_studio_identity') or 'Owner'),selected_visit=selected)
         return True
     return False
