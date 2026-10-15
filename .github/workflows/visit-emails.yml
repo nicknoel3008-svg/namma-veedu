@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
+    inputs:
+      check_only:
+        description: Verify worker connection without sending emails
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -34,5 +39,7 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - run: python run_visit_worker.py --check
-      - run: python run_visit_worker.py
-      - run: python run_followup_worker.py --channel email
+      - if: ${{ inputs.check_only != true }}
+        run: python run_visit_worker.py
+      - if: ${{ inputs.check_only != true }}
+        run: python run_followup_worker.py --channel email

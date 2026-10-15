@@ -22,3 +22,9 @@ class EmailDeliveryTests(unittest.TestCase):
     def test_rejected_dispatch_is_not_reported_as_success(self,post):
         post.return_value=Mock(status_code=403)
         with self.assertRaises(ValueError):dispatch_worker('test-token')
+
+    @patch('email_delivery_ui.requests.post')
+    def test_connection_check_dispatch_cannot_send_emails(self,post):
+        post.return_value=Mock(status_code=204)
+        dispatch_worker('test-token',check_only=True)
+        self.assertEqual(post.call_args.kwargs['json'],{'ref':'main','inputs':{'check_only':True}})

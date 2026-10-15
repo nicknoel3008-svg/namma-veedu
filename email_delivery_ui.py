@@ -24,9 +24,9 @@ def delivery_rows(db_path=FOLLOWUP_DB):
           ORDER BY updated_at DESC""").fetchall()
     return [{'Customer':r['customer'],'Property':r['property'],'Email':r['kind'],'Status':display_status(r['status'],bool(r['approval'])),'Updated':r['updated_at']} for r in rows]
 
-def dispatch_worker(token):
+def dispatch_worker(token, *, check_only=False):
     if not token: raise ValueError('Connect the hosted worker before sending.')
-    response=requests.post(DISPATCH_URL,headers={'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},json={'ref':'main'},timeout=20)
+    response=requests.post(DISPATCH_URL,headers={'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},json={'ref':'main','inputs':{'check_only':True}} if check_only else {'ref':'main'},timeout=20)
     if response.status_code!=204:
         raise ValueError('The hosted worker could not start. Check its connection and GitHub Actions permission.')
 
@@ -45,6 +45,12 @@ def render():
         if not token:
             st.info('One-time connection needed: add GITHUB_WORKFLOW_TOKEN in Streamlit secrets with Actions write permission for this repository. Enter the token privately, never in chat.')
             st.link_button('Open hosted worker',WORKFLOW_URL)
+        if st.button('Test worker connection',disabled=not token,key='test_email_worker_connection'):
+            try:
+                dispatch_worker(token,check_only=True)
+                st.success('GitHub accepted the connection test: workflow-start permission verified. This test does not send emails. Check the hosted worker for configuration-test results.')
+            except (ValueError,requests.RequestException):
+                st.error('Connection test could not be confirmed. Check the token repository selection, expiry and Actions write permission, then check GitHub run history before retrying.')
         if st.button('Send approved emails now',disabled=not token or not any(r['Status']=='Approved / queued' for r in rows),key='send_approved_emails_now'):
             try:
                 dispatch_worker(token)
