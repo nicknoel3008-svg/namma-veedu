@@ -248,8 +248,8 @@ def journey_summary(visit, *, now=None):
     next_step = ('Review requested new slot' if status=='Requested' else
                  'Visit cancelled / declined' if status in ('Cancelled','Declined') else
                  'Request attendance and property feedback' if attendance=='Awaiting response' else
+                 'Follow up on requested assistance' if visit.get('advisor_consent')=='Yes' and visit.get('advisor_status') not in ('Completed','Closed') else
                  'Assist with revised preferences' if visit.get('explore_consent')=='Yes' else
-                 'Follow up on requested assistance' if visit.get('advisor_consent')=='Yes' else
                  'Ask whether further assistance is needed' if visit.get('purchase_intent')=='Interested' else
                  'Review decline reason and offer assistance or more properties' if visit.get('purchase_intent')=='Not interested' else
                  'Check attendance after the visit' if attendance=='Not yet due' else 'Review customer feedback')
