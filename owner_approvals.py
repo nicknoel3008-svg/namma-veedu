@@ -118,3 +118,6 @@ def render():
             else:st.warning('Some changes could not be saved. Their drafts remain for correction; message approval was withheld.')
         if pending and st.button('Discard staged changes',key='owner_discard_drafts'):
             pending.clear();st.rerun()
+
+    from email_delivery_ui import render as render_email_delivery
+    render_email_delivery()
