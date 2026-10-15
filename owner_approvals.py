@@ -49,9 +49,11 @@ def prepare_current_actions(db_path=FOLLOWUP_DB):
 
 def pending_messages(db_path=FOLLOWUP_DB):
     messages=[]
+    from advisor_actions import schema as action_schema
     from property_advisors import schema as advisor_schema
     with _connect(db_path) as c:
         advisor_schema(c)
+        action_schema(c)
         schema(c)
         for r in c.execute("SELECT d.id,d.recipient,v.property_title,v.visit_at FROM advisor_register_delivery d JOIN property_visit_requests v ON v.id=d.visit_id WHERE d.status='queued'").fetchall():
             if not is_approved(c,'advisor',r['id']):messages.append(('advisor',r['id'],r['recipient'],r['property_title'],r['visit_at'],'Advisor attendance register'))
@@ -66,6 +68,8 @@ def pending_messages(db_path=FOLLOWUP_DB):
             for target in ('customer','owner'):
                 identifier=r['id']+':'+target
                 if r[target+'_mail']=='queued' and not is_approved(c,'purchase',identifier):messages.append(('purchase',identifier,r[target+'_email'],'Purchase confirmation',r['confirmed_at'],target+' receipt'))
+        for r in c.execute("SELECT r.*,v.property_title FROM advisor_action_requests r JOIN property_visit_requests v ON v.id=r.visit_id WHERE r.mail_status='queued'").fetchall():
+            if not is_approved(c,'advisor_action',r['id']):messages.append(('advisor_action',r['id'],r['recipient'],r['property_title'],r['visit_at'],r['kind']))
     return messages
 
 

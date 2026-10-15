@@ -2,11 +2,12 @@
 SECTIONS = {
     'Reports and Mira': ['Overview and reports'],
     'Visits and messaging': ['Approve a visit', 'WhatsApp confirmations', 'Visit records and email status'],
-    'Customers and CRM': ['Customer CRM', 'Property advisor setup', 'Team actions', 'Customer journey and outcomes'],
+    'Customers and CRM': ['Customer CRM', 'Property advisor setup', 'Advisor action requests', 'Team actions', 'Customer journey and outcomes'],
     'Settings and help': ['Team access', 'Health and readiness', 'Website blueprint'],
 }
 
 TOPIC_DETAILS = {
+    'Advisor action requests': 'advisor availability acceptance loan assistance accept decline progress reschedule',
     'Property advisor setup': 'property advisor assignment email automatic register attendance link setup location',
     'Team actions': 'manual pending exceptions assistance tasks callback overdue conflict missing advisor customer',
     'Approve a visit': 'approve approval booking appointment schedule property access',
@@ -64,6 +65,10 @@ def render_shortcut(topic):
     if topic=='Property advisor setup':
         from property_advisors import render_setup
         render_setup()
+        return True
+    if topic=='Advisor action requests':
+        from advisor_actions import render_owner
+        render_owner()
         return True
     if topic=='Team actions':
         from visit_actions import render_queue

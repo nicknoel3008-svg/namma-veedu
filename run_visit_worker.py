@@ -41,6 +41,10 @@ def main(argv=None, _attempt=0):
         advisor_sent,advisor_failed=run_advisor_worker(config)
         print(f'Advisor register emails: {advisor_sent} submitted, {advisor_failed} need review.')
         failed+=advisor_failed
+        from advisor_actions import run_worker as run_advisor_action_worker
+        action_sent,action_failed=run_advisor_action_worker(config)
+        sent+=action_sent;failed+=action_failed
+        print(f'Advisor action emails: {action_sent} submitted, {action_failed} need review.')
         from purchase_confirmation import run_purchase_worker
         purchase_sent,purchase_failed=run_purchase_worker(config)
         sent+=purchase_sent;failed+=purchase_failed

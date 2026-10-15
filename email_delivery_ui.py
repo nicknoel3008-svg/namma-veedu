@@ -14,6 +14,8 @@ def delivery_rows(db_path=FOLLOWUP_DB):
     from owner_approvals import schema
     with _connect(db_path) as c:
         schema(c)
+        from advisor_actions import schema as action_schema
+        action_schema(c)
         rows=c.execute("""SELECT v.customer_name AS customer,v.property_title AS property,o.kind,o.status,o.updated_at,a.id AS approval
           FROM visit_email_outbox o JOIN property_visit_requests v ON v.id=o.visit_id
           LEFT JOIN owner_message_approvals a ON a.id='visit:' || o.id
@@ -21,6 +23,10 @@ def delivery_rows(db_path=FOLLOWUP_DB):
           SELECT v.customer_name,v.property_title,'Advisor register',d.status,d.updated_at,a.id
           FROM advisor_register_delivery d JOIN property_visit_requests v ON v.id=d.visit_id
           LEFT JOIN owner_message_approvals a ON a.id='advisor:' || d.id
+          UNION ALL
+          SELECT v.customer_name,v.property_title,r.kind,r.mail_status,r.updated_at,a.id
+          FROM advisor_action_requests r JOIN property_visit_requests v ON v.id=r.visit_id
+          LEFT JOIN owner_message_approvals a ON a.id='advisor_action:' || r.id
           ORDER BY updated_at DESC""").fetchall()
     return [{'Customer':r['customer'],'Property':r['property'],'Email':r['kind'],'Status':display_status(r['status'],bool(r['approval'])),'Updated':r['updated_at']} for r in rows]
 

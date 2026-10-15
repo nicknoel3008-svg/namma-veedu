@@ -237,6 +237,8 @@ FOLLOWUP_EMAIL_CONFIG = {
 FOLLOWUP_EMAIL_READY = email_config_ready(FOLLOWUP_EMAIL_CONFIG)
 from visit_journey_ui import render_visit_response, render_purchase_rating
 render_purchase_rating()
+from advisor_actions import render_response as render_advisor_action_response
+render_advisor_action_response()
 from visit_attendance import render_register
 render_register()
 render_visit_response()
