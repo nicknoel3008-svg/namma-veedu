@@ -41,8 +41,11 @@ def render():
     if not st.session_state.get('owner_dashboard_authenticated') or st.session_state.get('mira_studio_role','Owner')!='Owner':return
     with st.expander('Email delivery — send approved emails now'):
         st.caption('Start the hosted worker for all eligible Owner-approved emails. This does not approve pending messages. Expired messages are skipped; SMTP acceptance does not confirm inbox delivery.')
+        cached_rows=st.cache_data(ttl=30,show_spinner=False)(delivery_rows)
+        st.button('Refresh email statuses',key='refresh_email_delivery',on_click=cached_rows.clear)
+        st.caption('Email statuses refresh at least every 30 seconds when this page runs. Use Refresh email statuses for the latest records.')
         try:
-            rows=delivery_rows()
+            rows=cached_rows()
             st.dataframe(rows,hide_index=True)
         except Exception:
             rows=[]
@@ -63,4 +66,3 @@ def render():
                 st.success('Hosted worker requested. Refresh email statuses after it finishes; this is not delivery confirmation.')
             except (ValueError,requests.RequestException):
                 st.error('The worker could not be confirmed as started. Check GitHub run history before trying again.')
-        st.button('Refresh email statuses',key='refresh_email_delivery')

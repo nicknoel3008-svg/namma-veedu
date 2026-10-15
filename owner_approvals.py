@@ -91,7 +91,6 @@ def render():
         for label,_ in pending.values():st.write('• '+label)
         messages=[]
         try:
-            prepare_current_actions()
             messages=pending_messages()
         except Exception:
             st.warning('Email approvals could not load. Draft changes can still be reviewed; email approvals remain blocked.')
