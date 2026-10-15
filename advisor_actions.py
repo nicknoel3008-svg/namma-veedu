@@ -141,6 +141,14 @@ def render_response():
     st.stop()
 
 
+def request_types(visit):
+    options=[]
+    if visit['status']=='Requested':options.append('Visit availability')
+    if visit.get('advisor_consent')=='Yes' and visit.get('assistance') in ('Both','Loan advisor'):
+        options.append('Loan assistance')
+    return options
+
+
 def render_owner():
     import streamlit as st
     if not st.session_state.get('owner_dashboard_authenticated'):return
@@ -153,7 +161,11 @@ def render_owner():
     st.dataframe([dict(r) for r in rows],hide_index=True)
     if not visits:return
     selected=st.selectbox('Customer visit for advisor request',visits,format_func=lambda v:v['customer_name']+' - '+v['property_title']+' - '+v['visit_at'])
-    kind=st.selectbox('Advisor request type',['Loan assistance','Visit availability'])
+    options=request_types(selected)
+    if not options:
+        st.info('No availability request or consented loan assistance is pending for this visit.')
+        return
+    kind=st.selectbox('Advisor request type',options,key='advisor_request_type_'+selected['id'])
     try:
         with _connect(FOLLOWUP_DB) as c:advisor=target(c,selected,kind)
         st.write('Assigned advisor: '+advisor['advisor']+' ('+advisor['email']+')')

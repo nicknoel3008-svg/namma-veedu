@@ -9,6 +9,10 @@ from followup_service import _connect, schedule_email_followup, send_chat_end_re
 
 
 class ChatEndEmailTests(unittest.TestCase):
+    def setUp(self):
+        approval=patch('owner_approvals.is_approved',return_value=True)
+        approval.start();self.addCleanup(approval.stop)
+
     config = dict(FOLLOWUP_SMTP_HOST='smtp.example.com', FOLLOWUP_SMTP_USERNAME='sender',
                   FOLLOWUP_SMTP_PASSWORD='test', FOLLOWUP_SMTP_FROM='sender@example.com',
                   FOLLOWUP_PUBLIC_URL='https://example.com')

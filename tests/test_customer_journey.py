@@ -106,6 +106,7 @@ class CustomerJourneyTests(unittest.TestCase):
         app=AppTest.from_file(str(Path(__file__).parent/'owner_dashboard_sandbox.py'),default_timeout=60)
         app.session_state['qa_journeys']=owner_journeys(self.db)
         app.session_state['qa_events']=timeline(self.db)
+        app.session_state['studio_search']='Customer journey and outcomes'
         app.run()
         next(button for button in app.button if button.label=='Load customer journey').click().run()
         self.assertFalse(app.exception)

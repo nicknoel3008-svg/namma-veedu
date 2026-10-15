@@ -10,6 +10,10 @@ from followup_service import _connect, schedule_email_followup, send_due_followu
 
 
 class FollowupDeliveryTests(unittest.TestCase):
+    def setUp(self):
+        approval=patch('owner_approvals.is_approved',return_value=True)
+        approval.start();self.addCleanup(approval.stop)
+
     def test_delayed_worker_spaces_messages_and_completes_sequence(self):
         config = {
             "FOLLOWUP_SMTP_HOST": "smtp.example.com",

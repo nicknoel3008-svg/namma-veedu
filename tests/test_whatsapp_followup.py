@@ -19,6 +19,9 @@ CONFIG = {"FOLLOWUP_WHATSAPP_ENABLED":"true", "WHATSAPP_ACCESS_TOKEN":"test-secr
 
 class WhatsAppFollowupTests(unittest.TestCase):
     def setUp(self):
+        # These delivery tests model messages already approved by the Owner.
+        approval=patch('owner_approvals.is_approved',return_value=True)
+        approval.start();self.addCleanup(approval.stop)
         self.folder = TemporaryDirectory()
         self.addCleanup(self.folder.cleanup)
         self.db = Path(self.folder.name)/"queue.sqlite3"

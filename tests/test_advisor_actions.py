@@ -57,3 +57,9 @@ class AdvisorActionTests(unittest.TestCase):
         respond(token,'Accepted',db_path=self.db)
         with _connect(self.db) as c:status=c.execute('SELECT status FROM property_visit_requests WHERE id=?',(self.visit,)).fetchone()['status']
         self.assertEqual(status,'Requested')
+
+    def test_owner_offers_only_requests_supported_by_customer_evidence(self):
+        from advisor_actions import request_types
+        self.assertEqual(request_types({'status':'Requested','advisor_consent':'','assistance':''}),['Visit availability'])
+        self.assertEqual(request_types({'status':'Confirmed','advisor_consent':'Yes','assistance':'Loan advisor'}),['Loan assistance'])
+        self.assertEqual(request_types({'status':'Confirmed','advisor_consent':'','assistance':''}),[])

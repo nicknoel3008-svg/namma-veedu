@@ -12,6 +12,9 @@ from visit_journey import run_visit_worker, record_response, owner_journeys, set
 
 class VisitJourneyTests(unittest.TestCase):
     def setUp(self):
+        # These delivery tests model messages already approved by the Owner.
+        approval=patch('owner_approvals.is_approved',return_value=True)
+        approval.start();self.addCleanup(approval.stop)
         self.tmp=TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         self.db=Path(self.tmp.name)/'queue.sqlite3'
         self.at=(datetime.now(INDIA_TZ)+timedelta(days=2)).replace(second=0,microsecond=0)
